@@ -4,6 +4,8 @@ import fs from 'fs'
 import { ensureExtensionBuilt } from './setup'
 import { buildExperimentsCacheSeed } from '../helpers/experiments-cache-seed'
 import { waitForConfigInitialization } from '../helpers/config-readiness'
+import { createProviderServer, createLiveProvider, type ProviderController } from '../helpers/provider-server'
+import { installProviderGuard } from '../helpers/provider-network'
 
 // In CI we run e2e against the production bundle (chrome-mv3-prod) so any
 // Plasmo/Parcel bundling regression surfaces before reaching Chrome Web Store.
@@ -33,6 +35,8 @@ function ensureSeedFileExists() {
 }
 
 type ExtFixtures = {
+  liveAI: boolean
+  aiProvider: ProviderController
   context: BrowserContext
   extensionId: string
   extensionUrl: (p: string) => string
@@ -42,7 +46,14 @@ type ExtFixtures = {
 }
 
 export const test = base.extend<ExtFixtures>({
-  context: async ({}, use, testInfo) => {
+  liveAI: [false, { option: true }],
+  aiProvider: async ({ liveAI }, use) => {
+    const provider = liveAI
+      ? createLiveProvider(process.env.PLASMO_PUBLIC_ANTHROPIC_ENDPOINT, process.env.PLASMO_PUBLIC_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY)
+      : await createProviderServer()
+    try { await use(provider); provider.assertComplete() } finally { await provider.close() }
+  },
+  context: async ({ aiProvider, liveAI }, use, testInfo) => {
     // Extension build is already ensured in global setup
     // Don't rebuild here to avoid multiple rebuilds per test
 
@@ -71,6 +82,8 @@ export const test = base.extend<ExtFixtures>({
       slowMo: process.env.SLOW_MO ? parseInt(process.env.SLOW_MO) : undefined,
       viewport: { width: 1920, height: 1080 },
     })
+
+    if (!liveAI) await installProviderGuard(context, aiProvider)
 
     // Keep timing/status evidence for live flakes without headers, keys,
     // request bodies or customer response data.
@@ -114,16 +127,8 @@ export const test = base.extend<ExtFixtures>({
     await seedPage.goto(seedUrl)
     await seedPage.waitForFunction(() => typeof (window as any).seed === 'function', { timeout: 5000 })
 
-    // When PLASMO_PUBLIC_ANTHROPIC_ENDPOINT points at a proxy (e.g. the
-    // internal llmproxy.absmartly-dev.com), prefer PLASMO_PUBLIC_ANTHROPIC_API_KEY
-    // because the proxy expects its own key format (llmp_sk_...). Only fall
-    // back to ANTHROPIC_API_KEY (the direct Anthropic key, sk-ant-...) when
-    // no endpoint override is configured and we're calling api.anthropic.com
-    // directly.
-    const anthropicEndpoint = process.env.PLASMO_PUBLIC_ANTHROPIC_ENDPOINT || ''
-    const anthropicApiKey = anthropicEndpoint
-      ? (process.env.PLASMO_PUBLIC_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY || '')
-      : (process.env.ANTHROPIC_API_KEY || process.env.PLASMO_PUBLIC_ANTHROPIC_API_KEY || '')
+    const anthropicEndpoint = aiProvider.endpoint
+    const anthropicApiKey = aiProvider.apiKey
 
     const defaultConfig = {
       apiKey: process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || '',
@@ -131,11 +136,9 @@ export const test = base.extend<ExtFixtures>({
       authMethod: process.env.PLASMO_PUBLIC_ABSMARTLY_AUTH_METHOD || 'apikey',
       domChangesFieldName: '__dom_changes',
       vibeStudioEnabled: true,
-      aiProvider: anthropicApiKey ? 'anthropic-api' : 'claude-subscription',
+      aiProvider: 'anthropic-api',
       aiApiKey: '',
-      // Use the Anthropic model ALIASES (no date suffix) so tests work both
-      // against api.anthropic.com direct and against the internal proxy at
-      // llmproxy.absmartly-dev.com which only maps alias names.
+      // Match the alias used by the deterministic native Anthropic contract.
       llmModel: 'claude-sonnet-4-5',
       providerModels: { 'anthropic-api': 'claude-sonnet-4-5' },
       providerEndpoints: anthropicEndpoint ? { 'anthropic-api': anthropicEndpoint } : {}
@@ -261,8 +264,24 @@ export const test = base.extend<ExtFixtures>({
     await use((p: string) => `chrome-extension://${extensionId}/${p.replace(/^\//, '')}`)
   },
 
-  seedStorage: async ({ context, extensionUrl }, use) => {
+  seedStorage: async ({ context, extensionUrl, aiProvider }, use) => {
     const fn = async (kv: Record<string, unknown>) => {
+      // Register configured AI transports before storage events can trigger a
+      // fetch. Office endpoints and target-page URLs are not provider routes.
+      for (const [key, raw] of Object.entries(kv)) {
+        let value = raw
+        if (typeof raw === 'string') {
+          try { value = JSON.parse(raw) } catch { /* Storage can contain raw strings. */ }
+        }
+        if (key.replace(/^plasmo:/, '') === 'absmartly-config' && value && typeof value === 'object') {
+          const endpoints = (value as { providerEndpoints?: Record<string, string> }).providerEndpoints || {}
+          for (const endpoint of Object.values(endpoints)) {
+            if (typeof endpoint === 'string' && endpoint) aiProvider.registerEndpoint(endpoint)
+          }
+        }
+        if (key.replace(/^plasmo:/, '') === 'claudeBridgeEndpoint' && typeof value === 'string' && value) aiProvider.registerEndpoint(value)
+        if (key.replace(/^plasmo:/, '') === 'claudeBridgePort' && value) aiProvider.registerEndpoint(`http://localhost:${value}`)
+      }
       const page = await context.newPage()
       await page.goto(extensionUrl('tests/seed.html'))
 

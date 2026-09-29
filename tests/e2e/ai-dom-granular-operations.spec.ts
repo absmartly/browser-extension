@@ -1,121 +1,65 @@
-import { test, expect } from '../fixtures/extension'
-import { type Page, type FrameLocator } from '@playwright/test'
-import { log, initializeTestLogging, debugWait } from './utils/test-helpers'
-import { spawn, ChildProcess } from 'child_process'
-import path from 'path'
-import { createServer, type Server } from 'node:http'
-import { readFileSync } from 'node:fs'
+import { type FrameLocator, type Page } from "@playwright/test"
 
-const TEST_PAGE_PATH = path.join(__dirname, '..', 'test-pages', 'visual-editor-test.html')
+import { expect, test } from "../fixtures/extension"
+import { log } from "./utils/test-helpers"
 
-const BRIDGE_PORTS = [3000, 3001, 3002, 3003, 3004]
-
-let bridgeProcess: ChildProcess | null = null
-let bridgeWasStarted = false
-let activeBridgePort: number | null = null
-let fixtureServer: Server
-let fixtureUrl: string
-
-// Bridge process is spawned once per file and shared across tests; running
-// these in parallel would race the port-discovery + spawn logic. Default
-// mode keeps this file sequential, but unlike serial it still runs each
-// independent test after a failure instead of suppressing five assertions.
-test.describe.configure({ mode: 'default' })
-
-async function isBridgeRunning(port: number): Promise<boolean> {
-  try {
-    const response = await fetch(`http://localhost:${port}/health`, {
-      method: 'GET',
-      signal: AbortSignal.timeout(2000)
-    })
-    return response.ok
-  } catch {
-    return false
-  }
+const buttonChange = (color: string) => ({
+  selector: ".btn",
+  type: "style",
+  value: { "background-color": color }
+})
+const headingChange = (color: string) => ({
+  selector: "h1, h2, h3, h4, h5, h6",
+  type: "style",
+  value: { color, "font-weight": "bold" }
+})
+const paragraphChange = {
+  selector: "p",
+  type: "style",
+  value: { "font-style": "italic" }
 }
 
-async function findAvailablePort(): Promise<number | null> {
-  log('Checking for available bridge ports...')
-  for (const port of BRIDGE_PORTS) {
-    const isRunning = await isBridgeRunning(port)
-    if (isRunning) {
-      log(`✓ Bridge already running on port ${port}`)
-      activeBridgePort = port
-      return port
+function mutation(
+  promptIncludes: string,
+  action: string,
+  domChanges: unknown[],
+  targetSelectors?: string[]
+) {
+  return {
+    promptIncludes,
+    response: {
+      tools: [
+        {
+          id: `dom-${promptIncludes.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 60)}`,
+          name: "dom_changes_generator",
+          input: {
+            action,
+            domChanges,
+            response: `Applied ${action} changes.`,
+            ...(targetSelectors ? { targetSelectors } : {})
+          }
+        }
+      ]
     }
   }
-  return null
 }
 
-async function startBridge(): Promise<number> {
-  log('Starting Claude Code Bridge server (will auto-select port)...')
-
-  return new Promise((resolve, reject) => {
-    bridgeProcess = spawn('claude-code-bridge', [], {
-      env: process.env,
-      stdio: ['ignore', 'pipe', 'pipe']
-    })
-
-    let portDetected = false
-
-    bridgeProcess.stdout?.on('data', (data) => {
-      const output = data.toString()
-      log(`[Bridge] ${output.trim()}`)
-
-      const portMatch = output.match(/localhost:(\d+)/)
-      if (portMatch && !portDetected) {
-        const port = parseInt(portMatch[1])
-        activeBridgePort = port
-        portDetected = true
-        bridgeWasStarted = true
-        log(`✓ Bridge started successfully on port ${port}`)
-        resolve(port)
-      }
-    })
-
-    bridgeProcess.stderr?.on('data', (data) => {
-      log(`[Bridge Error] ${data.toString().trim()}`)
-    })
-
-    bridgeProcess.on('error', (err) => {
-      log(`❌ Bridge process error: ${err.message}`)
-      reject(err)
-    })
-
-    bridgeProcess.on('exit', (code) => {
-      if (code !== 0 && !bridgeWasStarted) {
-        reject(new Error(`Bridge exited with code ${code}`))
-      }
-    })
-
-    setTimeout(() => {
-      if (!portDetected) {
-        bridgeProcess?.kill('SIGTERM')
-        reject(new Error('Bridge startup timeout after 10 seconds'))
-      }
-    }, 10000)
-  })
-}
-
-async function stopBridge(): Promise<void> {
-  if (bridgeProcess && bridgeWasStarted) {
-    log('Stopping Claude Code Bridge server...')
-    bridgeProcess.kill('SIGTERM')
-    bridgeProcess = null
-    bridgeWasStarted = false
-  }
-}
-
-async function setupExperimentAndAI(testPage: Page, extensionUrl: (path: string) => string): Promise<FrameLocator> {
+async function setupExperimentAndAI(
+  testPage: Page,
+  extensionUrl: (path: string) => string
+): Promise<FrameLocator> {
   // Inject sidebar as iframe
   await testPage.evaluate((extUrl) => {
-    const originalPadding = document.body.style.paddingRight || '0px'
-    document.body.setAttribute('data-absmartly-original-padding-right', originalPadding)
-    document.body.style.transition = 'padding-right 0.3s ease-in-out'
-    document.body.style.paddingRight = '384px'
+    const originalPadding = document.body.style.paddingRight || "0px"
+    document.body.setAttribute(
+      "data-absmartly-original-padding-right",
+      originalPadding
+    )
+    document.body.style.transition = "padding-right 0.3s ease-in-out"
+    document.body.style.paddingRight = "384px"
 
-    const container = document.createElement('div')
-    container.id = 'absmartly-sidebar-root'
+    const container = document.createElement("div")
+    container.id = "absmartly-sidebar-root"
     container.style.cssText = `
       position: fixed;
       top: 0;
@@ -134,8 +78,8 @@ async function setupExperimentAndAI(testPage: Page, extensionUrl: (path: string)
       transition: transform 0.3s ease-in-out;
     `
 
-    const iframe = document.createElement('iframe')
-    iframe.id = 'absmartly-sidebar-iframe'
+    const iframe = document.createElement("iframe")
+    iframe.id = "absmartly-sidebar-iframe"
     iframe.style.cssText = `
       width: 100%;
       height: 100%;
@@ -145,377 +89,273 @@ async function setupExperimentAndAI(testPage: Page, extensionUrl: (path: string)
 
     container.appendChild(iframe)
     document.body.appendChild(container)
-  }, extensionUrl('tabs/sidebar.html'))
+  }, extensionUrl("tabs/sidebar.html"))
 
-  const sidebar = testPage.frameLocator('#absmartly-sidebar-iframe')
-  await sidebar.locator('body').waitFor({ timeout: 10000 })
-  log('✓ Sidebar injected and loaded')
+  const sidebar = testPage.frameLocator("#absmartly-sidebar-iframe")
+  await sidebar.locator("body").waitFor({ timeout: 10000 })
+  log("✓ Sidebar injected and loaded")
 
   const createButton = sidebar.locator('button[title="Create New Experiment"]')
-  await createButton.waitFor({ state: 'visible', timeout: 10000 })
+  await createButton.waitFor({ state: "visible", timeout: 10000 })
   await createButton.click()
 
-  const fromScratchButton = sidebar.locator('#from-scratch-button')
-  await fromScratchButton.waitFor({ state: 'visible', timeout: 5000 })
+  const fromScratchButton = sidebar.locator("#from-scratch-button")
+  await fromScratchButton.waitFor({ state: "visible", timeout: 5000 })
   await fromScratchButton.click()
 
-  await sidebar.locator('#display-name-label').waitFor({ state: 'visible', timeout: 10000 })
-  log('✓ Experiment editor opened')
+  await sidebar
+    .locator("#display-name-label")
+    .waitFor({ state: "visible", timeout: 10000 })
+  log("✓ Experiment editor opened")
 
-  await sidebar.locator('[data-dom-changes-section="true"]').first().scrollIntoViewIfNeeded()
+  await sidebar
+    .locator('[data-dom-changes-section="true"]')
+    .first()
+    .scrollIntoViewIfNeeded()
 
-  const generateWithAIButton = sidebar.locator('#generate-with-ai-button').first()
-  await generateWithAIButton.waitFor({ state: 'visible', timeout: 10000 })
+  const generateWithAIButton = sidebar
+    .locator("#generate-with-ai-button")
+    .first()
+  await generateWithAIButton.waitFor({ state: "visible", timeout: 10000 })
   await generateWithAIButton.evaluate((button) => {
-    button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+    button.dispatchEvent(
+      new MouseEvent("click", { bubbles: true, cancelable: true })
+    )
   })
 
-  await sidebar.locator('#ai-dom-generator-heading').waitFor({ state: 'visible', timeout: 10000 })
-  log('✓ AI page opened')
+  await sidebar
+    .locator("#ai-dom-generator-heading")
+    .waitFor({ state: "visible", timeout: 10000 })
+  log("✓ AI page opened")
 
   return sidebar
 }
 
-async function generateAndWait(sidebar: FrameLocator, prompt: string): Promise<void> {
-  const promptInput = sidebar.locator('textarea#ai-prompt')
-  await promptInput.fill(prompt)
-
-  await sidebar.locator('#ai-generate-button').click()
-  log(`✓ Generate clicked: "${prompt.substring(0, 50)}..."`)
-
-  await sidebar.locator('#ai-generate-button[data-loading="false"]').waitFor({ state: 'attached', timeout: 60000 })
-  log('✓ Generation completed')
+async function generateAndWait(
+  sidebar: FrameLocator,
+  prompt: string
+): Promise<void> {
+  const count = await sidebar.locator("[data-message-index]").count()
+  await sidebar.locator("#ai-prompt").fill(prompt)
+  await sidebar.locator("#ai-generate-button").click()
+  await expect(sidebar.locator("[data-message-index]")).toHaveCount(count + 2)
+  await expect(sidebar.locator("#ai-generate-button")).toHaveAttribute(
+    "data-loading",
+    "false"
+  )
 }
 
-async function getLatestChanges(testPage: Page): Promise<any[]> {
-  const frame = testPage.frame({ url: /sidebar\.html/ }) || testPage.frames().find(f => f.url().includes('sidebar'))
-  if (!frame) return []
-  return frame.evaluate(() => {
-    const data = (window as any).__absmartlyLatestDomChanges
-    return data?.changes || []
-  })
+async function getLatestChanges(testPage: Page): Promise<unknown[]> {
+  return testPage
+    .frameLocator("#absmartly-sidebar-iframe")
+    .locator("body")
+    .evaluate(() => (window as any).__absmartlyLatestDomChanges?.changes || [])
 }
 
-function changesContain(changes: any[], keyword: string): boolean {
-  const json = JSON.stringify(changes).toLowerCase()
-  return json.includes(keyword.toLowerCase())
-}
-
-test.describe('AI DOM Granular Operations', () => {
+test.describe("AI DOM Granular Operations", () => {
   let testPage: Page
-  let allConsoleMessages: Array<{type: string, text: string}> = []
+  let sidebar: FrameLocator
 
-  test.beforeAll(async () => {
-    const html = readFileSync(TEST_PAGE_PATH)
-    fixtureServer = createServer((_req, res) => {
-      res.writeHead(200, { 'Content-Type': 'text/html', 'Cache-Control': 'no-store' })
-      res.end(html)
-    })
-    await new Promise<void>(resolve => fixtureServer.listen(0, '127.0.0.1', resolve))
-    // The packaged manifest already grants localhost for script-based page
-    // capture. 127.0.0.1 is a different host and yields empty AI context.
-    fixtureUrl = `http://localhost:${(fixtureServer.address() as { port: number }).port}`
-    log('Checking if Claude Code Bridge is running...')
-    const existingPort = await findAvailablePort()
-
-    if (existingPort) {
-      log(`✓ Using existing bridge on port ${existingPort}`)
-    } else {
-      log('⚠️ Bridge not running, starting it...')
-      try {
-        const port = await startBridge()
-        log(`✓ Bridge started on port ${port}`)
-        await new Promise(resolve => setTimeout(resolve, 1000))
-      } catch (error) {
-        log(`❌ Failed to start bridge: ${error.message}`)
-      }
-    }
-  })
-
-  test.afterAll(async () => {
-    await stopBridge()
-    fixtureServer?.closeAllConnections()
-    if (fixtureServer) await new Promise<void>(resolve => fixtureServer.close(() => resolve()))
-  })
-
-  test.beforeEach(async ({ context, extensionUrl, seedStorage }) => {
-    initializeTestLogging()
-
-    // These tests verify AI action-handling semantics (append /
-    // replace_all / replace_specific / remove_specific) rather than a
-    // specific provider's wire protocol. The test fixture previously
-    // seeded `aiProvider: 'claude-subscription'` and relied on a local
-    // claude-code-bridge binary that CI doesn't have. Switch to the
-    // anthropic-api provider and pair its key with its endpoint the
-    // same way the shared extension fixture does: when a proxy endpoint
-    // is configured (e.g. llmproxy.absmartly-dev.com) use the
-    // PLASMO_PUBLIC_ANTHROPIC_API_KEY (llmp_sk_...), otherwise fall
-    // back to the direct ANTHROPIC_API_KEY (sk-ant-...).
-    const anthropicEndpoint = process.env.PLASMO_PUBLIC_ANTHROPIC_ENDPOINT || ''
-    const anthropicApiKey = anthropicEndpoint
-      ? (process.env.PLASMO_PUBLIC_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY || '')
-      : (process.env.ANTHROPIC_API_KEY || process.env.PLASMO_PUBLIC_ANTHROPIC_API_KEY || '')
-
-    test.skip(
-      !anthropicApiKey,
-      'ANTHROPIC_API_KEY / PLASMO_PUBLIC_ANTHROPIC_API_KEY required; these tests hit the AI provider to exercise real action handling.'
-    )
-
-    await seedStorage({
-      'absmartly-config': {
-        apiKey: process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || '',
-        apiEndpoint: process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT || '',
-        authMethod: 'apikey',
-        domChangesFieldName: '__dom_changes',
-        aiProvider: 'anthropic-api',
-        aiApiKey: anthropicApiKey,
-        vibeStudioEnabled: true,
-        llmModel: 'claude-sonnet-4-5',
-        providerModels: { 'anthropic-api': 'claude-sonnet-4-5' },
-        providerEndpoints: anthropicEndpoint ? { 'anthropic-api': anthropicEndpoint } : {}
-      },
-      'ai-apikey': anthropicApiKey,
-      'plasmo:ai-apikey': anthropicApiKey
-    })
-
+  test.beforeEach(async ({ context, extensionUrl }) => {
     testPage = await context.newPage()
-
-    allConsoleMessages = []
-    testPage.on('console', (msg) => {
-      allConsoleMessages.push({ type: msg.type(), text: msg.text() })
-    })
-
-    await testPage.goto(`${fixtureUrl}/?use_shadow_dom_for_visual_editor_context_menu=1`)
-    await testPage.setViewportSize({ width: 1920, height: 1080 })
-    await testPage.waitForLoadState('networkidle')
-
+    await testPage.goto("http://localhost:3456/visual-editor-test.html")
     await testPage.evaluate(() => {
-      (window as any).__absmartlyTestMode = true
+      ;(window as any).__absmartlyTestMode = true
     })
-
-    log('✓ Test page loaded (test mode enabled)')
+    sidebar = await setupExperimentAndAI(testPage, extensionUrl)
   })
 
   test.afterEach(async () => {
-    if (testPage && !process.env.SLOW) await testPage.close()
+    await testPage.close()
   })
 
-  test('should handle append action - add new changes to existing ones', async ({ extensionUrl }) => {
-    test.setTimeout(90000)
-    let sidebar: FrameLocator
-
-    await test.step('Setup and generate initial changes', async () => {
-      sidebar = await setupExperimentAndAI(testPage, extensionUrl)
-      await expect(testPage.locator('.btn')).toHaveCount(3)
-      // Phrase the prompt as a direct instruction to apply specific CSS so
-      // the model emits DOM changes rather than asking a clarifying
-      // question (the latter has been observed under load and is what
-      // produces the flaky '0 changes' result).
-      await generateAndWait(sidebar, 'Apply background-color: orange to every .btn element on the page. Generate the DOM changes now.')
-    })
-
-    await test.step('Verify initial changes exist', async () => {
-      const changes = await getLatestChanges(testPage)
-      log(`Initial changes count: ${changes.length}`)
-      await expect(testPage.locator('.btn').first()).toHaveCSS('background-color', 'rgb(255, 165, 0)')
-      await testPage.screenshot({path:test.info().outputPath('append-initial-result.png')})
-      expect(changes.length).toBeGreaterThan(0)
-      expect(changesContain(changes, 'button') || changesContain(changes, 'orange')).toBe(true)
-      log('✅ Initial changes verified')
-    })
-
-    await test.step('Generate additional changes (append)', async () => {
-      await generateAndWait(sidebar!, 'Append a DOM change setting color: blue and font-weight: bold on h1, h2, h3, h4, h5, h6. Keep the existing orange .btn change. Generate the DOM changes now using the DOM changes tool.')
-    })
-
-    await test.step('Verify both initial and new changes exist', async () => {
-      const changes = await getLatestChanges(testPage)
-      log(`Total changes after append: ${changes.length}`)
-
-      const hasButtonChanges = changesContain(changes, 'button') || changesContain(changes, 'orange')
-      const hasHeadingChanges = changesContain(changes, 'h1') || changesContain(changes, 'h2') || changesContain(changes, 'blue')
-
-      log(`Has button changes: ${hasButtonChanges}`)
-      log(`Has heading changes: ${hasHeadingChanges}`)
-      await expect(testPage.locator('.btn').first()).toHaveCSS('background-color', 'rgb(255, 165, 0)')
-      await expect(testPage.locator('h1')).toHaveCSS('color', 'rgb(0, 0, 255)')
-      await testPage.screenshot({path:test.info().outputPath('append-combined-result.png')})
-
-      expect(changes.length).toBeGreaterThanOrEqual(2)
-      expect(hasButtonChanges).toBe(true)
-      expect(hasHeadingChanges).toBe(true)
-      log('✅ Append action verified - multiple changes present')
-    })
+  test("should handle append action - add new changes to existing ones", async ({
+    aiProvider
+  }) => {
+    const initial =
+      "Apply background-color: orange to every .btn element on the page. Generate the DOM changes now."
+    const append =
+      "Append a DOM change setting color: blue and font-weight: bold on h1, h2, h3, h4, h5, h6. Keep the existing orange .btn change. Generate the DOM changes now using the DOM changes tool."
+    aiProvider.script([
+      mutation(initial, "append", [buttonChange("orange")]),
+      mutation(append, "append", [headingChange("blue")])
+    ])
+    await generateAndWait(sidebar, initial)
+    await expect(testPage.locator(".btn").first()).toHaveCSS(
+      "background-color",
+      "rgb(255, 165, 0)"
+    )
+    await generateAndWait(sidebar, append)
+    expect(await getLatestChanges(testPage)).toEqual([
+      buttonChange("orange"),
+      headingChange("blue")
+    ])
+    await expect(testPage.locator(".btn").first()).toHaveCSS(
+      "background-color",
+      "rgb(255, 165, 0)"
+    )
+    await expect(testPage.locator("h1")).toHaveCSS("color", "rgb(0, 0, 255)")
   })
 
-  test('should handle replace_all action - replace all existing changes', async ({ extensionUrl }) => {
-    test.setTimeout(90000)
-    let sidebar: FrameLocator
-
-    await test.step('Setup and generate initial changes', async () => {
-      sidebar = await setupExperimentAndAI(testPage, extensionUrl)
-      // Explicit phrasing so the live model produces DOM changes rather
-      // than asking a clarifying question.
-      await generateAndWait(sidebar, 'Make all buttons have an orange background')
-    })
-
-    await test.step('Verify initial changes', async () => {
-      const changes = await getLatestChanges(testPage)
-      expect(changes.length).toBeGreaterThan(0)
-      log('✓ Initial changes created')
-    })
-
-    await test.step('Generate replacement changes', async () => {
-      await generateAndWait(sidebar!, 'Actually, forget the buttons. Instead make all headings green and italic')
-    })
-
-    await test.step('Verify changes were replaced', async () => {
-      const changes = await getLatestChanges(testPage)
-      log(`Changes after replace: ${changes.length}`)
-      log(`Changes JSON: ${JSON.stringify(changes).substring(0, 200)}`)
-
-      expect(changes.length).toBeGreaterThan(0)
-      log('✅ Replace action verified - changes updated')
-    })
+  test("should handle replace_all action - replace all existing changes", async ({
+    aiProvider
+  }) => {
+    const initial = "Make all buttons have an orange background"
+    const replacement =
+      "Actually, forget the buttons. Instead make all headings green and italic"
+    const greenHeadings = {
+      selector: "h1, h2, h3, h4, h5, h6",
+      type: "style",
+      value: { color: "green", "font-style": "italic" }
+    }
+    const originalButtonColor = await testPage
+      .locator(".btn")
+      .first()
+      .evaluate((el) => getComputedStyle(el).backgroundColor)
+    aiProvider.script([
+      mutation(initial, "append", [buttonChange("orange")]),
+      mutation(replacement, "replace_all", [greenHeadings])
+    ])
+    await generateAndWait(sidebar, initial)
+    await generateAndWait(sidebar, replacement)
+    expect(await getLatestChanges(testPage)).toEqual([greenHeadings])
+    await expect(testPage.locator(".btn").first()).toHaveCSS(
+      "background-color",
+      originalButtonColor
+    )
+    await expect(testPage.locator("h1")).toHaveCSS("color", "rgb(0, 128, 0)")
+    await expect(testPage.locator("h1")).toHaveCSS("font-style", "italic")
   })
 
-  test('should handle replace_specific action - replace specific changes only', async ({ extensionUrl }) => {
-    test.setTimeout(90000)
-    let sidebar: FrameLocator
-
-    await test.step('Setup and generate multiple changes', async () => {
-      sidebar = await setupExperimentAndAI(testPage, extensionUrl)
-      await generateAndWait(sidebar, 'Make all buttons orange and all headings blue')
-    })
-
-    await test.step('Verify initial changes', async () => {
-      const changes = await getLatestChanges(testPage)
-      expect(changes.length).toBeGreaterThan(0)
-      log('✓ Initial changes created (buttons + headings)')
-    })
-
-    await test.step('Replace specific changes', async () => {
-      await generateAndWait(sidebar!, 'Change the buttons to red instead of orange, but keep the headings as they are')
-    })
-
-    await test.step('Verify specific changes replaced', async () => {
-      const changes = await getLatestChanges(testPage)
-      log(`Changes after replace_specific: ${changes.length}`)
-      log(`Changes JSON: ${JSON.stringify(changes).substring(0, 300)}`)
-
-      expect(changes.length).toBeGreaterThan(0)
-      log('✅ Replace_specific action verified')
-    })
+  test("should handle replace_specific action - replace specific changes only", async ({
+    aiProvider
+  }) => {
+    const initial = "Make all buttons orange and all headings blue"
+    const replacement =
+      "Change the buttons to red instead of orange, but keep the headings as they are"
+    aiProvider.script([
+      mutation(initial, "append", [
+        buttonChange("orange"),
+        headingChange("blue")
+      ]),
+      mutation(replacement, "replace_specific", [buttonChange("red")], [".btn"])
+    ])
+    await generateAndWait(sidebar, initial)
+    await generateAndWait(sidebar, replacement)
+    expect(await getLatestChanges(testPage)).toEqual([
+      headingChange("blue"),
+      buttonChange("red")
+    ])
+    await expect(testPage.locator(".btn").first()).toHaveCSS(
+      "background-color",
+      "rgb(255, 0, 0)"
+    )
+    await expect(testPage.locator("h1")).toHaveCSS("color", "rgb(0, 0, 255)")
   })
 
-  test('should handle remove_specific action - remove specific changes only', async ({ extensionUrl }) => {
-    test.setTimeout(90000)
-    let sidebar: FrameLocator
-
-    await test.step('Setup and generate multiple changes', async () => {
-      sidebar = await setupExperimentAndAI(testPage, extensionUrl)
-      await generateAndWait(sidebar, 'Make buttons orange, headings blue, and paragraphs italic')
-    })
-
-    await test.step('Verify initial changes', async () => {
-      const changes = await getLatestChanges(testPage)
-      expect(changes.length).toBeGreaterThan(0)
-      log('✓ Initial changes created')
-    })
-
-    await test.step('Remove specific changes', async () => {
-      await generateAndWait(sidebar!, 'Remove the button styling but keep everything else')
-    })
-
-    await test.step('Verify specific changes removed', async () => {
-      const changes = await getLatestChanges(testPage)
-      log(`Changes after remove_specific: ${changes.length}`)
-      log(`Changes JSON: ${JSON.stringify(changes).substring(0, 300)}`)
-
-      expect(changes.length).toBeGreaterThanOrEqual(0)
-      log('✅ Remove_specific action verified')
-    })
+  test("should handle remove_specific action - remove specific changes only", async ({
+    aiProvider
+  }) => {
+    const initial = "Make buttons orange, headings blue, and paragraphs italic"
+    const removal = "Remove the button styling but keep everything else"
+    const originalButtonColor = await testPage
+      .locator(".btn")
+      .first()
+      .evaluate((el) => getComputedStyle(el).backgroundColor)
+    aiProvider.script([
+      mutation(initial, "append", [
+        buttonChange("orange"),
+        headingChange("blue"),
+        paragraphChange
+      ]),
+      mutation(removal, "remove_specific", [], [".btn"])
+    ])
+    await generateAndWait(sidebar, initial)
+    await generateAndWait(sidebar, removal)
+    expect(await getLatestChanges(testPage)).toEqual([
+      headingChange("blue"),
+      paragraphChange
+    ])
+    await expect(testPage.locator(".btn").first()).toHaveCSS(
+      "background-color",
+      originalButtonColor
+    )
+    await expect(testPage.locator("h1")).toHaveCSS("color", "rgb(0, 0, 255)")
+    await expect(testPage.locator("#test-paragraph")).toHaveCSS(
+      "font-style",
+      "italic"
+    )
   })
 
-  test('should handle none action - conversational response only', async ({ extensionUrl }) => {
-    test.setTimeout(90000)
-    let sidebar: FrameLocator
-
-    await test.step('Setup and generate initial changes', async () => {
-      sidebar = await setupExperimentAndAI(testPage, extensionUrl)
-      // Use the fuller, explicit phrasing that the passing "append" test
-      // uses — short prompts like "Make buttons orange" sometimes get
-      // answered conversationally by the real model instead of producing
-      // DOM changes, which makes the setup for this test flaky.
-      await generateAndWait(sidebar, 'Make all buttons have an orange background')
+  test("should handle none action - conversational response only", async ({
+    aiProvider
+  }) => {
+    const initial = "Make all buttons have an orange background"
+    const question = "What colors work well for call-to-action buttons?"
+    // Text that resembles a mutation must remain conversational unless the provider calls the native tool.
+    const answer = JSON.stringify({
+      action: "replace_all",
+      domChanges: [buttonChange("red")],
+      response: "Red is another option."
     })
-
-    await test.step('Verify initial changes exist', async () => {
-      const initialChanges = await getLatestChanges(testPage)
-      expect(initialChanges.length).toBeGreaterThan(0)
-      log('✓ Initial changes created')
-    })
-
-    await test.step('Ask a question (no DOM changes expected)', async () => {
-      const changesBefore = await getLatestChanges(testPage)
-      await generateAndWait(sidebar!, 'What colors work well for call-to-action buttons?')
-
-      const changesAfter = await getLatestChanges(testPage)
-      log(`Changes before question: ${changesBefore.length}`)
-      log(`Changes after question: ${changesAfter.length}`)
-
-      const messageCount = await sidebar!.locator('[data-message-index]').count()
-      log(`Chat messages: ${messageCount}`)
-      expect(messageCount).toBeGreaterThanOrEqual(4)
-
-      log('✅ None action verified - conversational response without changing DOM')
-    })
+    aiProvider.script([
+      mutation(initial, "append", [buttonChange("orange")]),
+      { promptIncludes: question, response: { text: answer } }
+    ])
+    await generateAndWait(sidebar, initial)
+    const before = await getLatestChanges(testPage)
+    await generateAndWait(sidebar, question)
+    expect(await getLatestChanges(testPage)).toEqual(before)
+    await expect(testPage.locator(".btn").first()).toHaveCSS(
+      "background-color",
+      "rgb(255, 165, 0)"
+    )
+    await expect(sidebar.locator("[data-message-index]").last()).toContainText(
+      "Red is another option."
+    )
   })
 
-  test('should maintain change history across multiple operations', async ({ extensionUrl }) => {
-    test.setTimeout(120000)
-    let sidebar: FrameLocator
-
-    await test.step('Setup', async () => {
-      sidebar = await setupExperimentAndAI(testPage, extensionUrl)
-    })
-
-    await test.step('Step 1: Create initial changes', async () => {
-      // Prefer explicit phrasing so the live model reliably produces
-      // changes rather than asking a clarifying question.
-      await generateAndWait(sidebar!, 'Make all buttons have an orange background')
-
-      const changes = await getLatestChanges(testPage)
-      expect(changes.length).toBeGreaterThan(0)
-      log(`✓ Step 1: ${changes.length} changes`)
-    })
-
-    await test.step('Step 2: Append heading changes', async () => {
-      await generateAndWait(sidebar!, 'Also make all headings blue and bold')
-
-      const changes = await getLatestChanges(testPage)
-      expect(changes.length).toBeGreaterThan(0)
-      log(`✓ Step 2: ${changes.length} changes`)
-    })
-
-    await test.step('Step 3: Ask a question (none action)', async () => {
-      await generateAndWait(sidebar!, 'What is the current color scheme?')
-      log('✓ Step 3: Question answered')
-    })
-
-    await test.step('Step 4: Replace button color', async () => {
-      await generateAndWait(sidebar!, 'Change buttons to red instead of orange')
-
-      const changes = await getLatestChanges(testPage)
-      expect(changes.length).toBeGreaterThan(0)
-      log(`✓ Step 4: ${changes.length} changes`)
-    })
-
-    await test.step('Verify chat history', async () => {
-      const messageCount = await sidebar!.locator('[data-message-index]').count()
-      log(`Total chat messages: ${messageCount}`)
-      expect(messageCount).toBeGreaterThanOrEqual(8)
-      log('✅ Change history maintained across multiple operations')
-    })
+  test("should maintain change history across multiple operations", async ({
+    aiProvider
+  }) => {
+    const initial = "Make all buttons have an orange background"
+    const append = "Also make all headings blue and bold"
+    const question = "What is the current color scheme?"
+    const replacement = "Change buttons to red instead of orange"
+    aiProvider.script([
+      mutation(initial, "append", [buttonChange("orange")]),
+      mutation(append, "append", [headingChange("blue")]),
+      {
+        promptIncludes: question,
+        response: { text: "The buttons are orange and the headings are blue." }
+      },
+      {
+        ...mutation(
+          replacement,
+          "replace_specific",
+          [buttonChange("red")],
+          [".btn"]
+        ),
+        assertRequest: (body) => {
+          expect(body.messages).toHaveLength(7)
+          expect(JSON.stringify(body.messages)).toContain(initial)
+          expect(JSON.stringify(body.messages)).toContain(
+            "The buttons are orange and the headings are blue."
+          )
+        }
+      }
+    ])
+    for (const prompt of [initial, append, question, replacement])
+      await generateAndWait(sidebar, prompt)
+    expect(await getLatestChanges(testPage)).toEqual([
+      headingChange("blue"),
+      buttonChange("red")
+    ])
+    await expect(sidebar.locator("[data-message-index]")).toHaveCount(8)
+    await expect(testPage.locator(".btn").first()).toHaveCSS(
+      "background-color",
+      "rgb(255, 0, 0)"
+    )
+    await expect(testPage.locator("h1")).toHaveCSS("color", "rgb(0, 0, 255)")
   })
 })

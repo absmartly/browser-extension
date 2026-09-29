@@ -1,12 +1,10 @@
-import { test, expect } from '../fixtures/extension'
-import type { Page } from '@playwright/test'
-import path from 'path'
-import { TEST_IMAGES } from '../../src/lib/__tests__/test-images'
-import { injectSidebar, debugWait } from './utils/test-helpers'
+import type { Page } from "@playwright/test"
 
-const TEST_PAGE_PATH = path.join(__dirname, '..', 'test-pages', 'visual-editor-test.html')
+import { TEST_IMAGES } from "../../src/lib/__tests__/test-images"
+import { expect, test } from "../fixtures/extension"
+import { debugWait, injectSidebar } from "./utils/test-helpers"
 
-const SLOW_MODE = process.env.SLOW === '1'
+const SLOW_MODE = process.env.SLOW === "1"
 
 /**
  * Read the conversation session id that AIDOMChangesPage stashes on its
@@ -17,8 +15,10 @@ const SLOW_MODE = process.env.SLOW === '1'
  * [AIDOMChangesPage] logs at all. Reading the global via frame.evaluate
  * works because Playwright's CDP session attaches to every frame.
  */
-async function readConversationSessionId(testPage: Page): Promise<string | null> {
-  const frame = testPage.frames().find(f => f.url().includes('sidebar'))
+async function readConversationSessionId(
+  testPage: Page
+): Promise<string | null> {
+  const frame = testPage.frames().find((f) => f.url().includes("sidebar"))
   if (!frame) return null
   try {
     return await frame.evaluate(() => {
@@ -30,9 +30,9 @@ async function readConversationSessionId(testPage: Page): Promise<string | null>
   }
 }
 
-test.describe('AI Session & Image Handling', () => {
+test.describe("AI Session & Image Handling", () => {
   let testPage: Page
-  let allConsoleMessages: Array<{type: string, text: string}> = []
+  let allConsoleMessages: Array<{ type: string; text: string }> = []
 
   test.beforeEach(async ({ context }) => {
     testPage = await context.newPage()
@@ -43,113 +43,197 @@ test.describe('AI Session & Image Handling', () => {
       const msgText = msg.text()
       allConsoleMessages.push({ type: msgType, text: msgText })
 
-      if (msgText.includes('[AIDOMChangesPage]') || msgText.includes('[useConversationHistory]') || msgText.includes('[Background]')) {
+      if (
+        msgText.includes("[AIDOMChangesPage]") ||
+        msgText.includes("[useConversationHistory]") ||
+        msgText.includes("[Background]")
+      ) {
         console.log(`  [${msgType}] ${msgText}`)
       }
     }
-    testPage.on('console', consoleHandler)
+    testPage.on("console", consoleHandler)
 
-    testPage.on('frameattached', async (frame) => {
-      ;(frame as any).on('console', consoleHandler)
+    testPage.on("frameattached", async (frame) => {
+      ;(frame as any).on("console", consoleHandler)
     })
 
     const [serviceWorker] = context.serviceWorkers()
     if (serviceWorker) {
-      ;(serviceWorker as any).on('console', (msg: any) => {
+      ;(serviceWorker as any).on("console", (msg: any) => {
         console.log(`  [ServiceWorker] [${msg.type()}] ${msg.text()}`)
       })
     } else {
-      context.on('serviceworker', (worker) => {
-        ;(worker as any).on('console', (msg: any) => {
+      context.on("serviceworker", (worker) => {
+        ;(worker as any).on("console", (msg: any) => {
           console.log(`  [ServiceWorker] [${msg.type()}] ${msg.text()}`)
         })
       })
     }
 
-    await testPage.goto(`file://${TEST_PAGE_PATH}?use_shadow_dom_for_visual_editor_context_menu=1`)
+    await testPage.goto(
+      "http://localhost:3456/visual-editor-test.html?use_shadow_dom_for_visual_editor_context_menu=1"
+    )
     await testPage.setViewportSize({ width: 1920, height: 1080 })
-    await testPage.waitForLoadState('networkidle')
+    await testPage.waitForLoadState("networkidle")
 
     await testPage.evaluate(() => {
-      (window as any).__absmartlyTestMode = true
+      ;(window as any).__absmartlyTestMode = true
     })
 
-    console.log('Test page loaded (test mode enabled)')
+    console.log("Test page loaded (test mode enabled)")
   })
 
   test.afterEach(async () => {
     if (testPage) await testPage.close()
   })
 
-  test('Session initialization, image upload, and persistence', async ({ extensionId, extensionUrl, context }) => {
+  test("Session initialization, image upload, and persistence", async ({
+    extensionId,
+    extensionUrl,
+    context,
+    aiProvider
+  }) => {
     test.setTimeout(SLOW_MODE ? 180000 : 120000)
 
-    const sidebar = testPage.frameLocator('#absmartly-sidebar-iframe')
+    aiProvider.script([
+      {
+        promptIncludes: "What text do you see in this image?",
+        assertRequest: (body) => {
+          const content = body.messages.at(-1)!.content
+          expect(Array.isArray(content)).toBe(true)
+          if (!Array.isArray(content))
+            throw new Error("Expected image content blocks")
+          const images = content.filter((part: any) => part.type === "image")
+          expect(images).toHaveLength(1)
+          expect(images[0].source.type).toBe("base64")
+          expect(images[0].source.data.length).toBeGreaterThan(0)
+        },
+        response: { text: "The image says HELLO." }
+      },
+      {
+        promptIncludes: "Change the button color to blue",
+        assertRequest: (body) => {
+          expect(body.messages).toHaveLength(3)
+          expect(JSON.stringify(body.messages)).toContain(
+            "The image says HELLO."
+          )
+          const content = body.messages.at(-1)!.content
+          expect(Array.isArray(content)).toBe(true)
+          if (!Array.isArray(content))
+            throw new Error("Expected user content blocks")
+          expect(
+            content.filter((part: any) => part.type === "image")
+          ).toHaveLength(0)
+        },
+        response: {
+          tools: [
+            {
+              id: "blue-button",
+              name: "dom_changes_generator",
+              input: {
+                action: "append",
+                domChanges: [
+                  {
+                    selector: ".btn",
+                    type: "style",
+                    value: { "background-color": "blue" }
+                  }
+                ],
+                response: "Changed the buttons to blue."
+              }
+            }
+          ]
+        }
+      },
+      {
+        promptIncludes: "Test new session",
+        assertRequest: (body) => {
+          expect(body.messages).toHaveLength(1)
+        },
+        response: { text: "Started a new conversation." }
+      }
+    ])
+
+    const sidebar = testPage.frameLocator("#absmartly-sidebar-iframe")
     let firstSessionId: string
     let secondSessionId: string
 
-    await test.step('Inject sidebar and navigate to AI page', async () => {
-      console.log('\n STEP 1: Injecting sidebar and setting up')
+    await test.step("Inject sidebar and navigate to AI page", async () => {
+      console.log("\n STEP 1: Injecting sidebar and setting up")
       await injectSidebar(testPage, extensionUrl)
 
-      const createButton = sidebar.locator('button[title="Create New Experiment"]')
-      await createButton.waitFor({ state: 'visible', timeout: 10000 })
+      const createButton = sidebar.locator(
+        'button[title="Create New Experiment"]'
+      )
+      await createButton.waitFor({ state: "visible", timeout: 10000 })
       await createButton.evaluate((btn) => {
-        btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+        btn.dispatchEvent(
+          new MouseEvent("click", { bubbles: true, cancelable: true })
+        )
       })
 
-      const fromScratchButton = sidebar.locator('#from-scratch-button')
-      await fromScratchButton.waitFor({ state: 'visible', timeout: 5000 })
+      const fromScratchButton = sidebar.locator("#from-scratch-button")
+      await fromScratchButton.waitFor({ state: "visible", timeout: 5000 })
       await fromScratchButton.evaluate((btn) => {
-        btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+        btn.dispatchEvent(
+          new MouseEvent("click", { bubbles: true, cancelable: true })
+        )
       })
 
-      await sidebar.locator('#display-name-label').waitFor({ state: 'visible', timeout: 10000 })
-      console.log('Experiment editor opened')
+      await sidebar
+        .locator("#display-name-label")
+        .waitFor({ state: "visible", timeout: 10000 })
+      console.log("Experiment editor opened")
 
-      const generateButton = sidebar.locator('#generate-with-ai-button').first()
+      const generateButton = sidebar.locator("#generate-with-ai-button").first()
       await generateButton.scrollIntoViewIfNeeded()
-      await generateButton.waitFor({ state: 'visible', timeout: 10000 })
+      await generateButton.waitFor({ state: "visible", timeout: 10000 })
       await generateButton.evaluate((btn) => {
-        btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+        btn.dispatchEvent(
+          new MouseEvent("click", { bubbles: true, cancelable: true })
+        )
       })
 
-      await sidebar.locator('#ai-dom-generator-heading').waitFor({ state: 'visible', timeout: 10000 })
-      console.log('AI DOM Generator page loaded')
+      await sidebar
+        .locator("#ai-dom-generator-heading")
+        .waitFor({ state: "visible", timeout: 10000 })
+      console.log("AI DOM Generator page loaded")
     })
 
-    await test.step('Verify AI page is ready', async () => {
-      console.log('\n STEP 2: Verifying AI page is ready')
+    await test.step("Verify AI page is ready", async () => {
+      console.log("\n STEP 2: Verifying AI page is ready")
 
-      await expect(sidebar.locator('#ai-dom-generator-heading')).toBeVisible()
-      await expect(sidebar.locator('#ai-prompt')).toBeVisible()
-      console.log('AI page is ready for input')
+      await expect(sidebar.locator("#ai-dom-generator-heading")).toBeVisible()
+      await expect(sidebar.locator("#ai-prompt")).toBeVisible()
+      console.log("AI page is ready for input")
     })
 
-    await test.step('Upload HELLO test image', async () => {
-      console.log('\n STEP 3: Uploading test image')
+    await test.step("Upload HELLO test image", async () => {
+      console.log("\n STEP 3: Uploading test image")
 
-      const promptTextarea = sidebar.locator('#ai-prompt')
-      await promptTextarea.waitFor({ state: 'visible' })
+      const promptTextarea = sidebar.locator("#ai-prompt")
+      await promptTextarea.waitFor({ state: "visible" })
 
       await promptTextarea.evaluate(async (textarea, imageDataUri) => {
         const response = await fetch(imageDataUri)
         const blob = await response.blob()
-        const file = new File([blob], 'test-image.png', { type: 'image/png' })
+        const file = new File([blob], "test-image.png", { type: "image/png" })
 
-        const event = new ClipboardEvent('paste', {
+        const event = new ClipboardEvent("paste", {
           clipboardData: new DataTransfer(),
           bubbles: true,
           cancelable: true
         })
 
-        Object.defineProperty(event, 'clipboardData', {
+        Object.defineProperty(event, "clipboardData", {
           value: {
-            items: [{
-              kind: 'file',
-              type: 'image/png',
-              getAsFile: () => file
-            }]
+            items: [
+              {
+                kind: "file",
+                type: "image/png",
+                getAsFile: () => file
+              }
+            ]
           }
         })
 
@@ -157,58 +241,66 @@ test.describe('AI Session & Image Handling', () => {
       }, TEST_IMAGES.HELLO)
 
       const imagePreview = sidebar.locator('img[alt^="Attachment"]')
-      await imagePreview.waitFor({ state: 'visible', timeout: 5000 })
-      console.log('Image uploaded and preview visible')
+      await imagePreview.waitFor({ state: "visible", timeout: 5000 })
+      console.log("Image uploaded and preview visible")
     })
 
-    await test.step('Generate DOM changes with image', async () => {
-      console.log('\n STEP 4: Generating DOM changes with image')
+    await test.step("Generate DOM changes with image", async () => {
+      console.log("\n STEP 4: Generating DOM changes with image")
 
-      const promptTextarea = sidebar.locator('#ai-prompt')
-      await promptTextarea.fill('What text do you see in this image?')
+      const promptTextarea = sidebar.locator("#ai-prompt")
+      await promptTextarea.fill("What text do you see in this image?")
 
-      const generateButton = sidebar.locator('#ai-generate-button')
+      const generateButton = sidebar.locator("#ai-generate-button")
       await generateButton.click()
 
-      await sidebar.locator('#ai-generate-button[data-loading="false"]').waitFor({ state: 'attached', timeout: 60000 })
-      console.log('Response received')
+      await sidebar
+        .locator('#ai-generate-button[data-loading="false"]')
+        .waitFor({ state: "attached", timeout: 60000 })
+      await expect(
+        sidebar.locator("[data-message-index]").last()
+      ).toContainText("The image says HELLO.")
 
-      const imageMessages = allConsoleMessages.filter(msg =>
-        msg.text.includes('[AIDOMChangesPage] LLM images:') && !msg.text.includes('LLM images: 0')
+      const imageMessages = allConsoleMessages.filter(
+        (msg) =>
+          msg.text.includes("[AIDOMChangesPage] LLM images:") &&
+          !msg.text.includes("LLM images: 0")
       )
       if (imageMessages.length > 0) {
-        console.log(`Found ${imageMessages.length} messages about sending images`)
+        console.log(
+          `Found ${imageMessages.length} messages about sending images`
+        )
       }
 
       const sessionId = await readConversationSessionId(testPage)
-      if (sessionId) {
-        firstSessionId = sessionId
-        console.log(`Captured session ID: ${firstSessionId}`)
-      } else {
-        firstSessionId = 'unknown'
-        console.log('Could not read session ID from window.__absmartlyConversationSession')
-      }
+      expect(sessionId).toBeTruthy()
+      firstSessionId = sessionId!
     })
 
-    await test.step('Verify session ID is consistent', async () => {
-      console.log('\n STEP 5: Verifying session is active')
+    await test.step("Verify session ID is consistent", async () => {
+      console.log("\n STEP 5: Verifying session is active")
 
       const sessionId = await readConversationSessionId(testPage)
       expect(sessionId).toBeTruthy()
       console.log(`Session active: ${sessionId}`)
     })
 
-    await test.step('Send second message without image', async () => {
-      console.log('\n STEP 6: Sending second message')
+    await test.step("Send second message without image", async () => {
+      console.log("\n STEP 6: Sending second message")
 
-      const promptTextarea = sidebar.locator('#ai-prompt')
-      await promptTextarea.fill('Change the button color to blue')
+      const promptTextarea = sidebar.locator("#ai-prompt")
+      await promptTextarea.fill("Change the button color to blue")
 
-      const generateButton = sidebar.locator('#ai-generate-button')
+      const generateButton = sidebar.locator("#ai-generate-button")
       await generateButton.click()
 
-      await sidebar.locator('#ai-generate-button[data-loading="false"]').waitFor({ state: 'attached', timeout: 60000 })
-      console.log('Second response received')
+      await sidebar
+        .locator('#ai-generate-button[data-loading="false"]')
+        .waitFor({ state: "attached", timeout: 60000 })
+      await expect(testPage.locator(".btn").first()).toHaveCSS(
+        "background-color",
+        "rgb(0, 0, 255)"
+      )
 
       const sessionId = await readConversationSessionId(testPage)
       expect(sessionId).toBe(firstSessionId)
@@ -216,33 +308,40 @@ test.describe('AI Session & Image Handling', () => {
     })
 
     await test.step('Click "New Chat" button and verify new session', async () => {
-      console.log('\n STEP 7: Starting new chat')
+      console.log("\n STEP 7: Starting new chat")
 
-      const messageCountBefore = allConsoleMessages.filter(msg =>
-        msg.text.includes('[AIDOMChangesPage] Current session:')
+      const messageCountBefore = allConsoleMessages.filter((msg) =>
+        msg.text.includes("[AIDOMChangesPage] Current session:")
       ).length
 
       const newChatButton = sidebar.locator('button[title="New Chat"]')
-      await newChatButton.waitFor({ state: 'visible' })
+      await newChatButton.waitFor({ state: "visible" })
       await newChatButton.evaluate((btn) => {
-        btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+        btn.dispatchEvent(
+          new MouseEvent("click", { bubbles: true, cancelable: true })
+        )
       })
 
-      await sidebar.locator('#ai-prompt').waitFor({ state: 'visible' })
-      console.log('New chat started, prompt ready')
+      await expect(sidebar.locator("[data-message-index]")).toHaveCount(0)
+      await sidebar.locator("#ai-prompt").waitFor({ state: "visible" })
+      console.log("New chat started, prompt ready")
     })
 
-    await test.step('Verify new session is used via generation', async () => {
-      console.log('\n STEP 8: Verifying new session usage')
+    await test.step("Verify new session is used via generation", async () => {
+      console.log("\n STEP 8: Verifying new session usage")
 
-      const promptTextarea = sidebar.locator('#ai-prompt')
-      await promptTextarea.fill('Test new session')
+      const promptTextarea = sidebar.locator("#ai-prompt")
+      await promptTextarea.fill("Test new session")
 
-      const generateButton = sidebar.locator('#ai-generate-button')
+      const generateButton = sidebar.locator("#ai-generate-button")
       await generateButton.click()
 
-      await sidebar.locator('#ai-generate-button[data-loading="false"]').waitFor({ state: 'attached', timeout: 60000 })
-      console.log('Response received in new session')
+      await sidebar
+        .locator('#ai-generate-button[data-loading="false"]')
+        .waitFor({ state: "attached", timeout: 60000 })
+      await expect(
+        sidebar.locator("[data-message-index]").last()
+      ).toContainText("Started a new conversation.")
 
       const newSessionId = await readConversationSessionId(testPage)
       expect(newSessionId).toBeTruthy()
@@ -252,6 +351,6 @@ test.describe('AI Session & Image Handling', () => {
       console.log(`Previous session ID: ${firstSessionId}`)
     })
 
-    console.log('\n All steps completed successfully!')
+    console.log("\n All steps completed successfully!")
   })
 })
