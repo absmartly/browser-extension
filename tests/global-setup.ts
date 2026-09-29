@@ -157,20 +157,21 @@ async function globalSetup(config: FullConfig) {
     console.log('✅ Copied local-test-page.html to build directory')
   }
 
-  // 3. Load environment variables from .env.dev.local
+  // Load only Office fixture credentials. Provider mode is an explicit Playwright
+  // option; a developer's local AI keys must never switch ordinary E2E to live.
   const envPath = path.join(rootDir, '.env.dev.local')
   if (fs.existsSync(envPath)) {
-    const envContent = fs.readFileSync(envPath, 'utf-8')
-    envContent.split('\n').forEach(line => {
-      // Skip comments and empty lines
-      if (line.trim().startsWith('#') || !line.trim()) return
-
-      const [key, value] = line.split('=')
-      if (key && value) {
-        process.env[key.trim()] = value.trim()
+    const officeVariables = new Set([
+      'PLASMO_PUBLIC_ABSMARTLY_API_KEY',
+      'PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT'
+    ])
+    for (const line of fs.readFileSync(envPath, 'utf-8').split('\n')) {
+      const match = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/)
+      if (match && officeVariables.has(match[1]) && process.env[match[1]] === undefined) {
+        process.env[match[1]] = match[2].replace(/^(['"])(.*)\1$/, '$2')
       }
-    })
-    console.log('✅ Loaded environment variables from .env.dev.local')
+    }
+    console.log('✅ Loaded Office fixture environment defaults')
   }
 
   // 4. Verify API credentials are available

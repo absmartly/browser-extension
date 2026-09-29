@@ -18,6 +18,7 @@
     "test": "bun run test:unit && bun run test:e2e",
     "test:quick": "bun run test:unit && bun run test:e2e:visual-editor",
     "test:e2e": "playwright test",
+    "test:integration:ai": "playwright test -c tests/integration/playwright.config.ts",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:visual-editor": "playwright test tests/e2e/visual-editor-complete.spec.ts --reporter=list",
     "test:unit": "jest",

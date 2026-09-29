@@ -13,7 +13,7 @@ jobs:
   live-flake-regressions:
     needs: e2e-tests
     # Run after e2e failures too, but not for runs cancelled by a newer push:
-    # the live repetitions consume shared provider/API quota.
+    # the Office API remains shared; model responses are scripted locally.
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -21,9 +21,6 @@ jobs:
       contents: read
     env:
       CI: true
-      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-      PLASMO_PUBLIC_ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-      PLASMO_PUBLIC_ANTHROPIC_ENDPOINT: ${{ secrets.ANTHROPIC_ENDPOINT }}
       PLASMO_PUBLIC_ABSMARTLY_API_KEY: ${{ secrets.ABSMARTLY_API_KEY }}
       PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT: ${{ vars.ABSMARTLY_ENDPOINT }}
     steps:
@@ -118,7 +115,7 @@ jobs:
       fail-fast: false
       # Each shard already has four concurrent browser workers. Running all
       # four shards together creates16 live clients against the same test-1
-      # API and provider quota. Keep within-shard races, bound aggregate load.
+      # Office API. Keep within-shard races, bound aggregate load.
       max-parallel: 1
       matrix:
         shard: [1/4, 2/4, 3/4, 4/4]
@@ -140,16 +137,11 @@ jobs:
       - run: bun run build
         env:
           NODE_ENV: production
-          PLASMO_PUBLIC_ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          PLASMO_PUBLIC_ANTHROPIC_ENDPOINT: ${{ secrets.ANTHROPIC_ENDPOINT }}
           PLASMO_PUBLIC_ABSMARTLY_API_KEY: ${{ secrets.ABSMARTLY_API_KEY }}
           PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT: ${{ vars.ABSMARTLY_ENDPOINT }}
       - run: bunx playwright test --shard=${{ matrix.shard }}
         env:
           CI: true
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          PLASMO_PUBLIC_ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          PLASMO_PUBLIC_ANTHROPIC_ENDPOINT: ${{ secrets.ANTHROPIC_ENDPOINT }}
           PLASMO_PUBLIC_ABSMARTLY_API_KEY: ${{ secrets.ABSMARTLY_API_KEY }}
           PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT: ${{ vars.ABSMARTLY_ENDPOINT }}
       - name: Redact credentials from retained evidence
@@ -157,9 +149,6 @@ jobs:
         if: always()
         run: python3 tests/sanitize-artifacts.py
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          PLASMO_PUBLIC_ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          PLASMO_PUBLIC_ANTHROPIC_ENDPOINT: ${{ secrets.ANTHROPIC_ENDPOINT }}
           PLASMO_PUBLIC_ABSMARTLY_API_KEY: ${{ secrets.ABSMARTLY_API_KEY }}
       - uses: actions/upload-artifact@v4
         # Successful shards can contain failed attempts; retain their evidence.
