@@ -86,4 +86,47 @@ describe("useABsmartly auth recovery after a corrected config", () => {
     await act(async () => {})
     expect(sendMessage).toHaveBeenCalledTimes(1)
   })
+
+  it.each(["success", "rejection"])(
+    "checks only the latest config after a stale %s and rapid config changes",
+    async (outcome) => {
+      let finishStale!: () => void
+      let finishCurrent!: () => void
+      sendMessage
+        .mockImplementationOnce(
+          () =>
+            new Promise((resolve, reject) => {
+              finishStale = () =>
+                outcome === "success"
+                  ? resolve({ success: true, data: { user: { id: 1 } } })
+                  : reject(new Error("Previous config failed"))
+            })
+        )
+        .mockImplementationOnce(
+          () =>
+            new Promise((resolve) => {
+              finishCurrent = () =>
+                resolve({ success: true, data: { user: USER } })
+            })
+        )
+      const { result } = renderHook(() => useABsmartly())
+      await waitFor(() => expect(sendMessage).toHaveBeenCalledTimes(1))
+
+      act(() => result.current.updateConfig({ ...badConfig }))
+      act(() => result.current.updateConfig(goodConfig))
+      act(() => window.dispatchEvent(new Event("focus")))
+      expect(sendMessage).toHaveBeenCalledTimes(1)
+      await act(async () => finishStale())
+
+      expect(sendMessage).toHaveBeenCalledTimes(2)
+      expect(result.current.isAuthenticated).toBe(false)
+      expect(result.current.user).toBeNull()
+      expect(result.current.error).toBeNull()
+
+      await act(async () => finishCurrent())
+      expect(result.current.user).toEqual(USER)
+      expect(result.current.isAuthenticated).toBe(true)
+      expect(sendMessage).toHaveBeenCalledTimes(2)
+    }
+  )
 })
