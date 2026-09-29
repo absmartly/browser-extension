@@ -77,16 +77,20 @@ test.describe('Visual Editor Test', () => {
     const extensionId = new URL(sw.url()).host
     console.log('✅ Extension ID:', extensionId)
 
-    // Step 1: Navigate to a real website
+    // Step 1: Load a controlled target document at the original HTTPS origin.
     console.log('\n📄 Creating new page...')
     const page = await context.newPage()
     console.log('✅ New page created')
 
+    await page.route('https://example.com/', route => route.fulfill({
+      contentType: 'text/html',
+      body: '<!doctype html><html><body><h1 id="visual-editor-test-heading">Visual Editor Test Page</h1></body></html>'
+    }))
     console.log('🌐 Navigating to test website...')
     await page.goto('https://example.com', { waitUntil: 'domcontentloaded', timeout: 15000 })
     console.log('✅ Page loaded (domcontentloaded)')
 
-    await page.waitForSelector('h1', { timeout: 5000 })
+    await page.waitForSelector('#visual-editor-test-heading', { timeout: 5000 })
     console.log('✅ Page content visible')
 
     // Step 2: Inject sidebar by simulating extension icon click
@@ -238,7 +242,7 @@ test.describe('Visual Editor Test', () => {
           console.log('\n🖱️ Testing context menu...')
 
           // Find an element to test
-          const heading = page.locator('h1').first()
+          const heading = page.locator('#visual-editor-test-heading')
           const headingVisible = await heading.isVisible().catch(() => false)
           console.log('H1 element visible:', headingVisible)
 

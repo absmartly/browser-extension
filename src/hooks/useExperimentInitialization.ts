@@ -1,4 +1,4 @@
-import { useEffect } from "react"
+import { useEffect, useRef } from "react"
 
 import type {
   ABsmartlyConfig,
@@ -7,7 +7,7 @@ import type {
 } from "~src/types/absmartly"
 import type { ExperimentFilters } from "~src/types/filters"
 import { debugError, debugLog } from "~src/utils/debug"
-import { localAreaStorage, setExperimentsCache } from "~src/utils/storage"
+import { localAreaStorage } from "~src/utils/storage"
 
 interface UseExperimentInitializationProps {
   config: ABsmartlyConfig | null
@@ -53,6 +53,12 @@ export function useExperimentInitialization({
   loadFavorites,
   loadEditorResources
 }: UseExperimentInitializationProps) {
+  // Applications and the pending app filter may resolve after the user has
+  // changed filters. Read the latest selection at each async completion so
+  // initialization cannot issue a newer request with an older selection.
+  const latestFilters = useRef(filters)
+  latestFilters.current = filters
+
   useEffect(() => {
     if (
       config &&
@@ -84,7 +90,7 @@ export function useExperimentInitialization({
                   const appId = app.id ?? app.application_id
                   if (appId) {
                     const newFilters = {
-                      ...filters,
+                      ...(latestFilters.current ?? filters),
                       applications: [appId]
                     }
                     setFilters(newFilters)
@@ -92,22 +98,42 @@ export function useExperimentInitialization({
                     storage.remove("pendingApplicationFilter")
                     loadExperiments(false, 1, pageSize, newFilters)
                   } else {
-                    loadExperiments(false, 1, pageSize, filters)
+                    loadExperiments(
+                      false,
+                      1,
+                      pageSize,
+                      latestFilters.current ?? filters
+                    )
                   }
                 } else {
-                  loadExperiments(false, 1, pageSize, filters)
+                  loadExperiments(
+                    false,
+                    1,
+                    pageSize,
+                    latestFilters.current ?? filters
+                  )
                 }
               } else {
-                loadExperiments(false, 1, pageSize, filters)
+                loadExperiments(
+                  false,
+                  1,
+                  pageSize,
+                  latestFilters.current ?? filters
+                )
               }
             })
           } else {
-            loadExperiments(false, 1, pageSize, filters)
+            loadExperiments(
+              false,
+              1,
+              pageSize,
+              latestFilters.current ?? filters
+            )
           }
         })
         .catch((error) => {
           debugError("Failed to load applications:", error)
-          loadExperiments(false, 1, pageSize, filters)
+          loadExperiments(false, 1, pageSize, latestFilters.current ?? filters)
         })
 
       loadFavorites()
