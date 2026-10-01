@@ -60,6 +60,7 @@ test('...', async ({ managementApi, seedStorage }) => {
 ```
 
 - **State:** each test gets a fresh server with its own state.
+- **Timing:** `managementApi.delay(method, path, ms)` holds matching requests to reproduce slow responses. Assert on the awaited response and its rendered outcome, not on a spinner being absent: the first list request starts only after config, auth and resources have loaded.
 - **Pre-mount data:** seed records before the sidebar mounts. The list loads on
   mount, and the default filter shows created and ready experiments.
 - **Reconfiguring:** use `controlledConfigSeed(managementApi)` when a spec

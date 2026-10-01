@@ -74,3 +74,17 @@ test('a request with no fixture route is a coverage failure', async () => {
   await call('/v1/goals')
   expect(api.issues.some(i => i.kind === 'coverage')).toBe(true)
 })
+
+test('delay() holds only the matching request, then answers normally', async () => {
+  api.delay('GET', '/v1/applications', 300)
+  const started = Date.now()
+  const [held, other] = await Promise.all([
+    call('/v1/applications').then(r => ({ status: r.status, ms: Date.now() - started })),
+    call('/v1/unit_types').then(r => ({ status: r.status, ms: Date.now() - started }))
+  ])
+  expect(held.status).toBe(200)
+  expect(held.ms).toBeGreaterThanOrEqual(280)
+  expect(other.status).toBe(200)
+  expect(other.ms).toBeLessThan(280)
+  expect(api.issues).toEqual([])
+})
