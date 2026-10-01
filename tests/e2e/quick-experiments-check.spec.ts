@@ -35,6 +35,20 @@ test.describe('Quick Experiments Check', () => {
     await testPage.close()
   })
 
+  // The first list request starts only after config/auth/resources load, and
+  // its response can arrive late. Holding both must not change the outcome:
+  // nothing may be asserted before the awaited response (PR34 run 36922963544).
+  test('renders the list from a delayed response that starts late', async ({ context, extensionUrl, managementApi }) => {
+    managementApi.state.experiments.push(experimentRecord({ name: 'quick_check_late', display_name: 'Quick Check Late', state: 'created' }))
+    managementApi.delay('GET', '/v1/applications', 1500)
+    managementApi.delay('GET', '/v1/experiments', 3000)
+    const { testPage, sidebar, body } = await openAndAwaitList(context, extensionUrl)
+    expect(body.experiments.map((e: any) => e.name)).toEqual(['quick_check_late'])
+    await expect(sidebar.locator('[data-experiment-name="quick_check_late"]')).toBeVisible()
+    await expect(sidebar.locator('#no-experiments-message')).toHaveCount(0)
+    await testPage.close()
+  })
+
   test('shows the empty state when the API returns no experiments', async ({ context, extensionUrl, managementApi }) => {
     const { testPage, sidebar, body } = await openAndAwaitList(context, extensionUrl)
     expect(body.experiments).toEqual([])
