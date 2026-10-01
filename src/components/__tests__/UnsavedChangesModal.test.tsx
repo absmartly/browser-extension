@@ -85,4 +85,144 @@ describe("UnsavedChangesModal", () => {
       "Save"
     ])
   })
+
+  describe("keyboard behaviour", () => {
+    it("moves focus into the dialog when it opens", () => {
+      render(<UnsavedChangesModal {...defaultProps} />)
+      expect(screen.getByRole("button", { name: "Cancel" })).toHaveFocus()
+    })
+
+    it("keeps Tab and Shift+Tab focus inside the dialog", () => {
+      render(
+        <>
+          <button id="behind-overlay">Behind</button>
+          <UnsavedChangesModal {...defaultProps} />
+        </>
+      )
+      const cancel = screen.getByRole("button", { name: "Cancel" })
+      const save = screen.getByRole("button", { name: "Save" })
+      save.focus()
+      fireEvent.keyDown(save, { key: "Tab" })
+      expect(cancel).toHaveFocus()
+      fireEvent.keyDown(cancel, { key: "Tab", shiftKey: true })
+      expect(save).toHaveFocus()
+    })
+
+    it("cancels on Escape", () => {
+      render(<UnsavedChangesModal {...defaultProps} />)
+      fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" })
+      expect(defaultProps.onCancel).toHaveBeenCalledTimes(1)
+      expect(defaultProps.onDiscard).not.toHaveBeenCalled()
+      expect(defaultProps.onSave).not.toHaveBeenCalled()
+    })
+
+    it("ignores Escape while saving", () => {
+      render(<UnsavedChangesModal {...defaultProps} saving={true} />)
+      fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" })
+      expect(defaultProps.onCancel).not.toHaveBeenCalled()
+    })
+
+    it("keeps focus inside the dialog while Save is in flight", () => {
+      const { rerender } = render(
+        <>
+          <button id="behind-overlay">Behind</button>
+          <UnsavedChangesModal {...defaultProps} />
+        </>
+      )
+      screen.getByRole("button", { name: "Save" }).focus()
+      rerender(
+        <>
+          <button id="behind-overlay">Behind</button>
+          <UnsavedChangesModal {...defaultProps} saving={true} />
+        </>
+      )
+      const dialog = screen.getByRole("dialog")
+      expect(dialog).toHaveFocus()
+      fireEvent.keyDown(dialog, { key: "Tab" })
+      expect(dialog).toHaveFocus()
+      fireEvent.keyDown(dialog, { key: "Tab", shiftKey: true })
+      expect(dialog).toHaveFocus()
+      fireEvent.keyDown(dialog, { key: "Escape" })
+      expect(defaultProps.onCancel).not.toHaveBeenCalled()
+
+      rerender(
+        <>
+          <button id="behind-overlay">Behind</button>
+          <UnsavedChangesModal {...defaultProps} saving={false} />
+        </>
+      )
+      fireEvent.keyDown(dialog, { key: "Tab" })
+      expect(screen.getByRole("button", { name: "Cancel" })).toHaveFocus()
+    })
+
+    it("takes back focus moved behind the overlay while open", () => {
+      render(
+        <>
+          <input id="invalid-field" />
+          <UnsavedChangesModal {...defaultProps} />
+        </>
+      )
+      const field = document.getElementById("invalid-field") as HTMLElement
+      // e.g. failed Save validation focusing the invalid field a frame later
+      field.focus()
+      const dialog = screen.getByRole("dialog")
+      expect(dialog).toHaveFocus()
+      fireEvent.keyDown(dialog, { key: "Escape" })
+      expect(defaultProps.onCancel).toHaveBeenCalledTimes(1)
+    })
+
+    it("lets a modal dialog opened on top keep keyboard focus", () => {
+      function Layered({ promptOpen }: { promptOpen: boolean }) {
+        return (
+          <>
+            <UnsavedChangesModal {...defaultProps} />
+            {promptOpen && (
+              <div role="dialog" aria-modal="true" id="prompt">
+                <button id="prompt-grant">Grant Access</button>
+                <button id="prompt-cancel">Cancel prompt</button>
+              </div>
+            )}
+          </>
+        )
+      }
+      const { rerender } = render(<Layered promptOpen={false} />)
+      expect(screen.getByRole("button", { name: "Cancel" })).toHaveFocus()
+      rerender(<Layered promptOpen={true} />)
+      const grant = screen.getByRole("button", { name: "Grant Access" })
+      const promptCancel = screen.getByRole("button", { name: "Cancel prompt" })
+      grant.focus()
+      expect(grant).toHaveFocus()
+      promptCancel.focus()
+      expect(promptCancel).toHaveFocus()
+      // Tabbing out of the prompt into the covered dialog wraps back into it.
+      screen.getByRole("button", { name: "Save" }).focus()
+      expect(grant).toHaveFocus()
+    })
+
+    it("restores focus to the element that opened it after closing", () => {
+      function Harness() {
+        const [open, setOpen] = React.useState(false)
+        return (
+          <>
+            <button id="opener" onClick={() => setOpen(true)}>
+              Back
+            </button>
+            <UnsavedChangesModal
+              {...defaultProps}
+              isOpen={open}
+              onCancel={() => setOpen(false)}
+            />
+          </>
+        )
+      }
+      render(<Harness />)
+      const opener = screen.getByRole("button", { name: "Back" })
+      opener.focus()
+      fireEvent.click(opener)
+      expect(screen.getByRole("button", { name: "Cancel" })).toHaveFocus()
+      fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" })
+      expect(screen.queryByRole("dialog")).toBeNull()
+      expect(opener).toHaveFocus()
+    })
+  })
 })

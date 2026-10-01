@@ -395,8 +395,21 @@ export function useSettingsForm() {
       newErrors.apiEndpoint = "API Endpoint is required"
     } else {
       try {
-        const url = new URL(normalizeEndpoint(apiEndpoint))
-        if (!["http:", "https:"].includes(url.protocol) || !url.hostname) {
+        const normalized = normalizeEndpoint(apiEndpoint)
+        // Chromium's URL parser percent-encodes some characters that are not
+        // valid in a hostname (e.g. "http://a b" -> "http://a%20b/"), whereas
+        // jsdom throws. Reject whitespace explicitly and never accept a host
+        // that the parser had to percent-encode, so the packaged extension
+        // behaves the same as the unit tests.
+        if (/\s/.test(normalized)) {
+          throw new Error("Invalid endpoint")
+        }
+        const url = new URL(normalized)
+        if (
+          !["http:", "https:"].includes(url.protocol) ||
+          !url.hostname ||
+          url.hostname.includes("%")
+        ) {
           throw new Error("Invalid endpoint")
         }
       } catch {

@@ -171,6 +171,7 @@ export function ListView({
       </div>
       {!isAuthenticated && (
         <div
+          id="not-logged-in-banner"
           role="alert"
           className="bg-blue-50 text-blue-700 px-4 py-2 text-sm">
           <div className="flex items-center justify-between">

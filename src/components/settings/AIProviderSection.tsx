@@ -255,9 +255,14 @@ export const AIProviderSection = React.memo(function AIProviderSection({
     }
   }
 
-  const CustomEndpointSection = () => (
+  // Plain render helpers, not nested components: a component declared in
+  // the render body gets a new type on every render, so React would remount
+  // its inputs (losing focus and <details> state) after each keystroke.
+  const renderCustomEndpointSection = () => (
     <details className="text-sm mt-3">
-      <summary className="cursor-pointer text-gray-700 hover:text-gray-900">
+      <summary
+        id={`custom-${aiProvider}-endpoint-summary`}
+        className="cursor-pointer text-gray-700 hover:text-gray-900">
         Advanced: Custom API Endpoint
       </summary>
       <div className="mt-2 space-y-2">
@@ -274,7 +279,7 @@ export const AIProviderSection = React.memo(function AIProviderSection({
     </details>
   )
 
-  const ApiKeySection = () => (
+  const renderApiKeySection = () => (
     <>
       <Input
         id="ai-api-key"
@@ -298,7 +303,7 @@ export const AIProviderSection = React.memo(function AIProviderSection({
     </>
   )
 
-  const ModelSelectionSection = () => {
+  const renderModelSelectionSection = () => {
     if (!aiApiKey) return null
 
     if (fetchingModels) {
@@ -470,7 +475,7 @@ export const AIProviderSection = React.memo(function AIProviderSection({
             </>
           )}
 
-          <CustomEndpointSection />
+          {renderCustomEndpointSection()}
 
           <div className="flex items-center justify-between p-3 bg-gray-50 rounded-md">
             <div className="flex items-center gap-3">
@@ -610,11 +615,11 @@ export const AIProviderSection = React.memo(function AIProviderSection({
 
       {!meta.isBridge && (
         <div className="mt-4 space-y-3">
-          <ApiKeySection />
+          {renderApiKeySection()}
           {aiApiKey && (
             <div>
-              <ModelSelectionSection />
-              <CustomEndpointSection />
+              {renderModelSelectionSection()}
+              {renderCustomEndpointSection()}
             </div>
           )}
         </div>
