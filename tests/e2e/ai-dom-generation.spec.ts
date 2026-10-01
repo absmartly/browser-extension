@@ -69,10 +69,15 @@ test.describe("AI DOM Changes Generation", () => {
 
   test("Refresh HTML button updates page context", async () => {
     const refresh = sidebar.locator("#refresh-html-button")
+    // The session exists only once conversation history has loaded. The
+    // button is enabled earlier (observed: an immediate click can report
+    // "No active conversation to refresh"); wait for the real readiness.
+    await expect(sidebar.locator('button[title="Conversation History"]')).toBeAttached()
     await expect(refresh).toBeEnabled()
     await refresh.click()
     await expect(refresh).toBeEnabled()
-    await expect(sidebar.locator(".bg-red-50").first()).not.toBeVisible()
+    await expect(sidebar.getByText("No active conversation to refresh")).toHaveCount(0)
+    await expect(sidebar.locator(".bg-red-50")).toHaveCount(0)
   })
 
   test("AI uses css_query tool with Anthropic API", async ({ aiProvider }) => {

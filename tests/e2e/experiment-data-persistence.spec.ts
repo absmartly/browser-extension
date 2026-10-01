@@ -42,7 +42,7 @@ test.describe('Experiment Data Persistence', () => {
     if (testPage && !process.env.SLOW) await testPage.close()
   })
 
-  test('should persist and reload all experiment metadata including unit type', async () => {
+  test('should persist and reload all experiment metadata including unit type', async ({ managementApi }) => {
     test.setTimeout(process.env.SLOW === '1' ? 90000 : 60000)
     let createdExperimentName: string
     const expectedSelections = new Map<string, string>()
@@ -379,6 +379,22 @@ test.describe('Experiment Data Persistence', () => {
         for (const [id, selection] of expectedSelections) {
           await expect(sidebar.locator(`#${id}-trigger`)).toHaveText(selection, { useInnerText: true })
         }
+
+        // The create request itself carried the saved values to the backend.
+        const [create] = managementApi.callsTo('POST', '/v1/experiments')
+        expect(create.status).toBe(200)
+        const r = managementApi.state.resources
+        const label = (list: any[], key: string, id: number) => list.find(x => x.id === id)?.[key]
+        expect(create.body).toMatchObject({ name: createdExperimentName, percentage_of_traffic: 75, state: 'created' })
+        expect(expectedSelections.get('unit-type-select')).toContain(label(r.unit_types, 'name', (create.body as any).unit_type.unit_type_id))
+        for (const tag of (create.body as any).experiment_tags) {
+          expect(expectedSelections.get('tags-select')).toContain(label(r.experiment_tags, 'tag', tag.experiment_tag_id))
+        }
+        for (const app of (create.body as any).applications) {
+          expect(expectedSelections.get('applications-select')).toContain(label(r.applications, 'name', app.application_id))
+        }
+        expect((create.body as any).applications.length).toBeGreaterThan(0)
+        expect((create.body as any).experiment_tags.length).toBeGreaterThan(0)
 
         await debugWait()
       } catch (error) {

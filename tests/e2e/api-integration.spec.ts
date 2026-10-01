@@ -1,5 +1,6 @@
 import { test, expect } from '../fixtures/extension'
 import { injectSidebar, setupTestPage } from './utils/test-helpers'
+import { controlledConfigSeed } from '../helpers/management-api/server'
 
 const TEST_PAGE_URL = '/visual-editor-test.html'
 
@@ -10,20 +11,9 @@ test.describe('API Integration Tests', () => {
 
   test('sidebar boots and makes a real API call via background', async ({
     context, seedStorage, extensionUrl
-  }) => {
+, managementApi }) => {
     // 1) Seed credentials
-    await seedStorage({
-      'absmartly-apikey': process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || 'BxYKd1U2DlzOLJ74gdvaIkwy4qyOCkXi_YJFFdE1EDyovjEsQ__iiX0IM1ONfHKB',
-      'absmartly-endpoint': process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT || 'https://dev-1.absmartly.com/v1',
-      'absmartly-env': process.env.PLASMO_PUBLIC_ABSMARTLY_ENVIRONMENT || 'development',
-      'absmartly-auth-method': 'apikey',
-      absmartlyConfig: {
-        apiKey: process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || 'BxYKd1U2DlzOLJ74gdvaIkwy4qyOCkXi_YJFFdE1EDyovjEsQ__iiX0IM1ONfHKB',
-        apiEndpoint: process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT || 'https://dev-1.absmartly.com/v1',
-        environment: process.env.PLASMO_PUBLIC_ABSMARTLY_ENVIRONMENT || 'development',
-        authMethod: 'apikey'
-      }
-    })
+    await seedStorage(controlledConfigSeed(managementApi))
 
     // 2) Load sidebar
     const page = await context.newPage()
@@ -55,17 +45,9 @@ test.describe('API Integration Tests', () => {
 
   test('sidebar shows experiments after API call', async ({
     context, seedStorage, extensionUrl, getStorage
-  }) => {
+, managementApi }) => {
     // Seed with real credentials including the config object
-    await seedStorage({
-      'absmartly-apikey': process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || 'BxYKd1U2DlzOLJ74gdvaIkwy4qyOCkXi_YJFFdE1EDyovjEsQ__iiX0IM1ONfHKB',
-      'absmartly-config': {
-        apiKey: process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || 'BxYKd1U2DlzOLJ74gdvaIkwy4qyOCkXi_YJFFdE1EDyovjEsQ__iiX0IM1ONfHKB',
-        apiEndpoint: process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT || 'https://dev-1.absmartly.com/v1',
-        environment: process.env.PLASMO_PUBLIC_ABSMARTLY_ENVIRONMENT || 'development',
-        authMethod: 'apikey'
-      }
-    })
+    await seedStorage(controlledConfigSeed(managementApi))
 
     // Load sidebar
     const page = await context.newPage()
@@ -91,17 +73,9 @@ test.describe('API Integration Tests', () => {
 
   test('can navigate to experiment details', async ({
     context, seedStorage, extensionUrl
-  }) => {
+, managementApi }) => {
     // Seed credentials including the config object
-    await seedStorage({
-      'absmartly-apikey': process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || 'BxYKd1U2DlzOLJ74gdvaIkwy4qyOCkXi_YJFFdE1EDyovjEsQ__iiX0IM1ONfHKB',
-      'absmartly-config': {
-        apiKey: process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || 'BxYKd1U2DlzOLJ74gdvaIkwy4qyOCkXi_YJFFdE1EDyovjEsQ__iiX0IM1ONfHKB',
-        apiEndpoint: process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT || 'https://dev-1.absmartly.com/v1',
-        environment: process.env.PLASMO_PUBLIC_ABSMARTLY_ENVIRONMENT || 'development',
-        authMethod: 'apikey'
-      }
-    })
+    await seedStorage(controlledConfigSeed(managementApi))
 
     const page = await context.newPage()
     await setupTestPage(page, extensionUrl, TEST_PAGE_URL)
