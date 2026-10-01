@@ -6,9 +6,10 @@ adapter, tool loop and DOM changes without contacting a model service. Each test
 owns its ordered responses; unexpected or unconsumed calls fail the test. Settings
 and storage resets must not turn this into a live-provider fallback.
 
-`bun run test:e2e` and pull-request CI need no Anthropic credentials. Office API
-fixture setup remains an integration dependency and uses the existing ABsmartly
-test credentials.
+`bun run test:e2e` and pull-request CI need no Anthropic or ABsmartly credentials.
+The management API is a local fixture validated against the pinned published
+contract (see `tests/helpers/management-api/README.md`); only this optional live
+smoke uses a real environment.
 
 ## Optional live compatibility smoke
 
