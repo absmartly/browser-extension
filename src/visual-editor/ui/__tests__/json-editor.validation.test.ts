@@ -47,6 +47,9 @@ describe("JSONEditor save validation (FT-2251)", () => {
       editor.show("Edit DOM Changes - Variant 1", '{"a":1}').then(onResult)
 
       const host = await saveWith(text)
+      // Let any resolution reach the handler before asserting it never fired.
+      await Promise.resolve()
+      await Promise.resolve()
 
       expect(document.body.contains(host)).toBe(true)
       expect(document.getElementById("json-editor-status")!.textContent).toBe(
