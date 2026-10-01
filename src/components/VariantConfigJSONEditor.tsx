@@ -56,7 +56,11 @@ export const VariantConfigJSONEditor: React.FC<
           const parsedConfig = JSON.parse(message.value)
 
           // Validate: must be an object
-          if (typeof parsedConfig !== "object" || parsedConfig === null) {
+          if (
+            typeof parsedConfig !== "object" ||
+            parsedConfig === null ||
+            Array.isArray(parsedConfig)
+          ) {
             console.error("Variant config must be an object")
             return
           }

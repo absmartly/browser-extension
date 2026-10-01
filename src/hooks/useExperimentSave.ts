@@ -40,6 +40,12 @@ export interface ExperimentFormData {
   customFieldValues?: Record<string, unknown>
 }
 
+// Returning false means the update failed and the handler already reported it.
+export type ExperimentUpdateHandler = (
+  id: number,
+  updates: Partial<Experiment>
+) => void | boolean | Promise<void | boolean>
+
 interface UseExperimentSaveOptions {
   experiment?: Experiment | null
   domFieldName: string
@@ -72,7 +78,7 @@ export function useExperimentSave({
   const save = async (
     formData: ExperimentFormData,
     currentVariants: VariantData[],
-    onUpdate?: (id: number, updates: Partial<Experiment>) => void,
+    onUpdate?: ExperimentUpdateHandler,
     onSave?: (experiment: Partial<Experiment>) => Promise<void>
   ) => {
     if (savingRef.current) return
@@ -371,7 +377,7 @@ async function saveExistingExperiment(
   formData: ExperimentFormData,
   currentVariants: VariantData[],
   fieldName: string,
-  onUpdate: (id: number, updates: Partial<Experiment>) => void,
+  onUpdate: ExperimentUpdateHandler,
   onError?: (message: string) => void,
   setSaveStatus?: (status: SaveStatus) => void
 ) {
@@ -397,7 +403,7 @@ async function saveExistingExperiment(
       if (onError) {
         onError(errorMessage)
       }
-      return
+      return false
     }
 
     const fullExperiment: FullExperiment =
@@ -572,12 +578,20 @@ async function saveExistingExperiment(
 
     try {
       setSaveStatus?.({ step: "saving", message: "Saving to ABsmartly..." })
-      await onUpdate(experiment.id, changes)
+      const updated = await onUpdate(experiment.id, changes)
+      if (updated === false) {
+        setSaveStatus?.({
+          step: "error",
+          message: "Failed to save to ABsmartly"
+        })
+        return false
+      }
       setSaveStatus?.({
         step: "complete",
         message: "Experiment saved successfully"
       })
       await notifySuccess("Experiment saved successfully")
+      return true
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error"

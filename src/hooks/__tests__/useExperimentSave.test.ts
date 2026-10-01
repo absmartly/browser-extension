@@ -431,10 +431,17 @@ describe("useExperimentSave - Custom Fields", () => {
         })
       )
 
+      let saved: unknown
       await act(async () => {
-        await result.current.save(formData, variants, mockOnUpdate, undefined)
+        saved = await result.current.save(
+          formData,
+          variants,
+          mockOnUpdate,
+          undefined
+        )
       })
 
+      expect(saved).toBe(true)
       expect(mockOnUpdate).toHaveBeenCalled()
       const updatePayload = mockOnUpdate.mock.calls[0][1]
 
@@ -650,10 +657,18 @@ describe("useExperimentSave - Custom Fields", () => {
         })
       )
 
+      let saved: unknown
       await act(async () => {
-        await result.current.save(formData, variants, mockOnUpdate, undefined)
+        saved = await result.current.save(
+          formData,
+          variants,
+          mockOnUpdate,
+          undefined
+        )
       })
 
+      expect(saved).toBe(false)
+      expect(mockOnUpdate).not.toHaveBeenCalled()
       expect(notifyError).toHaveBeenCalledWith(
         "Failed to load experiment: Experiment not found"
       )
@@ -720,6 +735,64 @@ describe("useExperimentSave - Custom Fields", () => {
       expect(mockOnError).toHaveBeenCalledWith(
         "Failed to save to ABsmartly: Network timeout"
       )
+    })
+
+    it("returns false without success or a second error when the update handler reports failure", async () => {
+      const existingExperiment: Partial<Experiment> = {
+        id: unsafeExperimentId(1),
+        name: "test-experiment",
+        state: "created"
+      }
+      ;(chrome.runtime.sendMessage as jest.Mock).mockResolvedValue({
+        success: true,
+        data: {
+          experiment: {
+            id: 1,
+            name: "test-experiment",
+            state: "created",
+            iteration: 1,
+            variants: [],
+            percentages: "50/50",
+            audience: "{}",
+            audience_strict: false,
+            updated_at: "2024-01-01T00:00:00Z"
+          }
+        }
+      })
+      const mockOnUpdate = jest.fn().mockResolvedValue(false)
+      const mockOnError = jest.fn()
+      const { result } = renderHook(() =>
+        useExperimentSave({
+          experiment: existingExperiment as Experiment,
+          domFieldName: "__dom_changes",
+          onError: mockOnError
+        })
+      )
+
+      let saved: unknown
+      await act(async () => {
+        saved = await result.current.save(
+          {
+            display_name: "Test",
+            percentage_of_traffic: 42,
+            unit_type_id: 1,
+            application_ids: [1],
+            owner_ids: [1],
+            team_ids: [],
+            tag_ids: []
+          },
+          [{ name: "Control", config: {} }],
+          mockOnUpdate,
+          undefined
+        )
+      })
+
+      expect(mockOnUpdate).toHaveBeenCalledTimes(1)
+      expect(saved).toBe(false)
+      expect(notifySuccess).not.toHaveBeenCalled()
+      expect(notifyError).not.toHaveBeenCalled()
+      expect(mockOnError).not.toHaveBeenCalled()
+      expect(result.current.saveStatus.step).toBe("error")
     })
 
     it("should show success notification when save completes", async () => {
