@@ -1,23 +1,15 @@
 import { test, expect } from '../fixtures/extension'
 import { type Page } from '@playwright/test'
 import { setupTestPage, debugWait, setupConsoleLogging, click } from './utils/test-helpers'
+import { controlledConfigSeed } from '../helpers/management-api/server'
 
 test.describe('Variable Sync - __inject_html and DOM Changes Preservation', () => {
   let testPage: Page
   let allConsoleMessages: Array<{type: string, text: string}> = []
 
-  test.beforeEach(async ({ context, seedStorage }) => {
+  test.beforeEach(async ({ context, seedStorage, managementApi }) => {
     // Seed credentials before each test
-    await seedStorage({
-      'absmartly-config': {
-        apiKey: process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || '',
-        apiEndpoint: process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT || '',
-        authMethod: 'apikey',
-        domChangesFieldName: '__dom_changes',
-        vibeStudioEnabled: true,
-        htmlInjectionEnabled: true
-      }
-    })
+    await seedStorage(controlledConfigSeed(managementApi, { domChangesFieldName: '__dom_changes', vibeStudioEnabled: true, htmlInjectionEnabled: true }))
 
     testPage = await context.newPage()
 

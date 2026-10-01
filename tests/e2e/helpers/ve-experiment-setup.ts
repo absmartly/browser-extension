@@ -22,8 +22,10 @@ export async function createExperiment(
   await debugWait()
 
   const experimentName = `E2E Test Experiment ${Date.now()}`
-  await sidebar.locator('input[placeholder*="xperiment"], input[name="name"], input[type="text"]').first().fill(experimentName)
-  await debugWait()
+  // Fill the display name; with synced names the editor derives the unique
+  // experiment name from it. A generic text-input match filled another field.
+  await sidebar.locator('#display-name-input').fill(experimentName)
+  await expect(sidebar.locator('#experiment-name-input')).toHaveValue(experimentName.toLowerCase().replace(/\s+/g, '_'))
 
   const unitTypeTrigger = sidebar.locator('#unit-type-select-trigger')
   await unitTypeTrigger.waitFor({ state: 'visible', timeout: 5000 })

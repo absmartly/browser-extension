@@ -1,6 +1,7 @@
 import { test, expect } from '../fixtures/extension'
 import { setupTestPage, injectSidebar } from './utils/test-helpers'
 import type { FrameLocator } from '@playwright/test'
+import { controlledConfigSeed } from '../helpers/management-api/server'
 
 const TEST_PAGE_URL = '/visual-editor-test.html'
 
@@ -21,19 +22,10 @@ async function openSettings(sidebar: FrameLocator): Promise<void> {
 }
 
 test.describe('Claude API Key Authentication', () => {
-  test('should display AI API Key input in settings', async ({ context, extensionUrl, seedStorage }) => {
+  test('should display AI API Key input in settings', async ({ context, extensionUrl, seedStorage, managementApi }) => {
     // Same explicit seed as the other two tests so vibeStudioEnabled is
     // present and the AI section renders deterministically under workers=4.
-    await seedStorage({
-      'absmartly-apikey': process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || 'BxYKd1U2DlzOLJ74gdvaIkwy4qyOCkXi_YJFFdE1EDyovjEsQ__iiX0IM1ONfHKB',
-      'absmartly-config': {
-        apiKey: '',
-        apiEndpoint: process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT || 'https://dev-1.absmartly.com/v1',
-        authMethod: 'apikey',
-        vibeStudioEnabled: true,
-        domChangesFieldName: '__dom_changes'
-      }
-    })
+    await seedStorage(controlledConfigSeed(managementApi, { domChangesFieldName: '__dom_changes', vibeStudioEnabled: true }))
 
     const page = await context.newPage()
 
@@ -55,22 +47,13 @@ test.describe('Claude API Key Authentication', () => {
     await page.close()
   })
 
-  test('should allow entering and saving Claude API Key', async ({ context, extensionUrl, seedStorage }) => {
+  test('should allow entering and saving Claude API Key', async ({ context, extensionUrl, seedStorage, managementApi }) => {
     // Same rationale as test #69 below: seed the new-format config
     // explicitly so vibeStudioEnabled is set and the SettingsView "API key
     // required" validator has a value. The shared fixture seeds these too,
     // but Plasmo Storage's prod-build serialization can race the test
     // setup under workers=4 — be explicit.
-    await seedStorage({
-      'absmartly-apikey': process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || 'BxYKd1U2DlzOLJ74gdvaIkwy4qyOCkXi_YJFFdE1EDyovjEsQ__iiX0IM1ONfHKB',
-      'absmartly-config': {
-        apiKey: '',
-        apiEndpoint: process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT || 'https://dev-1.absmartly.com/v1',
-        authMethod: 'apikey',
-        vibeStudioEnabled: true,
-        domChangesFieldName: '__dom_changes'
-      }
-    })
+    await seedStorage(controlledConfigSeed(managementApi, { domChangesFieldName: '__dom_changes', vibeStudioEnabled: true }))
 
     const page = await context.newPage()
 
@@ -79,16 +62,8 @@ test.describe('Claude API Key Authentication', () => {
 
     await openSettings(sidebar)
 
-    // The shared seed should already populate the absmartly apiKey field,
-    // but under workers=4 the form's loadConfig race occasionally leaves
-    // it blank. Fill explicitly so validateForm passes deterministically.
-    const absmartlyApiKeyField = sidebar.locator('#api-key-input')
-    if (await absmartlyApiKeyField.isVisible({ timeout: 5000 }).catch(() => false)) {
-      const currentValue = await absmartlyApiKeyField.inputValue()
-      if (!currentValue) {
-        await absmartlyApiKeyField.fill(process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || 'BxYKd1U2DlzOLJ74gdvaIkwy4qyOCkXi_YJFFdE1EDyovjEsQ__iiX0IM1ONfHKB')
-      }
-    }
+    // The controlled credential is seeded before mount and must be shown as-is.
+    await expect(sidebar.locator('#api-key-input')).toHaveValue(managementApi.apiKey)
 
     const providerSelect = sidebar.locator('#ai-provider-select')
     await providerSelect.waitFor({ state: 'visible', timeout: 5000 })
@@ -116,23 +91,14 @@ test.describe('Claude API Key Authentication', () => {
     await page.close()
   })
 
-  test('should persist Claude API Key across page reloads', async ({ context, extensionUrl, seedStorage }) => {
+  test('should persist Claude API Key across page reloads', async ({ context, extensionUrl, seedStorage, managementApi }) => {
     // Previous tests in this file seed via the legacy `absmartly-apikey` /
     // `absmartly-endpoint` keys that seed.js converts to a partial config.
     // That conversion omits `vibeStudioEnabled`, which gates the AI provider
     // section in SettingsView — so #ai-provider-select never rendered and
     // the test timed out waiting for it. Seed the new-format config
     // directly with vibeStudioEnabled=true so the AI section shows up.
-    await seedStorage({
-      'absmartly-apikey': process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || 'BxYKd1U2DlzOLJ74gdvaIkwy4qyOCkXi_YJFFdE1EDyovjEsQ__iiX0IM1ONfHKB',
-      'absmartly-config': {
-        apiKey: '',
-        apiEndpoint: process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT || 'https://dev-1.absmartly.com/v1',
-        authMethod: 'apikey',
-        vibeStudioEnabled: true,
-        domChangesFieldName: '__dom_changes'
-      }
-    })
+    await seedStorage(controlledConfigSeed(managementApi, { domChangesFieldName: '__dom_changes', vibeStudioEnabled: true }))
 
     const page = await context.newPage()
 
@@ -141,15 +107,8 @@ test.describe('Claude API Key Authentication', () => {
 
     await openSettings(sidebar)
 
-    // Same defensive fill as test #58 — the seeded apiKey may not always
-    // propagate into the form's apiKey state under workers=4.
-    const absmartlyApiKeyField = sidebar.locator('#api-key-input')
-    if (await absmartlyApiKeyField.isVisible({ timeout: 5000 }).catch(() => false)) {
-      const currentValue = await absmartlyApiKeyField.inputValue()
-      if (!currentValue) {
-        await absmartlyApiKeyField.fill(process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || 'BxYKd1U2DlzOLJ74gdvaIkwy4qyOCkXi_YJFFdE1EDyovjEsQ__iiX0IM1ONfHKB')
-      }
-    }
+    // The controlled credential is seeded before mount and must be shown as-is.
+    await expect(sidebar.locator('#api-key-input')).toHaveValue(managementApi.apiKey)
 
     const providerSelect = sidebar.locator('#ai-provider-select')
     await providerSelect.waitFor({ state: 'visible', timeout: 5000 })
