@@ -8,7 +8,9 @@ export const MANAGEMENT_API_ORIGIN = 'https://e2e-api.absmartly.com'
 export const MANAGEMENT_API_KEY = 'e2e-synthetic-api-key'
 
 export type RecordedCall = { method: string; path: string; query: Record<string, string>; body: unknown; status: number }
-export type Override = (call: { method: string; url: URL; body: any }) => FixtureResponse | undefined
+// May return a response (or a promise of one, e.g. to delay it); undefined
+// falls through to the next override and then to the stateful routes.
+export type Override = (call: { method: string; url: URL; body: any }) => FixtureResponse | undefined | Promise<FixtureResponse | undefined>
 
 export interface ManagementApi {
   origin: string
@@ -18,6 +20,8 @@ export interface ManagementApi {
   calls: RecordedCall[]
   issues: ContractIssue[]
   override(handler: Override): void
+  // Hold matching requests before they are answered (by overrides or routes).
+  delay(method: string, path: string | RegExp, ms: number): void
   reset(): void
   callsTo(method: string, path: string | RegExp): RecordedCall[]
   assertClean(): void
@@ -145,6 +149,7 @@ export function compileCoveredOperations() {
 export async function createManagementApi(): Promise<ManagementApi> {
   compileCoveredOperations()
   const overrides: Override[] = []
+  const delays: Array<{ method: string; path: string | RegExp; ms: number }> = []
   const api: ManagementApi = {
     origin: MANAGEMENT_API_ORIGIN,
     url: '',
@@ -153,7 +158,8 @@ export async function createManagementApi(): Promise<ManagementApi> {
     calls: [],
     issues: [],
     override: handler => { overrides.push(handler) },
-    reset: () => { api.state = freshState(); api.calls.length = 0; api.issues.length = 0; overrides.length = 0 },
+    delay: (method, path, ms) => { delays.push({ method, path, ms }) },
+    reset: () => { api.state = freshState(); api.calls.length = 0; api.issues.length = 0; overrides.length = 0; delays.length = 0 },
     callsTo: (method, path) => api.calls.filter(c => c.method === method && (typeof path === 'string' ? c.path === path : path.test(c.path))),
     assertClean: () => {
       if (api.issues.length) throw new Error(`Management API contract issues:\n${api.issues.map(i => `- [${i.kind}] ${i.message}`).join('\n')}`)
@@ -182,8 +188,11 @@ export async function createManagementApi(): Promise<ManagementApi> {
       result = UNAUTHORIZED
     } else {
       api.issues.push(...validateRequest(method, url, body))
-      result = overrides.reduce<FixtureResponse | undefined>((found, o) => found ?? o({ method, url, body }), undefined)
-        ?? route(api, method, url, body)
+      const hold = delays.find(d => d.method === method && (typeof d.path === 'string' ? d.path === url.pathname : d.path.test(url.pathname)))
+      if (hold) await new Promise(resolve => setTimeout(resolve, hold.ms))
+      let overridden: FixtureResponse | undefined
+      for (const o of overrides) if ((overridden = await o({ method, url, body }))) break
+      result = overridden ?? route(api, method, url, body)
     }
     // A missing route is a coverage failure, never a silent 404 success path.
     if (result.status === 404 && String((result.body as any)?.errors?.[0] || '').startsWith('No fixture route')) {
