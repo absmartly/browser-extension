@@ -70,7 +70,7 @@ describe("experiment update result", () => {
     expect(props.loadExperiments).not.toHaveBeenCalled()
   })
 
-  it("resolves true after a successful update", async () => {
+  it("resolves true only after sending the update", async () => {
     const props = makeProps(jest.fn().mockResolvedValue({}))
     const { result } = renderHook(() => useExperimentHandlers(props))
 
@@ -79,6 +79,10 @@ describe("experiment update result", () => {
       persisted = await result.current.handleUpdateExperiment(7, {
         percentage_of_traffic: 42
       })
+    })
+    expect(props.updateExperiment).toHaveBeenCalledTimes(1)
+    expect(props.updateExperiment).toHaveBeenCalledWith(7, {
+      percentage_of_traffic: 42
     })
     expect(persisted).toBe(true)
     expect(props.onError).not.toHaveBeenCalled()
