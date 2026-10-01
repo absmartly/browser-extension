@@ -56,8 +56,12 @@ test.describe("Experiment editor — inline form (FT-1905)", () => {
   test("inline sections render in the sidebar editor", async ({
     extensionUrl
   }) => {
-    test.setTimeout(8000)
-
+    // test.setTimeout() also counts fixture setup (persistent browser launch,
+    // worker readiness, storage seed) and beforeEach. Under CI load that alone
+    // consumed the old 8s budget before the editor was reached. Bound the
+    // behaviour under test instead: each UI step below has its own 3s limit,
+    // and the editor must render within 8s of sidebar injection.
+    const startedAt = Date.now()
     const sidebar = await injectSidebar(testPage, extensionUrl)
 
     // Open create experiment from scratch.
@@ -84,5 +88,6 @@ test.describe("Experiment editor — inline form (FT-1905)", () => {
     await expect(
       sidebar.locator("#experiment-metrics-section")
     ).toBeVisible({ timeout: 3000 })
+    expect(Date.now() - startedAt, "inline editor ready after injection (ms)").toBeLessThan(8000)
   })
 })
