@@ -355,16 +355,6 @@ describe('config-manager', () => {
       return 'Authorization' in fetchMock.mock.calls[0][1].headers
     }
 
-    it('old ordering: a seed written during startup initialization is overwritten and requests go out unauthenticated', async () => {
-      const { storage, secureStorage, seed, armBeforeDefaultsWrite } = setup()
-      armBeforeDefaultsWrite(seed)
-      await startConfigInitialization(storage, secureStorage, jest.fn())
-      const config = await getConfig(storage, secureStorage)
-      expect(config?.authMethod).toBe('jwt')
-      expect(config?.apiKey).toBe('synthetic-seeded-key')
-      expect(await authorizationSent(config)).toBe(false)
-    })
-
     it('new ordering: a seeder that awaits the readiness promise keeps the seeded API-key auth', async () => {
       const { storage, secureStorage, seed, armBeforeDefaultsWrite } = setup()
       let seeding: Promise<void> | undefined
