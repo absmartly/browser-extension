@@ -256,11 +256,7 @@ test.describe('Experiment Creation and Editing Flows', () => {
       console.log('\n🔄 Testing detail view dropdowns with existing experiment')
 
       const hasExperiments = await waitForExperiments(sidebar)
-
-      if (!hasExperiments) {
-        console.log('  ℹ️  No experiments available to test detail view')
-        return
-      }
+      expect(hasExperiments, 'experiment list must load before opening a detail view').toBe(true)
 
       const experimentRow = sidebar.locator('.experiment-item').first()
       await experimentRow.waitFor({ state: 'visible', timeout: 5000 })
