@@ -365,43 +365,20 @@ test.describe('Experiment Creation and Editing Flows', () => {
     await test.step('Navigate back to experiments list', async () => {
       console.log('\n◀️  Navigating back to experiments list')
 
-      const backButton = sidebar.locator('button[aria-label="Go back"], button[title="Go back"]')
-      await backButton.click()
-      console.log('  ✓ Clicked back button')
-      // TODO: Replace timeout with specific element wait
-    await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 1000 }).catch(() => {})
-
-      // Check for either heading or create button
-      const experimentList = sidebar.locator('#experiments-header, #experiments-heading')
-      const createButton = sidebar.locator('button[title="Create New Experiment"]')
-
-      const listVisible = await experimentList.isVisible({ timeout: 2000 }).catch(() => false)
-      const buttonVisible = await createButton.isVisible({ timeout: 2000 }).catch(() => false)
-
-      if (listVisible || buttonVisible) {
-        console.log('  ✓ Returned to experiment list')
-      } else {
-        console.log('  ⚠️  Could not confirm return to experiment list')
-      }
-
-      await debugWait()
+      // Back runs the editor's async cleanup (content-script messages) before
+      // switching views: wait for the list itself, not a fixed delay.
+      await sidebar.locator('#create-experiment-header').waitFor({ state: 'visible' })
+      await sidebar.locator('#header-back-button').click()
+      await expect(sidebar.locator('#create-experiment-header')).toBeHidden()
+      await expect(sidebar.locator('#experiments-heading')).toBeVisible()
+      console.log('  ✓ Returned to experiment list')
     })
 
     await test.step('Navigate to Settings and verify Header', async () => {
       console.log('\n⚙️  Testing Settings view')
 
-      // Click settings button
-      const settingsButton = sidebar.locator('button[title*="Settings"], button[aria-label*="Settings"]').first()
-      const hasSettingsButton = await settingsButton.isVisible({ timeout: 2000 }).catch(() => false)
-
-      if (!hasSettingsButton) {
-        console.log('  ℹ️  Settings button not found, skipping settings test')
-        return
-      }
-
-      await settingsButton.click()
+      await sidebar.locator('#nav-settings').click()
       console.log('  ✓ Clicked settings button')
-      await debugWait()
 
       // Verify Header in Settings
       const headerTitle = sidebar.locator('#absmartly-endpoint')
@@ -422,22 +399,12 @@ test.describe('Experiment Creation and Editing Flows', () => {
     await test.step('Test back navigation from Settings', async () => {
       console.log('\n◀️  Testing back from Settings')
 
-      const backButton = sidebar.locator('#header-back-button')
-      const isVisible = await backButton.isVisible({ timeout: 2000 }).catch(() => false)
-      if (!isVisible) {
-        console.log('  ℹ️  Back button not visible (settings was skipped), skipping')
-        return
-      }
-
-      await backButton.click()
+      await expect(sidebar.locator('#absmartly-endpoint')).toBeVisible()
+      await sidebar.locator('#header-back-button').click()
       console.log('  ✓ Clicked back button')
-      await debugWait()
-
-      const settingsGone = sidebar.locator('#absmartly-endpoint')
-      await expect(settingsGone).not.toBeVisible({ timeout: 2000 })
-      console.log('  ✓ Settings view closed')
-
-      await debugWait()
+      await expect(sidebar.locator('#absmartly-endpoint')).toBeHidden()
+      await expect(sidebar.locator('#experiments-heading')).toBeVisible()
+      console.log('  ✓ Settings view closed, back on the list')
     })
 
     console.log('\n✅ Comprehensive experiment flow test PASSED!')
