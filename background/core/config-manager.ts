@@ -200,6 +200,7 @@ export function startConfigInitialization(
   onError: (error: unknown) => void
 ): Promise<void> {
   const initialization = initializeConfig(storage, secureStorage).catch(onError)
-  ;(globalThis as Record<string, unknown>)[CONFIG_INITIALIZATION_KEY] = initialization
+  const workerGlobal = globalThis as Record<string, unknown>
+  workerGlobal[CONFIG_INITIALIZATION_KEY] = initialization
   return initialization
 }

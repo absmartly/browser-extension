@@ -169,7 +169,8 @@ export function setupConsoleLogging(
 export async function waitForExperiments(sidebar: FrameLocator): Promise<boolean> {
   const experimentItem = sidebar.locator('[data-testid="experiment-list-item"]').first()
 
-  return await experimentItem.isVisible({ timeout: 10000 }).catch(() => false)
+  // isVisible() does not wait; a cold list load needs an actual wait.
+  return await experimentItem.waitFor({ state: 'visible', timeout: 30000 }).then(() => true, () => false)
 }
 
 /**
