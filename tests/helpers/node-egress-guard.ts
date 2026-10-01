@@ -4,11 +4,15 @@ import net from 'node:net'
 import tls from 'node:tls'
 
 // Deterministic-mode guard for the Node test process (Playwright main process
-// and workers). Outbound connections may only target loopback. Covered
-// transports: global fetch (undici, by URL), http/https.request/get,
-// net.connect/createConnection and tls.connect. Not covered: child processes
-// (e.g. the static test server or the browser), raw dgram/UDP and DNS lookups
-// that never connect. The browser itself is guarded by network-boundary.ts.
+// and workers). Outbound connections may only target loopback.
+// Covered: globalThis.fetch (by URL), http/https.request/get,
+// net.connect/createConnection and tls.connect, called through these module
+// objects after installNodeEgressGuard() runs.
+// Not covered: functions captured before installation (e.g. a destructured
+// `const { request } = require('https')` loaded earlier); undici used
+// directly (its own request/Dispatcher/Agent, not globalThis.fetch);
+// child processes (static test server, browser); dgram/UDP; DNS lookups.
+// The browser and its service worker are guarded by network-boundary.ts.
 export type NodeEgressViolation = { transport: string; target: string }
 
 const LOOPBACK = new Set(['localhost', '127.0.0.1', '::1', '[::1]'])
