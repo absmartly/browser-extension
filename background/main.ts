@@ -27,7 +27,7 @@ import { createExtensionClient } from "./core/absmartly-client"
 import { makeAPIRequest, openLoginPage } from "./core/api-client"
 import { routeAPIOperation } from "./core/api-operations"
 import type { APIOperation } from "./core/api-operations"
-import { getConfig, initializeConfig } from "./core/config-manager"
+import { getConfig, startConfigInitialization } from "./core/config-manager"
 import { routeMessage, validateSender } from "./core/message-router"
 import { initializeAvatarProxy } from "./handlers/avatar-proxy"
 import {
@@ -270,7 +270,7 @@ function resizeAbsmartlySidebar(
 export function initializeBackgroundScript() {
   debugLog("[Background] Initializing background script...")
 
-  initializeConfig(storage, secureStorage).catch((err) => {
+  startConfigInitialization(storage, secureStorage, (err) => {
     configInitError = err instanceof Error ? err.message : String(err)
     debugError("[Background] Init config error:", err)
     console.error("[Background] CRITICAL: Config initialization failed:", err)

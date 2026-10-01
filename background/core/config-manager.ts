@@ -5,6 +5,7 @@ import type { AIProviderType } from '~src/lib/ai-providers'
 import { debugLog } from '~src/utils/debug'
 import { validateAPIEndpoint } from '../utils/security'
 import { unsafeAPIEndpoint, unsafeApplicationId } from '~src/types/branded'
+import { CONFIG_INITIALIZATION_KEY } from './config-initialization-key'
 
 const ConfigSchema = z.object({
   apiKey: z.string().optional(),
@@ -168,4 +169,18 @@ export async function initializeConfig(
   } else {
     debugLog('[Config] No updates needed from environment variables')
   }
+}
+
+// Startup defaults are written after asynchronous reads, so a config written
+// by another context before that write can be overwritten. Expose the settled
+// promise on the worker global so automation that seeds storage can wait for
+// initialization to finish first.
+export function startConfigInitialization(
+  storage: Storage,
+  secureStorage: Storage,
+  onError: (error: unknown) => void
+): Promise<void> {
+  const initialization = initializeConfig(storage, secureStorage).catch(onError)
+  ;(globalThis as Record<string, unknown>)[CONFIG_INITIALIZATION_KEY] = initialization
+  return initialization
 }

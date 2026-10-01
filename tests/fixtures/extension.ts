@@ -2,6 +2,7 @@ import { test as base, chromium, type BrowserContext } from '@playwright/test'
 import path from 'path'
 import fs from 'fs'
 import { ensureExtensionBuilt } from './setup'
+import { waitForConfigInitialization } from '../helpers/config-readiness'
 
 // In CI we run e2e against the production bundle (chrome-mv3-prod) so any
 // Plasmo/Parcel bundling regression surfaces before reaching Chrome Web Store.
@@ -75,6 +76,7 @@ export const test = base.extend<ExtFixtures>({
     if (!sw) {
       sw = await context.waitForEvent('serviceworker')
     }
+    await waitForConfigInitialization(sw)
     const seedExtId = new URL(sw.url()).host
     const seedPage = await context.newPage()
     const seedUrl = `chrome-extension://${seedExtId}/tests/seed.html`

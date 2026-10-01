@@ -240,19 +240,26 @@ test.describe('Message Bridge System', () => {
           chrome.runtime.sendMessage({
             type: 'API_REQUEST',
             method: 'GET',
-            path: '/experiments'
+            path: '/experiments',
+            // Exercise the live bridge contract without downloading the
+            // server's default 1500 experiments for a message receipt check.
+            data: { items: 1, page: 1 }
           }, (response) => {
-            resolve({ success: true, receivedResponse: true, response })
+            resolve({ success: !chrome.runtime.lastError, receivedResponse: !!response, response })
           })
         })
       } catch (error) {
-        return { success: true, receivedResponse: true, error: error instanceof Error ? error.message : String(error) }
+        return { success: false, receivedResponse: false, error: error instanceof Error ? error.message : String(error) }
       }
     })
 
     console.log('API_REQUEST result:', apiResult)
     const apiData = apiResult as { success: boolean; receivedResponse: boolean; response?: any }
+    expect(apiData.success).toBe(true)
     expect(apiData.receivedResponse).toBe(true)
+    expect(apiData.response?.success).toBe(true)
+    expect(Array.isArray(apiData.response?.data?.experiments)).toBe(true)
+    expect(apiData.response.data.experiments.length).toBeLessThanOrEqual(1)
   })
 
   test('Test CHECK_AUTH message', async ({ extensionUrl }) => {
