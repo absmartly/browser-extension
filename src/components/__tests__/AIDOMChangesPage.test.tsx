@@ -3,7 +3,8 @@ import React from "react"
 
 import "@testing-library/jest-dom"
 
-import type { DOMChange } from "~src/types/dom-changes"
+import type { AIDOMGenerationResult, DOMChange } from "~src/types/dom-changes"
+import { localAreaStorage, sessionStorage } from "~src/utils/storage"
 
 import { AIDOMChangesPage } from "../AIDOMChangesPage"
 
@@ -95,6 +96,101 @@ describe("AIDOMChangesPage - Preview Toggle", () => {
   beforeEach(() => {
     jest.clearAllMocks()
   })
+
+  it.each<AIDOMGenerationResult["action"]>([
+    "remove_specific",
+    "replace_specific",
+    "replace_all"
+  ])("applies %s even when it adds no DOM changes", async (action) => {
+    const retained: DOMChange = {
+      selector: "h1",
+      type: "text",
+      value: "Keep this heading"
+    }
+    const initial = [...mockChanges, retained]
+    const expected = action === "replace_all" ? [] : [retained]
+    const onGenerate = jest.fn().mockResolvedValue({
+      action,
+      domChanges: [],
+      targetSelectors: [".test-button"],
+      response: "Removed the requested changes"
+    })
+    render(
+      <AIDOMChangesPage
+        {...defaultProps}
+        currentChanges={initial}
+        onGenerate={onGenerate}
+      />
+    )
+    await waitFor(() =>
+      expect(defaultProps.onPreviewWithChanges).toHaveBeenCalledWith(
+        true,
+        initial
+      )
+    )
+    jest.clearAllMocks()
+    fireEvent.change(screen.getByPlaceholderText(/Example: Change the CTA/i), {
+      target: { value: "Remove the button change" }
+    })
+    fireEvent.click(
+      screen.getByRole("button", { name: /Generate DOM Changes/i })
+    )
+    await waitFor(() =>
+      expect(defaultProps.onRestoreChanges).toHaveBeenCalledWith(expected)
+    )
+    expect(defaultProps.onPreviewToggle).toHaveBeenCalledWith(false)
+    expect(defaultProps.onPreviewWithChanges).toHaveBeenCalledWith(
+      true,
+      expected
+    )
+    for (const storage of [localAreaStorage, sessionStorage]) {
+      expect(storage.set).toHaveBeenCalledWith(
+        "aiDomChangesState",
+        expect.objectContaining({
+          variantName: "Test Variant",
+          changes: expected
+        })
+      )
+    }
+  })
+
+  it.each<AIDOMGenerationResult["action"]>(["none", "append"])(
+    "does not rewrite or preview changes for a %s no-op",
+    async (action) => {
+      const onGenerate = jest.fn().mockResolvedValue({
+        action,
+        domChanges: action === "none" ? mockChanges : [],
+        response: "No changes requested"
+      })
+      render(<AIDOMChangesPage {...defaultProps} onGenerate={onGenerate} />)
+      await waitFor(() =>
+        expect(defaultProps.onPreviewWithChanges).toHaveBeenCalledWith(
+          true,
+          mockChanges
+        )
+      )
+      jest.clearAllMocks()
+      fireEvent.change(
+        screen.getByPlaceholderText(/Example: Change the CTA/i),
+        { target: { value: "Discuss the changes" } }
+      )
+      fireEvent.click(
+        screen.getByRole("button", { name: /Generate DOM Changes/i })
+      )
+      await screen.findByText("No changes requested")
+      await waitFor(() =>
+        expect(document.querySelector("#ai-generate-button")).toHaveAttribute(
+          "data-loading",
+          "false"
+        )
+      )
+      expect(defaultProps.onRestoreChanges).not.toHaveBeenCalled()
+      expect(defaultProps.onPreviewWithChanges).not.toHaveBeenCalled()
+      expect(defaultProps.onPreviewToggle).not.toHaveBeenCalled()
+      expect(localAreaStorage.set).not.toHaveBeenCalled()
+      expect(sessionStorage.set).not.toHaveBeenCalled()
+    }
+  )
 
   it("should call onPreviewWithChanges when toggling preview ON", async () => {
     render(<AIDOMChangesPage {...defaultProps} />)

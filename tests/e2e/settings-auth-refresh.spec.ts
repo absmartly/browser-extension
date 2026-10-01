@@ -1,147 +1,38 @@
 import { test, expect } from '../fixtures/extension'
-import { type Page } from '@playwright/test'
-import { injectSidebar } from './utils/test-helpers'
-import fs from 'fs'
-import path from 'path'
+import { setupTestPage } from './utils/test-helpers'
+import { UNAUTHORIZED } from '../helpers/management-api/server'
 
-// Load environment variables from .env.dev.local if not already set
-if (!process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY) {
-  const envPath = path.join(__dirname, '../../.env.dev.local')
-  if (fs.existsSync(envPath)) {
-    const envContent = fs.readFileSync(envPath, 'utf-8')
-    envContent.split('\n').forEach(line => {
-      if (line.trim().startsWith('#') || !line.trim()) return
-      const [key, value] = line.split('=')
-      if (key && value) {
-        const trimmedKey = key.trim()
-        if (!process.env[trimmedKey]) {
-          process.env[trimmedKey] = value.trim()
-        }
-      }
-    })
-  }
-}
-
+// Settings authentication status against the controlled management API: the
+// refresh button issues a real worker request to /auth/current-user and the
+// UI reflects that exact response (user, then an expired credential).
 test.describe('Settings Auth Refresh Button', () => {
-  let testPage: Page
+  test('Auth refresh button updates UI immediately with auth response data', async ({ context, extensionUrl, managementApi }) => {
+    const testPage = await context.newPage()
+    const { sidebar } = await setupTestPage(testPage, extensionUrl, '/visual-editor-test.html')
 
-  test.beforeEach(async ({ context }) => {
-    testPage = await context.newPage()
-
-    // Load test page from same domain as API to avoid CORS issues
-    await testPage.goto('https://demo-2.absmartly.com/')
-    await testPage.setViewportSize({ width: 1920, height: 1080 })
-    await testPage.waitForSelector('body', { timeout: 5000 })
-
-    // Enable test mode
-    await testPage.evaluate(() => {
-      (window as any).__absmartlyTestMode = true
-    })
-  })
-
-  test.afterEach(async () => {
-    if (testPage) await testPage.close()
-  })
-
-  test('Auth refresh button updates UI immediately with auth response data', async ({ extensionUrl }) => {
-    let sidebar: any
-
-    await test.step('Inject sidebar and navigate to settings', async () => {
-      sidebar = await injectSidebar(testPage, extensionUrl)
-
-      // Click settings - find configure button or settings icon
-      const configureButton = sidebar.locator('#configure-settings-button')
-      const hasWelcomeScreen = await configureButton.isVisible().catch(() => false)
-
-      if (hasWelcomeScreen) {
-        await configureButton.evaluate((btn: HTMLElement) =>
-          btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
-        )
-      } else {
-        const settingsButton = sidebar.locator('button[aria-label="Settings"], button[title*="Settings"]').first()
-        await settingsButton.evaluate((btn: HTMLElement) =>
-          btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
-        )
-      }
-
-      // Verify Settings page loaded
+    await test.step('Open settings', async () => {
+      await sidebar.locator('#nav-settings').click()
       await expect(sidebar.locator('text=Authentication Status')).toBeVisible()
     })
 
-    await test.step('Configure authentication with API key', async () => {
-      const apiKeyRadio = sidebar.locator('#auth-method-apikey')
-      await apiKeyRadio.evaluate((radio: HTMLInputElement) => {
-        radio.checked = true
-        radio.dispatchEvent(new Event('change', { bubbles: true }))
-      })
-
-      const endpointInput = sidebar.locator('#absmartly-endpoint')
-      await endpointInput.fill('https://demo-2.absmartly.com/v1')
-
-      const apiKeyInput = sidebar.locator('#api-key-input')
-      const testApiKey = process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || ''
-      await apiKeyInput.fill(testApiKey)
+    await test.step('Shows the authenticated fixture user', async () => {
+      await expect(sidebar.locator('[data-testid="auth-user-email"]')).toHaveText(managementApi.state.user.email)
+      expect(managementApi.callsTo('GET', '/auth/current-user').length).toBeGreaterThan(0)
     })
 
-    await test.step('Verify refresh button responds to clicks', async () => {
-      const refreshButton = sidebar.locator('#auth-refresh-button')
-      // Refresh button is hidden while checkingAuth=true. Under workers=4
-      // the auth probe can take 10-15s.
-      await expect(refreshButton).toBeVisible({ timeout: 20000 })
-
-      // Initially should show "Not authenticated" or loading spinner
-      let loadingSpinner = sidebar.locator('[role="status"]')
-      let notAuthText = sidebar.locator('text=Not authenticated')
-      let hasLoadingOrNotAuth = false
-
-      try {
-        hasLoadingOrNotAuth = await Promise.race([
-          loadingSpinner.isVisible({ timeout: 2000 }),
-          notAuthText.isVisible({ timeout: 2000 })
-        ]).catch(() => false)
-      } catch (e) {
-        hasLoadingOrNotAuth = false
-      }
-
-      // Click refresh button
-      await refreshButton.evaluate((btn: HTMLElement) => {
-        btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
-      })
-
-      // Wait for response - should show either user info or "Not authenticated"
-      // The key is that we should NOT see the initial loading state anymore
-      const checkingAuthSpinner = sidebar.locator('[role="status"]:has-text("Checking")')
-
-      // Either we see user info or not authenticated, but NOT the original state indefinitely
-      const userInfo = sidebar.locator('[data-testid="auth-user-info"]')
-      const notAuthAfter = sidebar.locator('[data-testid="auth-not-authenticated"]')
-
-      // Wait for either user info or explicit "not authenticated" state
-      const hasResponse = await Promise.race([
-        userInfo.waitFor({ state: 'visible', timeout: 5000 }).then(() => true),
-        notAuthAfter.waitFor({ state: 'visible', timeout: 5000 }).then(() => true)
-      ]).catch(() => false)
-
-      expect(hasResponse).toBeTruthy()
+    await test.step('Refresh reflects a revoked credential', async () => {
+      const before = managementApi.callsTo('GET', '/auth/current-user').length
+      managementApi.override(({ url }) => url.pathname === '/auth/current-user' ? UNAUTHORIZED : undefined)
+      await sidebar.locator('#auth-refresh-button').click()
+      await expect(sidebar.locator('[data-testid="auth-not-authenticated"]')).toBeVisible()
+      await expect(sidebar.locator('[data-testid="auth-user-email"]')).toHaveCount(0)
+      expect(managementApi.callsTo('GET', '/auth/current-user').length).toBeGreaterThan(before)
     })
 
-    await test.step('Verify multiple refreshes work correctly', async () => {
-      const refreshButton = sidebar.locator('#auth-refresh-button')
-      const userInfo = sidebar.locator('[data-testid="auth-user-info"]')
-      const notAuthSection = sidebar.locator('[data-testid="auth-not-authenticated"]')
-
-      // Click refresh again
-      await refreshButton.evaluate((btn: HTMLElement) => {
-        btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
-      })
-
-      // Should respond again - either showing user or not authenticated
-      const hasSecondResponse = await Promise.race([
-        userInfo.waitFor({ state: 'visible', timeout: 5000 }).then(() => true),
-        notAuthSection.waitFor({ state: 'visible', timeout: 5000 }).then(() => true)
-      ]).catch(() => false)
-
-      expect(hasSecondResponse).toBeTruthy()
+    await test.step('Refresh recovers when the credential is valid again', async () => {
+      managementApi.reset()
+      await sidebar.locator('#auth-refresh-button').click()
+      await expect(sidebar.locator('[data-testid="auth-user-email"]')).toHaveText(managementApi.state.user.email)
     })
   })
 })
