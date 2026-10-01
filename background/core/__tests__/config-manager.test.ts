@@ -213,6 +213,45 @@ describe('config-manager', () => {
       process.env = originalEnv
     })
 
+    it('does not overwrite configuration saved while environment initialization is pending', async () => {
+      process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT = 'https://fixture.absmartly.com'
+      delete process.env.PLASMO_PUBLIC_ABSMARTLY_AUTH_METHOD
+      let current: any = null
+      let release!: (value: string) => void
+      jest.spyOn(storage, 'get').mockImplementation(async () => current)
+      jest.spyOn(storage, 'set').mockImplementation(async (_key, value) => {current = value; return null})
+      jest.spyOn(secureStorage, 'get').mockImplementationOnce(() => new Promise(resolve => {release = resolve})).mockResolvedValue(null)
+      const init = initializeConfig(storage, secureStorage)
+      await Promise.resolve()
+      const saved = {apiEndpoint:'https://fixture.absmartly.com',authMethod:'apikey',vibeStudioEnabled:true}
+      current = saved
+      release('synthetic-key')
+      await init
+      expect(current).toEqual(saved)
+      const config = await getConfig(storage, secureStorage)
+      expect(config?.authMethod).toBe('apikey')
+    })
+
+    it.each([false, true])('preserves a concurrently saved key instead of restoring the build-time key (existing config: %s)', async (existing) => {
+      process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT = 'https://fixture.absmartly.com'
+      process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY = 'synthetic-build-default'
+      let current: any = existing ? {apiEndpoint:'https://fixture.absmartly.com',authMethod:'apikey'} : null
+      let key: string | null = null
+      let release!: (value: null) => void
+      jest.spyOn(storage, 'get').mockImplementation(async () => current)
+      jest.spyOn(storage, 'set').mockImplementation(async (_name, value) => {current = value; return null})
+      jest.spyOn(secureStorage, 'get').mockImplementationOnce(() => new Promise(resolve => {release = resolve})).mockImplementation(async name => name === 'absmartly-apikey' ? key : null)
+      const saveKey = jest.spyOn(secureStorage, 'set').mockImplementation(async (_name, value) => {key = value; return null})
+      const init = initializeConfig(storage, secureStorage)
+      await Promise.resolve()
+      current = {apiEndpoint:'https://fixture.absmartly.com',authMethod:'apikey'}
+      key = 'synthetic-user-saved-key'
+      release(null)
+      await init
+      expect(key).toBe('synthetic-user-saved-key')
+      expect(saveKey).not.toHaveBeenCalled()
+    })
+
     it('should initialize config from environment variables when storage is empty', async () => {
       process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY = 'env-api-key'
       process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT = 'https://api.absmartly.com'
@@ -233,6 +272,18 @@ describe('config-manager', () => {
         applicationId: 456,
         authMethod: 'apikey'
       }))
+    })
+
+    it('does not write stale defaults when the config recheck fails and allows initialization retry', async () => {
+      process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT = 'https://fixture.absmartly.com'
+      const get = jest.spyOn(storage, 'get').mockResolvedValueOnce(null).mockRejectedValueOnce(new Error('fixture read failure')).mockResolvedValue(null)
+      jest.spyOn(secureStorage, 'get').mockResolvedValue('synthetic-key')
+      const set = jest.spyOn(storage, 'set').mockResolvedValue(null)
+      await expect(initializeConfig(storage, secureStorage)).rejects.toThrow('fixture read failure')
+      expect(set).not.toHaveBeenCalled()
+      await initializeConfig(storage, secureStorage)
+      expect(set).toHaveBeenCalledTimes(1)
+      expect(get).toHaveBeenCalledTimes(5)
     })
 
     it('should not override existing config values', async () => {

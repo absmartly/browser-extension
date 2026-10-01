@@ -110,7 +110,8 @@ function SidebarContent() {
     getExperiments,
     requestPermissionsIfNeeded,
     onAuthExpired: setIsAuthExpired,
-    onError: setError
+    onError: setError,
+    filters
   })
 
   const {

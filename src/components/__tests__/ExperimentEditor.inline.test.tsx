@@ -115,7 +115,11 @@ jest.mock("~src/hooks/useExperimentVariants", () => ({
 }))
 
 jest.mock("~src/hooks/useExperimentSave", () => ({
-  useExperimentSave: jest.fn(() => ({ save: jest.fn() }))
+  useExperimentSave: jest.fn(() => ({
+    save: jest.fn(),
+    saving: false,
+    saveStatus: { step: "idle" }
+  }))
 }))
 
 global.chrome = {

@@ -5,6 +5,8 @@ import { localAreaStorage } from "~src/utils/storage"
 
 import {
   buildFilterParams,
+  buildFilterRequests,
+  getFilteredExperiments,
   useExperimentFilters
 } from "../useExperimentFilters"
 
@@ -247,6 +249,203 @@ describe("useExperimentFilters", () => {
 })
 
 describe("buildFilterParams", () => {
+  it.each(["full_on", "running_not_full_on"])(
+    "preserves Draft/Ready OR %s without a global running type",
+    (state) => {
+      const requests = buildFilterRequests(
+        { state: ["created", "ready", state], search: "owned" },
+        1,
+        50
+      )
+      expect(requests).toHaveLength(2)
+      expect(requests[0]).toMatchObject({
+        state: "created,ready",
+        search: "owned"
+      })
+      expect(requests[0].running_type).toBeUndefined()
+      expect(requests[1]).toMatchObject({
+        state: "running",
+        running_type: state === "full_on" ? "full_on" : "experiment",
+        search: "owned"
+      })
+    }
+  )
+
+  it.each([
+    ["running", "full_on"],
+    ["running", "running_not_full_on"],
+    ["full_on", "running_not_full_on"]
+  ])("keeps the entire running union for %j", (...states) => {
+    const requests = buildFilterRequests(
+      { state: ["created", ...states] },
+      1,
+      50
+    )
+    expect(requests).toHaveLength(1)
+    expect(requests[0].state).toBe("created,running")
+    expect(requests[0].running_type).toBeUndefined()
+  })
+
+  it("merges overlapping sorted partitions without dropping ordinary states or inventing totals", async () => {
+    const row = (id: number) => ({
+      id,
+      created_at: new Date(id * 1000).toISOString()
+    })
+    const ordinary = [9, 7, 5, 3, 1].map(row)
+    const fullOn = [10, 7, 6, 2].map(row)
+    const get = jest.fn(async (params: Record<string, unknown>) => {
+      const rows = params.running_type ? fullOn : ordinary
+      const start = (Number(params.page) - 1) * Number(params.items)
+      return {
+        experiments: rows.slice(start, start + Number(params.items)),
+        total: rows.length
+      }
+    })
+    const filters = { state: ["scheduled", "full_on"] }
+    const first = await getFilteredExperiments(get, filters, 1, 2)
+    expect(first).toEqual({
+      experiments: [row(10), row(9)],
+      total: undefined,
+      hasMore: true
+    })
+    // One bounded sorted-prefix request per partition: page*size+1 rows.
+    expect(get).toHaveBeenCalledTimes(2)
+    expect(
+      get.mock.calls.map(([params]) => [params.page, params.items])
+    ).toEqual([
+      [1, 3],
+      [1, 3]
+    ])
+    const second = await getFilteredExperiments(get, filters, 2, 2)
+    expect(second.experiments.map((item) => item.id)).toEqual([7, 6])
+    expect(second.total).toBe(8)
+    const last = await getFilteredExperiments(get, filters, 4, 2)
+    expect(last).toEqual({
+      experiments: [row(2), row(1)],
+      total: 8,
+      hasMore: false
+    })
+  })
+
+  it("keeps mixed-union reads to one request per partition at list page depth", async () => {
+    const row = (id: number) => ({
+      id,
+      created_at: new Date(id * 1000).toISOString()
+    })
+    const ordinary = Array.from({ length: 2000 }, (_, i) => row(4000 - i * 2))
+    const fullOn = Array.from({ length: 2000 }, (_, i) => row(3999 - i * 2))
+    const get = jest.fn(async (params: Record<string, unknown>) => {
+      const rows = params.running_type ? fullOn : ordinary
+      const start = (Number(params.page) - 1) * Number(params.items)
+      return {
+        experiments: rows.slice(start, start + Number(params.items)),
+        total: rows.length
+      }
+    })
+    const result = await getFilteredExperiments(
+      get,
+      { state: ["created", "full_on"] },
+      10,
+      50
+    )
+    expect(get).toHaveBeenCalledTimes(2)
+    expect(get.mock.calls.map(([params]) => params.items)).toEqual([501, 501])
+    // Global page 10 of the interleaved union: ids 4000, 3999, ... descending.
+    expect(result.experiments).toHaveLength(50)
+    expect(result.experiments[0].id).toBe(4000 - 450)
+    expect(result.experiments[49].id).toBe(4000 - 499)
+    expect(result).toMatchObject({ total: undefined, hasMore: true })
+  })
+
+  it("never exceeds the endpoint items cap and still pages correctly beyond it", async () => {
+    const row = (id: number) => ({
+      id,
+      created_at: new Date(id * 1000).toISOString()
+    })
+    // 1600 ordinary rows interleaved with 1 full-on row near the top.
+    const ordinary = Array.from({ length: 1600 }, (_, i) => row(3200 - i * 2))
+    const fullOn = [row(3199)]
+    const get = jest.fn(async (params: Record<string, unknown>) => {
+      expect(Number(params.items)).toBeLessThanOrEqual(1500)
+      const rows = params.running_type ? fullOn : ordinary
+      const start = (Number(params.page) - 1) * Number(params.items)
+      return {
+        experiments: rows.slice(start, start + Number(params.items)),
+        total: rows.length
+      }
+    })
+    // page 32 × 50 = 1600 rows needed (+1) > cap: ordinary needs two capped
+    // requests, the full-on partition is exhausted by its first request.
+    const result = await getFilteredExperiments(
+      get,
+      { state: ["created", "full_on"] },
+      32,
+      50
+    )
+    const ordinaryCalls = get.mock.calls.filter(
+      ([params]) => !params.running_type
+    )
+    expect(
+      ordinaryCalls.map(([params]) => [params.page, params.items])
+    ).toEqual([
+      [1, 1500],
+      [2, 1500]
+    ])
+    expect(get).toHaveBeenCalledTimes(3)
+    // Union has 1601 rows; the last page holds ids 3200-2*1550 .. 3200-2*1599.
+    expect(result.experiments).toHaveLength(50)
+    expect(result.experiments[0].id).toBe(3200 - 2 * 1549)
+    expect(result.experiments[49].id).toBe(3200 - 2 * 1598)
+    expect(result).toEqual(
+      expect.objectContaining({ total: 1601, hasMore: true })
+    )
+  })
+
+  it("propagates a failed partition instead of presenting an incomplete successful union", async () => {
+    const get = jest
+      .fn()
+      .mockResolvedValueOnce({ experiments: [], total: 0 })
+      .mockRejectedValueOnce(new Error("HTTP 400"))
+    await expect(
+      getFilteredExperiments(get, { state: ["ready", "full_on"] }, 1, 50)
+    ).rejects.toThrow("HTTP 400")
+  })
+
+  it("maps Full On to the experiment running category, not feature flag on", () => {
+    expect(buildFilterParams({ state: ["full_on"] }, 1, 50)).toMatchObject({
+      state: "running",
+      running_type: "full_on"
+    })
+  })
+
+  it("maps Running Not Full On to running with the documented experiment running type", () => {
+    expect(
+      buildFilterParams({ state: ["running_not_full_on"] }, 1, 50)
+    ).toMatchObject({ state: "running", running_type: "experiment" })
+  })
+
+  it("keeps the broader running/full-on union when both running options are selected", () => {
+    const params = buildFilterParams(
+      { state: ["full_on", "running_not_full_on", "running"] },
+      1,
+      50
+    )
+    expect(params.state).toBe("running")
+    expect(params.running_type).toBeUndefined()
+  })
+
+  it.each([
+    "created",
+    "ready",
+    "running",
+    "development",
+    "stopped",
+    "archived",
+    "scheduled"
+  ])("preserves supported API state %s", (state) => {
+    expect(buildFilterParams({ state: [state] }, 1, 50).state).toBe(state)
+  })
+
   it("omits filter keys entirely when filterState is null", () => {
     const params = buildFilterParams(null, 1, 50)
     expect(params).toEqual({

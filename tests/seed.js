@@ -89,7 +89,7 @@ window.getAll = async () => {
         deserialized[key] = value;
       }
     }
-    console.log('Current storage:', deserialized);
+    console.log('Current storage keys:', Object.keys(deserialized));
     return deserialized;
   } catch (error) {
     console.error('Failed to get storage:', error);
@@ -99,5 +99,8 @@ window.getAll = async () => {
 
 window.addEventListener('DOMContentLoaded', async () => {
   const items = await window.getAll();
-  document.body.innerHTML += `<pre>${JSON.stringify(items, null, 2)}</pre>`;
+  // Traces/video can capture this page. Never render credential values.
+  const summary = document.createElement('pre');
+  summary.textContent = `Storage keys: ${Object.keys(items).join(', ')}`;
+  document.body.appendChild(summary);
 });

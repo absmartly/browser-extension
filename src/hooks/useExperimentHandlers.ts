@@ -225,6 +225,9 @@ export function useExperimentHandlers({
           onError(errorMessage)
         }
         debugError("Failed to save experiment:", error)
+        // The editor's save hook must observe failure, otherwise it reports
+        // completion after the API rejected the draft.
+        throw err
       }
     },
     [

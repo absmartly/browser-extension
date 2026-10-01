@@ -70,7 +70,9 @@ tests/*
 !tests/e2e/
 !tests/fixtures/
 !tests/helpers/
+!tests/integration/
 !tests/mocks/
+!tests/reproductions/
 !tests/setup/
 !tests/test-pages/
 !tests/unit/

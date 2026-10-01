@@ -7,6 +7,8 @@ import type { ExperimentFilters } from "~src/types/filters"
 import { debugError, debugLog } from "~src/utils/debug"
 import { setExperimentsCache } from "~src/utils/storage"
 
+import { getFilteredExperiments } from "./useExperimentFilters"
+
 interface UseLoginRedirectProps {
   client: BackgroundAPIClient
   pageSize: number
@@ -38,20 +40,13 @@ export function useLoginRedirect({
 
       debugLog("Attempting to refresh experiments before login redirect...")
 
-      const params: Record<string, unknown> = {
-        page: 1,
-        items: pageSize,
-        iterations: 1,
-        previews: 1,
-        type: "test"
-      }
-
-      if (filters?.state && filters.state.length > 0) {
-        params.state = filters.state.join(",")
-      }
-
       try {
-        const response = await getExperiments(params)
+        const response = await getFilteredExperiments(
+          getExperiments,
+          filters,
+          1,
+          pageSize
+        )
         debugLog("Session is still valid, refreshing experiments")
         setIsAuthExpired(false)
         setError(null)

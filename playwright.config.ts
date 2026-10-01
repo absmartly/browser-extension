@@ -2,6 +2,8 @@ import { defineConfig, devices } from '@playwright/test'
 
 export default defineConfig({
   testDir: './tests',
+  // These isolated fixtures own their browser, tracing and production setup.
+  testIgnore: ['**/reproductions/**', '**/integration/**'],
   globalSetup: require.resolve('./tests/global-setup.ts'),
   timeout: 180 * 1000, // 180 seconds (3 minutes)
   expect: {
@@ -14,12 +16,12 @@ export default defineConfig({
   reporter: [['html', { open: process.env.SLOW === '1' ? 'always' : 'never' }], ['list']],
   use: {
     actionTimeout: 0,
-    trace: 'on-first-retry',
+    trace: 'retain-on-failure',
     video: 'retain-on-failure',
     baseURL: 'http://localhost:3456'
   },
 
-  // Web servers: test pages + AI CLI bridge
+  // Only extension-owned test pages run here. AI responses come from the test fixture.
   webServer: [
     {
       // Custom Node static server. http-server (npm v14) crashes on certain
@@ -27,16 +29,11 @@ export default defineConfig({
       // ERR_CONNECTION_REFUSED. tests/test-server.js logs socket errors
       // instead of exiting and bounds keep-alive timeouts.
       command: 'node tests/test-server.js --port 3456 --root tests/test-pages',
+      cwd: __dirname,
       port: 3456,
       reuseExistingServer: !process.env.CI,
       timeout: 120 * 1000
-    },
-    ...(!process.env.CI ? [{
-      command: 'node ../claude-code-bridge/index.js',
-      port: 3000,
-      reuseExistingServer: true,
-      timeout: 30 * 1000
-    }] : [])
+    }
   ],
 
   projects: [

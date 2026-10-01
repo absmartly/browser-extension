@@ -78,6 +78,7 @@ export const ExperimentListItem = React.memo(function ExperimentListItem({
   return (
     <div
       data-testid="experiment-list-item"
+      data-experiment-state={status}
       className="experiment-item px-4 py-3 hover:bg-gray-50 transition-colors flex items-center justify-between border-b border-gray-100">
       <div
         onClick={() => onExperimentClick(experiment)}

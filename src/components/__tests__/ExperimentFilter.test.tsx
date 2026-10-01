@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react"
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import React from "react"
 
 import "@testing-library/jest-dom"
@@ -96,6 +96,84 @@ describe("ExperimentFilter", () => {
   })
 
   describe("Search Filter", () => {
+    it("does not resurrect pending search or selections after Clear All", () => {
+      jest.useFakeTimers()
+      try {
+        const { container } = render(
+          <ExperimentFilter
+            onFilterChange={mockOnFilterChange}
+            initialFilters={{
+              state: ["running"],
+              search: "old",
+              significance: ["positive"]
+            }}
+          />
+        )
+        fireEvent.click(screen.getByLabelText(/Toggle filters/i))
+        fireEvent.change(screen.getByPlaceholderText(/Search experiments/i), {
+          target: { value: "pending" }
+        })
+        act(() => jest.advanceTimersByTime(200))
+        fireEvent.click(container.querySelector("#filter-clear-all")!)
+        act(() => jest.advanceTimersByTime(300))
+        expect(mockOnFilterChange).toHaveBeenLastCalledWith({
+          state: ["created", "ready"]
+        })
+        expect(screen.getByPlaceholderText(/Search experiments/i)).toHaveValue(
+          ""
+        )
+        expect(
+          container.querySelector("#filter-clear-all")
+        ).not.toBeInTheDocument()
+        fireEvent.click(screen.getByText("Running"))
+        expect(mockOnFilterChange).toHaveBeenLastCalledWith({
+          state: ["created", "ready", "running"]
+        })
+      } finally {
+        jest.useRealTimers()
+      }
+    })
+
+    it.each(["", "updated"])(
+      "preserves intervening filter selections when pending search becomes %s",
+      (search) => {
+        jest.useFakeTimers()
+        try {
+          const { container } = render(
+            <ExperimentFilter
+              onFilterChange={mockOnFilterChange}
+              initialFilters={{ state: ["created", "ready"], search: "old" }}
+            />
+          )
+          fireEvent.click(screen.getByLabelText(/Toggle filters/i))
+          fireEvent.change(screen.getByPlaceholderText(/Search experiments/i), {
+            target: { value: search }
+          })
+          act(() => jest.advanceTimersByTime(200))
+          fireEvent.click(screen.getByText("Running"))
+          fireEvent.click(
+            container.querySelector("#filter-significance-positive")!
+          )
+          fireEvent.click(
+            container.querySelector("#filter-alert-sample_ratio_mismatch")!
+          )
+          act(() => jest.advanceTimersByTime(100))
+          expect(mockOnFilterChange).toHaveBeenLastCalledWith({
+            state: ["created", "ready", "running"],
+            significance: ["positive"],
+            sample_ratio_mismatch: true,
+            ...(search ? { search } : {})
+          })
+          expect(container.querySelector("#filter-state-running")).toHaveClass(
+            "bg-blue-100"
+          )
+          expect(container.querySelector("#filter-clear-all")).toBeVisible()
+        } finally {
+          jest.useRealTimers()
+        }
+      }
+    )
+
     it("should update search value on input change", () => {
       render(<ExperimentFilter onFilterChange={mockOnFilterChange} />)
 

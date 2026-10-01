@@ -54,6 +54,15 @@ export function useSettingsForm() {
   // being "click Refresh after changing the endpoint, but the user info
   // still reflects the previous endpoint."
   const authCheckCallIdRef = useRef(0)
+  const endpointValidationIdRef = useRef(0)
+
+  useEffect(() => {
+    // Invalidate probes when the user edits the form or leaves Settings.
+    endpointValidationIdRef.current++
+    return () => {
+      endpointValidationIdRef.current++
+    }
+  }, [apiEndpoint, authMethod, apiKey])
 
   const buildFormSnapshot = (): string =>
     JSON.stringify({
@@ -332,10 +341,12 @@ export function useSettingsForm() {
   const normalizeEndpoint = (endpoint: string): string => {
     let normalized = endpoint.trim()
     if (
-      normalized &&
-      !normalized.startsWith("http://") &&
-      !normalized.startsWith("https://")
+      /^https?:/i.test(normalized) &&
+      !/^https?:\/\/[^/\\]/i.test(normalized)
     ) {
+      throw new Error("Malformed HTTP endpoint")
+    }
+    if (normalized && !/^[a-z][a-z\d+.-]*:\/\//i.test(normalized)) {
       normalized = `https://${normalized}`
     }
     if (normalized.endsWith("/")) {
@@ -377,10 +388,21 @@ export function useSettingsForm() {
   }
 
   const validateForm = async (): Promise<boolean> => {
+    const validationId = ++endpointValidationIdRef.current
     const newErrors: Record<string, string> = {}
 
     if (!apiEndpoint.trim()) {
       newErrors.apiEndpoint = "API Endpoint is required"
+    } else {
+      try {
+        const url = new URL(normalizeEndpoint(apiEndpoint))
+        if (!["http:", "https:"].includes(url.protocol) || !url.hostname) {
+          throw new Error("Invalid endpoint")
+        }
+      } catch {
+        newErrors.apiEndpoint =
+          "Invalid endpoint URL. Use a valid HTTP or HTTPS URL."
+      }
     }
 
     // Endpoint reachability used to be a blocking check here, but it
@@ -390,9 +412,9 @@ export function useSettingsForm() {
     // stuck waiting for a navigation that never came. Move the probe out
     // of the validation pipeline — fire it for the side-effect (will set
     // an inline reachability error if it fails) but don't gate save on it.
-    if (apiEndpoint.trim()) {
+    if (apiEndpoint.trim() && !newErrors.apiEndpoint) {
       void validateEndpointReachable(apiEndpoint).then((isReachable) => {
-        if (!isReachable) {
+        if (!isReachable && validationId === endpointValidationIdRef.current) {
           setErrors((prev) => ({
             ...prev,
             apiEndpoint: `Cannot reach endpoint. Please check the URL and your network connection.`
@@ -406,6 +428,19 @@ export function useSettingsForm() {
     }
 
     setErrors(newErrors)
+    const firstInvalidId = newErrors.apiEndpoint
+      ? "absmartly-endpoint"
+      : newErrors.apiKey
+        ? "api-key-input"
+        : null
+    if (firstInvalidId) {
+      // Wait for the inline error to render before centering its field.
+      requestAnimationFrame(() => {
+        const field = document.getElementById(firstInvalidId)
+        field?.focus({ preventScroll: true })
+        field?.scrollIntoView({ block: "center" })
+      })
+    }
     return Object.keys(newErrors).length === 0
   }
 

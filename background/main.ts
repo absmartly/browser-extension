@@ -396,22 +396,7 @@ export function initializeBackgroundScript() {
     } else if (message.type === "SDK_EVENT") {
       bufferSDKEvent(message.payload)
         .then(() => {
-          chrome.runtime
-            .sendMessage({
-              type: "SDK_EVENT_BROADCAST",
-              payload: message.payload
-            })
-            .catch((error) => {
-              if (
-                !error?.message?.includes("Receiving end does not exist") &&
-                !error?.message?.includes("message port closed")
-              ) {
-                debugError(
-                  "[Background] Unexpected error broadcasting SDK event:",
-                  error
-                )
-              }
-            })
+          // bufferSDKEvent owns the single live broadcast after persistence.
           sendResponse({ success: true })
         })
         .catch((error) => {
