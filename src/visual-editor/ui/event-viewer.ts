@@ -24,8 +24,15 @@ export class EventViewer {
   private viewerHost: HTMLElement | null = null
   private shadowRoot: ShadowRoot | null = null
   private editorView: EditorView | null = null
+  private keydownHandler: ((e: KeyboardEvent) => void) | null = null
+  private previousFocus: HTMLElement | null = null
+  private initTimer: ReturnType<typeof setTimeout> | null = null
 
   show(eventName: string, timestamp: string, jsonData: string): void {
+    if (this.viewerHost) {
+      this.teardown()
+    }
+
     // Create viewer host with Shadow DOM to avoid CSP issues
     this.viewerHost = document.createElement("div")
     this.viewerHost.id = "absmartly-event-viewer-host"
@@ -53,12 +60,17 @@ export class EventViewer {
 
     const container = document.createElement("div")
     container.className = "event-viewer-container"
+    container.setAttribute("role", "dialog")
+    container.setAttribute("aria-modal", "true")
+    container.setAttribute("aria-labelledby", "event-viewer-title")
+    container.tabIndex = -1
 
     const header = document.createElement("div")
     header.className = "event-viewer-header"
 
     const titleEl = document.createElement("h3")
     titleEl.className = "event-viewer-title"
+    titleEl.id = "event-viewer-title"
     titleEl.textContent = "Event Details"
 
     header.appendChild(titleEl)
@@ -134,8 +146,25 @@ export class EventViewer {
     this.shadowRoot.appendChild(backdrop)
     document.body.appendChild(this.viewerHost)
 
+    // The viewer is usually opened from the sidebar iframe, which keeps
+    // keyboard focus. Move focus into the dialog so Escape reaches this
+    // document, and remember where focus was so it can be restored on close.
+    const active = document.activeElement
+    this.previousFocus =
+      active instanceof HTMLElement && active !== document.body ? active : null
+    this.keydownHandler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        this.close()
+      } else if (e.key === "Tab") {
+        this.keepTabInside(e, container)
+      }
+    }
+    document.addEventListener("keydown", this.keydownHandler)
+    container.focus({ preventScroll: true })
+
     // Create CodeMirror viewer (read-only)
-    setTimeout(() => {
+    this.initTimer = setTimeout(() => {
+      this.initTimer = null
       const startState = EditorState.create({
         doc: jsonData,
         extensions: [
@@ -192,42 +221,69 @@ export class EventViewer {
           this.close()
         }
       })
-
-      // Escape key to close
-      const handleKeydown = (e: KeyboardEvent) => {
-        if (e.key === "Escape") {
-          this.close()
-        }
-      }
-      document.addEventListener("keydown", handleKeydown)
-
-      // Store handler for cleanup
-      ;(this.viewerHost as any)._keydownHandler = handleKeydown
     }, 0)
   }
 
+  // aria-modal: keep keyboard focus out of the page behind the dialog.
+  private keepTabInside(e: KeyboardEvent, container: HTMLElement): void {
+    if (!this.shadowRoot) return
+    const focusable = Array.from(
+      this.shadowRoot.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      )
+    )
+    e.preventDefault()
+    if (focusable.length === 0) {
+      container.focus({ preventScroll: true })
+      return
+    }
+    const active = this.shadowRoot.activeElement as HTMLElement | null
+    const index = active ? focusable.indexOf(active) : -1
+    const next = e.shiftKey
+      ? index <= 0
+        ? focusable.length - 1
+        : index - 1
+      : index === -1 || index === focusable.length - 1
+        ? 0
+        : index + 1
+    focusable[next].focus({ preventScroll: true })
+  }
+
   close(): void {
+    this.teardown()
+    // Notify extension that viewer was closed
+    chrome.runtime.sendMessage({ type: "EVENT_VIEWER_CLOSE" })
+  }
+
+  private teardown(): void {
+    // Closing before the deferred editor setup runs must not build an editor
+    // into the removed dialog.
+    if (this.initTimer !== null) {
+      clearTimeout(this.initTimer)
+      this.initTimer = null
+    }
+
     if (this.editorView) {
       this.editorView.destroy()
       this.editorView = null
     }
 
-    if (this.viewerHost) {
-      // Remove keydown handler
-      const handler = (this.viewerHost as any)._keydownHandler
-      if (handler) {
-        document.removeEventListener("keydown", handler)
-      }
+    if (this.keydownHandler) {
+      document.removeEventListener("keydown", this.keydownHandler)
+      this.keydownHandler = null
+    }
 
+    if (this.viewerHost) {
+      const hadFocus = this.viewerHost.contains(document.activeElement)
       this.viewerHost.remove()
       this.viewerHost = null
       this.shadowRoot = null // Clear shadow root reference
+
+      if (hadFocus && this.previousFocus?.isConnected) {
+        this.previousFocus.focus({ preventScroll: true })
+      }
     }
-
-    // No need to remove style from head anymore - it's in shadow root
-
-    // Notify extension that viewer was closed
-    chrome.runtime.sendMessage({ type: "EVENT_VIEWER_CLOSE" })
+    this.previousFocus = null
   }
 
   private getViewerStyles(): string {
@@ -246,6 +302,7 @@ export class EventViewer {
       }
 
       .event-viewer-container {
+        outline: none;
         background: #1e1e1e;
         border-radius: 8px;
         box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
