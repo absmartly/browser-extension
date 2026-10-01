@@ -22,8 +22,9 @@ const respond = (route: Route, data: unknown) => route.fulfill({ status: 200, co
 // authenticated), so saving is the first list load. The save reload must use
 // the Draft/Ready defaults shown in the filter panel. Initialization's own
 // /v1/applications read is held after the save so only the save reload is
-// observed.
-test('post-save reload before list initialization keeps the default state filters', async ({ page, sidebar }, testInfo) => {
+// observed. Changing filters while that read is pending must also survive
+// the delayed initialization load.
+test('post-save reload uses defaults and delayed initialization preserves newer filters', async ({ page, sidebar }, testInfo) => {
   const listStates: Array<string | null> = []
   let holdApplications = false
   let releaseAuth: (() => void) | undefined
@@ -74,13 +75,27 @@ test('post-save reload before list initialization keeps the default state filter
   try {
     expect(listStates[0], 'post-save reload must request the Draft/Ready defaults').toBe('created,ready')
     await expect(sidebar.locator('[data-experiment-state="stopped"], [data-experiment-state="running"]')).toHaveCount(0)
+    await sidebar.getByLabel('Toggle filters').click()
+    await expect(sidebar.locator('#filter-state-created')).toHaveClass(/bg-blue-100/)
+    await sidebar.locator('#filter-state-created').click()
+    await sidebar.locator('#filter-state-ready').click()
+    await sidebar.locator('#filter-state-running').click()
+    await expect.poll(() => listStates.at(-1)).toBe('running')
+    await expect(sidebar.locator('[data-testid="experiment-list-item"]')).toHaveCount(1)
+    await expect(sidebar.locator('[data-experiment-name="ft_filter_running"]')).toBeVisible()
+
+    const beforeInitialization = listStates.length
+    releaseApplications?.()
+    await expect.poll(() => listStates.length).toBeGreaterThan(beforeInitialization)
+    expect(listStates.at(-1), 'initialization must use the filters selected while its applications request was pending').toBe('running')
+    await expect(sidebar.locator('[data-testid="experiment-list-item"]')).toHaveCount(1)
+    await expect(sidebar.locator('[data-experiment-name="ft_filter_running"]')).toBeVisible()
+    await expect(sidebar.locator('#filter-state-created')).not.toHaveClass(/bg-blue-100/)
+    await expect(sidebar.locator('#filter-state-running')).toHaveClass(/bg-blue-100/)
+    await page.screenshot({ path: testInfo.outputPath('post-save-current-filters-after-initialization.png') })
   } finally {
     await testInfo.attach('list-requests', { body: JSON.stringify(listStates), contentType: 'application/json' })
     releaseApplications?.()
     releaseAuth?.()
   }
-  await sidebar.getByLabel('Toggle filters').click()
-  await expect(sidebar.locator('#filter-state-created')).toHaveClass(/bg-blue-100/)
-  await expect(sidebar.locator('#filter-state-stopped')).not.toHaveClass(/bg-blue-100/)
-  await page.screenshot({ path: testInfo.outputPath('post-save-list-filters-open.png') })
 })

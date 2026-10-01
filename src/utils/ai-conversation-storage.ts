@@ -73,6 +73,20 @@ export async function loadConversation(
 
     if (conversation) {
       debugLog(`[ConversationStorage] Loaded conversation ${conversationId}`)
+      // Saving removes duplicate provider messages. Rebuild the text history
+      // in memory so reloading or switching chats preserves conversational context.
+      if (conversation.conversationSession.messages.length === 0) {
+        return {
+          ...conversation,
+          conversationSession: {
+            ...conversation.conversationSession,
+            messages: conversation.messages.map(({ role, content }) => ({
+              role,
+              content
+            }))
+          }
+        }
+      }
     } else {
       debugWarn(
         `[ConversationStorage] Conversation ${conversationId} not found`

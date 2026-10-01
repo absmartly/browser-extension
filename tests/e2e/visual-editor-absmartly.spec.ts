@@ -1,16 +1,12 @@
 import { test, expect } from '../fixtures/extension'
+import { controlledConfigSeed } from '../helpers/management-api/server'
 
 test.describe('Visual Editor Complete Test', () => {
-  test.beforeEach(async ({ clearStorage, seedStorage }) => {
+  test.beforeEach(async ({ clearStorage, seedStorage, managementApi }) => {
     await clearStorage()
 
     // Seed with API credentials
-    await seedStorage({
-      'absmartly-apikey': process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || 'pq2xUUeL3LZecLplTLP3T8qQAG77JnHc3Ln-wa8Uf3WQqFIy47uFLSNmyVBKd3uk',
-      'absmartly-endpoint': process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT || 'https://demo-2.absmartly.com/v1',
-      'absmartly-env': 'production',
-      'absmartly-auth-method': 'apikey'
-    })
+    await seedStorage(controlledConfigSeed(managementApi))
   })
 
   test('Complete visual editor workflow with all context menu actions', async ({ context, extensionId }) => {

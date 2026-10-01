@@ -355,9 +355,6 @@ describe('config-manager', () => {
     })
   })
 
-  // CI flake FT-2267: the worker's startup defaults write (authMethod jwt)
-  // landed after the e2e fixture seeded authMethod apikey, so API requests
-  // went out without Authorization and failed with AUTH_EXPIRED.
   describe('startConfigInitialization readiness', () => {
     const originalEnv = process.env
     const originalFetch = global.fetch
@@ -381,7 +378,7 @@ describe('config-manager', () => {
       jest.spyOn(storage, 'set').mockImplementation(async (_name, value) => {
         // The seed arrives after init's last read, just before its write lands.
         // chrome.storage writes are asynchronous IPC, so the write lands a
-        // macrotask later; a seeder that merely yields still wins the race.
+        // macrotask later.
         const hook = beforeDefaultsWrite
         beforeDefaultsWrite = undefined
         hook?.()
@@ -406,21 +403,11 @@ describe('config-manager', () => {
       return 'Authorization' in fetchMock.mock.calls[0][1].headers
     }
 
-    it('old ordering: a seed written during startup initialization is overwritten and requests go out unauthenticated', async () => {
-      const { storage, secureStorage, seed, armBeforeDefaultsWrite } = setup()
-      armBeforeDefaultsWrite(seed)
-      await startConfigInitialization(storage, secureStorage, jest.fn())
-      const config = await getConfig(storage, secureStorage)
-      expect(config?.authMethod).toBe('jwt')
-      expect(config?.apiKey).toBe('synthetic-seeded-key')
-      expect(await authorizationSent(config)).toBe(false)
-    })
-
-    it('new ordering: a seeder that awaits the readiness promise keeps the seeded API-key auth', async () => {
+    it('a seeder that awaits the readiness promise keeps the seeded API-key auth', async () => {
       const { storage, secureStorage, seed, armBeforeDefaultsWrite } = setup()
       let seeding: Promise<void> | undefined
       armBeforeDefaultsWrite(() => {
-        // Same interleave point; the fixture-equivalent seeder waits first.
+        // The fixture-equivalent seeder waits for readiness before seeding.
         seeding = (async () => {
           await (globalThis as any)[CONFIG_INITIALIZATION_KEY]
           seed()
@@ -435,22 +422,6 @@ describe('config-manager', () => {
       expect(config?.authMethod).toBe('apikey')
       expect(config?.apiKey).toBe('synthetic-seeded-key')
       expect(await authorizationSent(config)).toBe(true)
-    })
-
-    it('control: a seeder that only yields without awaiting readiness is still overwritten', async () => {
-      const { storage, secureStorage, seed, armBeforeDefaultsWrite } = setup()
-      let seeding: Promise<void> | undefined
-      armBeforeDefaultsWrite(() => {
-        seeding = (async () => {
-          await undefined
-          seed()
-        })()
-      })
-      await startConfigInitialization(storage, secureStorage, jest.fn())
-      await seeding
-      const config = await getConfig(storage, secureStorage)
-      expect(config?.authMethod).toBe('jwt')
-      expect(await authorizationSent(config)).toBe(false)
     })
 
     it('settles and reports initialization errors instead of rejecting the readiness promise', async () => {

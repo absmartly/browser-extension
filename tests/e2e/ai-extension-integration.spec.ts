@@ -1,86 +1,100 @@
-import { test, expect } from '../fixtures/extension'
-import { setupTestPage, click } from './utils/test-helpers'
-import { createExperiment, fillMetadataForSave, saveExperiment } from './helpers/ve-experiment-setup'
+import { expect, test } from "../fixtures/extension"
+import {
+  createExperiment,
+  fillMetadataForSave,
+  saveExperiment
+} from "./helpers/ve-experiment-setup"
+import { click, setupTestPage } from "./utils/test-helpers"
 
-test.describe('Extension AI Integration (Anthropic API)', () => {
-  test('extension generates DOM changes via Anthropic API', async ({ context, extensionUrl, seedStorage }) => {
+test.describe("Extension AI Integration (mocked Anthropic protocol)", () => {
+  test("extension generates DOM changes via Anthropic API", async ({
+    context,
+    extensionUrl,
+    aiProvider
+  }) => {
     test.setTimeout(180000)
 
-    // Prefer the proxy-specific key when the endpoint is the internal proxy;
-    // otherwise use the direct Anthropic key.
-    const anthropicEndpoint = process.env.PLASMO_PUBLIC_ANTHROPIC_ENDPOINT || ''
-    const anthropicApiKey = anthropicEndpoint
-      ? (process.env.PLASMO_PUBLIC_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY)
-      : (process.env.ANTHROPIC_API_KEY || process.env.PLASMO_PUBLIC_ANTHROPIC_API_KEY)
-    test.skip(
-      !anthropicApiKey,
-      'ANTHROPIC_API_KEY / PLASMO_PUBLIC_ANTHROPIC_API_KEY required; test hits the real Anthropic API'
-    )
-
-    const config = {
-      apiKey: process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || '',
-      apiEndpoint: process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT || '',
-      authMethod: 'apikey',
-      aiProvider: 'anthropic-api',
-      aiApiKey: '',
-      vibeStudioEnabled: true,
-      // Proxy expects model aliases (no date suffix); aliases also work
-      // against api.anthropic.com.
-      llmModel: 'claude-sonnet-4-5',
-      providerModels: { 'anthropic-api': 'claude-sonnet-4-5' },
-      providerEndpoints: anthropicEndpoint ? { 'anthropic-api': anthropicEndpoint } : {}
-    }
-
-    await seedStorage({
-      'absmartly-config': config,
-      'plasmo:absmartly-config': config,
-      'ai-apikey': anthropicApiKey,
-      'plasmo:ai-apikey': anthropicApiKey
-    })
+    const prompt =
+      'Use the DOM-change tool to change the h1 text to "Hello from Anthropic!". Apply the change, not just describe it.'
+    aiProvider.script([
+      {
+        promptIncludes: prompt,
+        response: {
+          tools: [
+            {
+              id: "integration-title",
+              name: "dom_changes_generator",
+              input: {
+                action: "append",
+                domChanges: [
+                  {
+                    selector: "h1",
+                    type: "text",
+                    value: "Hello from Anthropic!"
+                  }
+                ],
+                response:
+                  "Updated the page heading through the native DOM-change tool."
+              }
+            }
+          ]
+        }
+      }
+    ])
 
     const testPage = await context.newPage()
     const { sidebar } = await setupTestPage(testPage, extensionUrl)
 
-    await sidebar.locator('[role="status"][aria-label="Loading experiments"]')
-      .waitFor({ state: 'hidden', timeout: 30000 })
+    await sidebar
+      .locator('[role="status"][aria-label="Loading experiments"]')
+      .waitFor({ state: "hidden", timeout: 30000 })
       .catch(() => {})
 
     const experimentName = await createExperiment(sidebar)
     await fillMetadataForSave(sidebar, testPage)
-    const createdName = await sidebar.locator('#experiment-name-input').inputValue()
+    const createdName = await sidebar
+      .locator("#experiment-name-input")
+      .inputValue()
     await saveExperiment(sidebar, testPage, experimentName)
 
-    const createdRow = sidebar.locator(`[data-experiment-name=${JSON.stringify(createdName)}]`)
-    await createdRow.waitFor({ state: 'visible', timeout: 10000 })
+    const createdRow = sidebar.locator(
+      `[data-experiment-name=${JSON.stringify(createdName)}]`
+    )
+    await createdRow.waitFor({ state: "visible", timeout: 10000 })
     await click(sidebar, createdRow)
 
-    const generateAIButton = sidebar.locator('#generate-with-ai-button').first()
+    const generateAIButton = sidebar.locator("#generate-with-ai-button").first()
     await generateAIButton.scrollIntoViewIfNeeded()
-    await generateAIButton.waitFor({ state: 'visible', timeout: 15000 })
+    await generateAIButton.waitFor({ state: "visible", timeout: 15000 })
     await click(sidebar, generateAIButton)
 
-    const aiPrompt = sidebar.locator('#ai-prompt')
-    await aiPrompt.waitFor({ state: 'visible', timeout: 10000 })
-    await aiPrompt.fill('Use the DOM-change tool to change the h1 text to "Hello from Anthropic!". Apply the change, not just describe it.')
-    const modelResponse = context.waitForEvent('response', {
-      predicate: response => response.request().method() === 'POST' && new URL(response.url()).pathname.endsWith('/messages'),
-      timeout: 90000
-    })
-    await click(sidebar, '#ai-generate-button')
-    const response = await modelResponse
-    expect(response.status(), 'Live provider response (a quota error is not generation success)').toBe(200)
+    const aiPrompt = sidebar.locator("#ai-prompt")
+    await aiPrompt.waitFor({ state: "visible", timeout: 10000 })
+    await aiPrompt.fill(prompt)
+    await click(sidebar, "#ai-generate-button")
+    await expect(testPage.locator("h1")).toHaveText("Hello from Anthropic!")
 
     // The last message immediately after click is the USER prompt. Require
     // the rendered assistant role and actual generated changes as well.
-    const assistantMessage = sidebar.locator('[data-message-index].justify-start').last()
-    await assistantMessage.waitFor({ state: 'visible', timeout: 60000 })
+    const assistantMessage = sidebar
+      .locator("[data-message-index].justify-start")
+      .last()
+    await assistantMessage.waitFor({ state: "visible", timeout: 60000 })
 
     const responseText = await assistantMessage.textContent()
     expect(responseText).toBeTruthy()
     expect(responseText!.length).toBeGreaterThan(10)
-    await expect.poll(async () => sidebar.locator('body').evaluate(() =>
-      JSON.stringify((window as any).__absmartlyLatestDomChanges?.changes || [])
-    )).toContain('Hello from Anthropic!')
+    await expect
+      .poll(async () =>
+        sidebar
+          .locator("body")
+          .evaluate(() =>
+            JSON.stringify(
+              (window as any).__absmartlyLatestDomChanges?.changes || []
+            )
+          )
+      )
+      .toContain("Hello from Anthropic!")
 
     await testPage.close()
   })
