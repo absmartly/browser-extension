@@ -2,6 +2,8 @@ import { test, expect } from '../fixtures/extension'
 import { type Page, type FrameLocator } from '@playwright/test'
 import { injectSidebar, click, debugWait, log, initializeTestLogging, setupTestPage } from './utils/test-helpers'
 import { createExperiment, fillMetadataForSave, saveExperiment } from './helpers/ve-experiment-setup'
+import { controlledConfigSeed } from '../helpers/management-api/server'
+import { experimentRecord } from '../helpers/management-api/records'
 
 const TEST_PAGE_URL = '/visual-editor-test.html'
 
@@ -9,18 +11,19 @@ test.describe('Experiment List Filters', () => {
   let testPage: Page
   let allConsoleMessages: Array<{type: string, text: string}> = []
 
-  test.beforeEach(async ({ context, extensionUrl, seedStorage }) => {
+  test.beforeEach(async ({ context, extensionUrl, seedStorage, managementApi }) => {
     initializeTestLogging()
 
-    await seedStorage({
-      'absmartly-config': {
-        apiKey: process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || '',
-        apiEndpoint: process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT || '',
-        authMethod: 'apikey',
-        domChangesFieldName: '__dom_changes',
-        vibeStudioEnabled: true
-      }
-    })
+    await seedStorage(controlledConfigSeed(managementApi, { domChangesFieldName: '__dom_changes', vibeStudioEnabled: true }))
+    // One owned record per state partition the filters exercise, including
+    // both running sub-partitions (full_on_at set / null).
+    const partitions: Array<[string, Record<string, unknown>]> = [
+      ['filter_created', { state: 'created' }], ['filter_ready', { state: 'ready' }],
+      ['filter_running', { state: 'running' }], ['filter_full_on', { state: 'running', full_on_at: '2026-09-02T10:00:00.000Z', full_on_variant: 1 }],
+      ['filter_development', { state: 'development' }], ['filter_stopped', { state: 'stopped' }],
+      ['filter_archived', { state: 'stopped', archived: true }]
+    ]
+    managementApi.state.experiments.push(...partitions.map(([name, fields], i) => experimentRecord({ name, display_name: name, created_at: `2026-08-${10 + i}T10:00:00.000Z`, ...fields })))
 
     testPage = await context.newPage()
 

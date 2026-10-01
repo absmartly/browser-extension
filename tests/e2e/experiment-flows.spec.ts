@@ -2,6 +2,8 @@ import { test, expect } from '../fixtures/extension'
 import { type Page } from '@playwright/test'
 import path from 'path'
 import { injectSidebar, debugWait, setupConsoleLogging, waitForExperiments, openLiveExperimentDetails } from './utils/test-helpers'
+import { controlledConfigSeed } from '../helpers/management-api/server'
+import { experimentRecord } from '../helpers/management-api/records'
 
 const TEST_PAGE_PATH = path.join(__dirname, '..', 'test-pages', 'visual-editor-test.html')
 
@@ -20,13 +22,20 @@ test.describe('Experiment Creation and Editing Flows', () => {
   let testPage: Page
   let allConsoleMessages: Array<{type: string, text: string}> = []
 
-  test.beforeEach(async ({ context, seedStorage }) => {
-    await seedStorage({
-      'absmartly-apikey': process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || 'BxYKd1U2DlzOLJ74gdvaIkwy4qyOCkXi_YJFFdE1EDyovjEsQ__iiX0IM1ONfHKB',
-      'absmartly-endpoint': process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT || 'https://dev-1.absmartly.com/v1',
-      'absmartly-env': process.env.PLASMO_PUBLIC_ABSMARTLY_ENVIRONMENT || 'development',
-      'absmartly-auth-method': 'apikey'
-    })
+  test.beforeEach(async ({ context, seedStorage, managementApi }) => {
+    await seedStorage(controlledConfigSeed(managementApi))
+    // Owned records with full metadata so the detail view has exact values.
+    const r = managementApi.state.resources
+    managementApi.state.experiments.push(
+      experimentRecord({
+        name: 'flows_owned_draft', display_name: 'Flows Owned Draft', state: 'created', created_at: '2026-09-03T10:00:00.000Z',
+        unit_type_id: 22, unit_type: r.unit_types[1],
+        owners: [{ experiment_id: 0, user_id: 2, user: r.users[1] }],
+        experiment_tags: [{ experiment_id: 0, experiment_tag_id: 42, experiment_tag: r.experiment_tags[1] }],
+        applications: [{ experiment_id: 0, application_id: 12, application_version: '0', application: r.applications[1] }]
+      }),
+      experimentRecord({ name: 'flows_owned_ready', display_name: 'Flows Owned Ready', state: 'ready', created_at: '2026-09-02T10:00:00.000Z' })
+    )
 
     testPage = await context.newPage()
 
@@ -190,7 +199,8 @@ test.describe('Experiment Creation and Editing Flows', () => {
       console.log('\n🔗 Testing name sync functionality')
 
       // Get current lock state (should be locked for new experiments)
-      const lockButton = sidebar.locator('button').filter({ has: sidebar.locator('svg.h-4.w-4') }).first()
+      const lockButton = sidebar.locator('button[title="Names are synced. Click to unlock"]')
+      await expect(lockButton).toBeVisible()
 
       // Type in experiment name
       const nameInput = sidebar.locator('#experiment-name-input')
@@ -206,6 +216,7 @@ test.describe('Experiment Creation and Editing Flows', () => {
 
       // Click lock to unsync
       await lockButton.click()
+      await expect(sidebar.locator('button[title="Names are not synced. Click to lock"]')).toBeVisible()
 
       // Now change experiment name again
       await nameInput.fill('another_test')
@@ -256,64 +267,22 @@ test.describe('Experiment Creation and Editing Flows', () => {
       console.log('\n🔄 Testing detail view dropdowns with existing experiment')
 
       const hasExperiments = await waitForExperiments(sidebar)
+      expect(hasExperiments, 'experiment list must load before opening a detail view').toBe(true)
 
-      if (!hasExperiments) {
-        console.log('  ℹ️  No experiments available to test detail view')
-        return
-      }
-
-      const experimentRow = sidebar.locator('.experiment-item').first()
-      await experimentRow.waitFor({ state: 'visible', timeout: 5000 })
-
-      const clickableArea = experimentRow.locator('[data-experiment-name]')
-      await clickableArea.waitFor({ state: 'visible', timeout: 2000 })
+      const experimentRow = sidebar.locator('.experiment-item').filter({ has: sidebar.locator('[data-experiment-name="flows_owned_draft"]') })
       await openLiveExperimentDetails(testPage, experimentRow)
-      console.log('  ✓ Opened existing experiment')
+      console.log('  ✓ Opened owned experiment')
 
       // Wait for detail view title to change
       await sidebar.locator('h2, h1').first().waitFor({ state: 'visible', timeout: 5000 })
       await debugWait()
 
-      // Check Unit Type dropdown
-      const unitTypeDropdown = sidebar.locator('#unit-type-select-trigger')
-      const unitTypeText = await unitTypeDropdown.textContent()
-      const isUnitTypeLoading = unitTypeText?.includes('Loading...')
-
-      if (isUnitTypeLoading) {
-        console.log('  ❌ Unit Type dropdown stuck in loading state')
-        console.log('  📝 Unit Type text:', unitTypeText)
-      } else {
-        console.log('  ✓ Unit Type dropdown loaded')
-      }
-      expect(isUnitTypeLoading).toBe(false)
-
-      // Check Owners dropdown
-      const ownersDropdown = sidebar.locator('#owners-label').locator('..').locator('[class*="cursor-pointer"]').first()
-      const ownersText = await ownersDropdown.textContent()
-      const isOwnersLoading = ownersText?.includes('Loading...')
-
-      if (isOwnersLoading) {
-        console.log('  ❌ Owners dropdown stuck in loading state')
-        console.log('  📝 Owners text:', ownersText)
-      } else {
-        console.log('  ✓ Owners dropdown loaded')
-      }
-      expect(isOwnersLoading).toBe(false)
-
-      // Check Tags dropdown
-      const tagsDropdown = sidebar.locator('#tags-select-trigger')
-      const tagsText = await tagsDropdown.textContent()
-      const isTagsLoading = tagsText?.includes('Loading...')
-
-      if (isTagsLoading) {
-        console.log('  ❌ Tags dropdown stuck in loading state')
-        console.log('  📝 Tags text:', tagsText)
-      } else {
-        console.log('  ✓ Tags dropdown loaded')
-      }
-      expect(isTagsLoading).toBe(false)
-
-      await debugWait()
+      // The detail view shows the record's own metadata, not placeholders.
+      await expect(sidebar.locator('#unit-type-select-trigger')).toContainText('session_id')
+      await expect(sidebar.locator('#unit-type-select-trigger')).not.toContainText('user_id')
+      await expect(sidebar.locator('#owners-label-trigger')).toContainText('Second Owner')
+      await expect(sidebar.locator('#tags-select-trigger')).toContainText('second-tag')
+      await expect(sidebar.locator('#applications-select-trigger')).toContainText('app')
     })
 
     // Continue testing with the experiments list that's already loaded
@@ -322,34 +291,11 @@ test.describe('Experiment Creation and Editing Flows', () => {
       await sidebar.locator('#header-back-button').click({ timeout: 10000 })
       await expect(sidebar.locator('#experiments-heading')).toBeVisible()
 
-      // Get all experiment cards with state badges
-      const experimentCards = sidebar.locator('.experiment-item')
-      const cardCount = await experimentCards.count()
-
-      if (cardCount > 0) {
-        // Check first 3 experiment cards for state badges
-        const cardsToCheck = Math.min(3, cardCount)
-        for (let i = 0; i < cardsToCheck; i++) {
-          const card = experimentCards.nth(i)
-          const stateBadge = card.locator('[class*="badge"], span[class*="bg-"]').first()
-          const hasStateBadge = await stateBadge.isVisible().catch(() => false)
-
-          if (hasStateBadge) {
-            const badgeText = await stateBadge.textContent()
-            console.log(`  Card ${i + 1} badge: "${badgeText}"`)
-
-            // Verify badge doesn't show raw state values
-            const rawStates = ['created', 'running_not_full_on', 'full_on']
-            const hasRawState = rawStates.some(raw => badgeText?.toLowerCase() === raw.toLowerCase())
-            expect(hasRawState).toBe(false)
-          }
-        }
-        console.log('  ✓ State labels display correctly in list view')
-      } else {
-        console.log('  ℹ️  No experiments available to check')
-      }
-
-      await debugWait()
+      const badge = (name: string) => sidebar.locator('[data-testid="experiment-list-item"]')
+        .filter({ has: sidebar.locator(`[data-experiment-name="${name}"]`) }).locator('span.rounded-full').first()
+      await expect(badge('flows_owned_draft')).toHaveText('Draft')
+      await expect(badge('flows_owned_ready')).toHaveText('Ready')
+      console.log('  ✓ State labels display correctly in list view')
     })
 
     await test.step('Test template selection flow', async () => {
@@ -419,43 +365,20 @@ test.describe('Experiment Creation and Editing Flows', () => {
     await test.step('Navigate back to experiments list', async () => {
       console.log('\n◀️  Navigating back to experiments list')
 
-      const backButton = sidebar.locator('button[aria-label="Go back"], button[title="Go back"]')
-      await backButton.click()
-      console.log('  ✓ Clicked back button')
-      // TODO: Replace timeout with specific element wait
-    await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 1000 }).catch(() => {})
-
-      // Check for either heading or create button
-      const experimentList = sidebar.locator('#experiments-heading')
-      const createButton = sidebar.locator('button[title="Create New Experiment"]')
-
-      const listVisible = await experimentList.isVisible({ timeout: 2000 }).catch(() => false)
-      const buttonVisible = await createButton.isVisible({ timeout: 2000 }).catch(() => false)
-
-      if (listVisible || buttonVisible) {
-        console.log('  ✓ Returned to experiment list')
-      } else {
-        console.log('  ⚠️  Could not confirm return to experiment list')
-      }
-
-      await debugWait()
+      // Back runs the editor's async cleanup (content-script messages) before
+      // switching views: wait for the list itself, not a fixed delay.
+      await sidebar.locator('#create-experiment-header').waitFor({ state: 'visible' })
+      await sidebar.locator('#header-back-button').click()
+      await expect(sidebar.locator('#create-experiment-header')).toBeHidden()
+      await expect(sidebar.locator('#experiments-heading')).toBeVisible()
+      console.log('  ✓ Returned to experiment list')
     })
 
     await test.step('Navigate to Settings and verify Header', async () => {
       console.log('\n⚙️  Testing Settings view')
 
-      // Click settings button
-      const settingsButton = sidebar.locator('button[title*="Settings"], button[aria-label*="Settings"]').first()
-      const hasSettingsButton = await settingsButton.isVisible({ timeout: 2000 }).catch(() => false)
-
-      if (!hasSettingsButton) {
-        console.log('  ℹ️  Settings button not found, skipping settings test')
-        return
-      }
-
-      await settingsButton.click()
+      await sidebar.locator('#nav-settings').click()
       console.log('  ✓ Clicked settings button')
-      await debugWait()
 
       // Verify Header in Settings
       const headerTitle = sidebar.locator('#absmartly-endpoint')
@@ -476,22 +399,12 @@ test.describe('Experiment Creation and Editing Flows', () => {
     await test.step('Test back navigation from Settings', async () => {
       console.log('\n◀️  Testing back from Settings')
 
-      const backButton = sidebar.locator('#header-back-button')
-      const isVisible = await backButton.isVisible({ timeout: 2000 }).catch(() => false)
-      if (!isVisible) {
-        console.log('  ℹ️  Back button not visible (settings was skipped), skipping')
-        return
-      }
-
-      await backButton.click()
+      await expect(sidebar.locator('#absmartly-endpoint')).toBeVisible()
+      await sidebar.locator('#header-back-button').click()
       console.log('  ✓ Clicked back button')
-      await debugWait()
-
-      const settingsGone = sidebar.locator('#absmartly-endpoint')
-      await expect(settingsGone).not.toBeVisible({ timeout: 2000 })
-      console.log('  ✓ Settings view closed')
-
-      await debugWait()
+      await expect(sidebar.locator('#absmartly-endpoint')).toBeHidden()
+      await expect(sidebar.locator('#experiments-heading')).toBeVisible()
+      console.log('  ✓ Settings view closed, back on the list')
     })
 
     console.log('\n✅ Comprehensive experiment flow test PASSED!')

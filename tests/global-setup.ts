@@ -2,7 +2,7 @@ import type { FullConfig } from '@playwright/test'
 import path from 'path'
 import fs from 'fs'
 import { execSync } from 'child_process'
-import { fetchResource, requireEditorResources } from './helpers/resource-prefetch'
+import { installNodeEgressGuard } from './helpers/node-egress-guard'
 
 const getLatestMtimeMs = (targetPath: string): number => {
   if (!fs.existsSync(targetPath)) return 0
@@ -157,78 +157,13 @@ async function globalSetup(config: FullConfig) {
     console.log('✅ Copied local-test-page.html to build directory')
   }
 
-  // Load only Office fixture credentials. Provider mode is an explicit Playwright
-  // option; a developer's local AI keys must never switch ordinary E2E to live.
-  const envPath = path.join(rootDir, '.env.dev.local')
-  if (fs.existsSync(envPath)) {
-    const officeVariables = new Set([
-      'PLASMO_PUBLIC_ABSMARTLY_API_KEY',
-      'PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT'
-    ])
-    for (const line of fs.readFileSync(envPath, 'utf-8').split('\n')) {
-      const match = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/)
-      if (match && officeVariables.has(match[1]) && process.env[match[1]] === undefined) {
-        process.env[match[1]] = match[2].replace(/^(['"])(.*)\1$/, '$2')
-      }
-    }
-    console.log('✅ Loaded Office fixture environment defaults')
-  }
-
-  // 4. Verify API credentials are available
-  const apiKey = process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY
-  const apiEndpoint = process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT
-
-  if (!apiKey || !apiEndpoint) {
-    console.warn('⚠️ API credentials not found in environment variables')
-    console.warn('   Tests will use default test credentials')
-  } else {
-    console.log('✅ API credentials found in environment')
-  }
-
-  // 5. Pre-fetch /v1/* editor resources ONCE so every test context can
-  // seed its cache instead of triggering 6 concurrent calls per sidebar
-  // mount. Under workers=4 + 4 CI shards = 16 sidebars in flight that
-  // burst saturates the API and the unit-type-select dropdown stays
-  // disabled for 30-90s. Pre-fetch reduces it to 6 calls total per CI
-  // shard at suite start.
-  if (apiKey && apiEndpoint) {
-    const cachePath = path.join(rootDir, '.editor-resources-cache.json')
-    fs.rmSync(cachePath, { force: true })
-    // Endpoint env var sometimes ends in /v1 and sometimes doesn't, depending
-    // on which environment the workflow points at. Strip the trailing slash
-    // and the optional /v1 so we can append /v1/<resource> deterministically.
-    const baseEndpoint = apiEndpoint.replace(/\/+$/, '').replace(/\/v1$/, '')
-    const fetchOne = async (resource: string, items = 200): Promise<unknown[]> => fetchResource(resource, async () => {
-      const controller = new AbortController()
-      // Two 20s attempts within the 40s budget: healthy apps/unit-types
-      // reads can take ~10s in CI, so shorter attempts abort good calls.
-      const timer = setTimeout(() => controller.abort(), 20000)
-      try {
-        const response = await fetch(`${baseEndpoint}/v1/${resource}?items=${items}`, {
-          headers: { Authorization: `Api-Key ${apiKey}`, Accept: 'application/json' },
-          signal: controller.signal
-        })
-        // Consume the body inside the bounded request deadline as well.
-        const body = response.ok ? await response.json() : undefined
-        return { ok: response.ok, status: response.status, json: async () => body }
-      } finally { clearTimeout(timer) }
-    }, undefined, 2)
-    // Serialize startup requests: four shards must not burst seven requests
-    // each at the live backend. Never cache failed requests as empty arrays.
-    const applications = await fetchOne('applications')
-    const unitTypes = await fetchOne('unit_types')
-    requireEditorResources({ applications, unitTypes })
-    const metrics = await fetchOne('metrics')
-    const tags = await fetchOne('experiment_tags')
-    const owners = await fetchOne('users')
-    const teams = await fetchOne('teams')
-    const experiments = await fetchOne('experiments', 25)
-    fs.writeFileSync(
-      cachePath,
-      JSON.stringify({ applications, unitTypes, metrics, tags, owners, teams, experiments, timestamp: Date.now() })
-    )
-    console.log(`✅ Pre-fetched editor resources (apps:${applications.length}, unitTypes:${unitTypes.length}, metrics:${metrics.length}, tags:${tags.length}, owners:${owners.length}, teams:${teams.length}, experiments:${experiments.length}) → ${cachePath}`)
-  }
+  // Required E2E never reads environment credentials or calls a shared
+  // backend: the management API is a local fixture validated against the
+  // pinned published contract, fetched/verified here (cached afterwards).
+  // Contract acquisition is explicit preparation, done before the guard.
+  execSync('node scripts/fetch-api-contract.js', { cwd: rootDir, stdio: 'inherit' })
+  fs.rmSync(path.join(rootDir, '.editor-resources-cache.json'), { force: true })
+  if (process.env.E2E_LIVE_BACKEND !== '1') installNodeEgressGuard()
 
   console.log('✅ Global setup completed successfully')
   console.log('---')

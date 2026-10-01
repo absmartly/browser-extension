@@ -205,6 +205,8 @@ test.describe("AI Session & Image Handling", () => {
 
       await expect(sidebar.locator("#ai-dom-generator-heading")).toBeVisible()
       await expect(sidebar.locator("#ai-prompt")).toBeVisible()
+      // The conversation session exists only after history has loaded.
+      await expect(sidebar.locator('button[title="Conversation History"]')).toBeAttached()
       console.log("AI page is ready for input")
     })
 

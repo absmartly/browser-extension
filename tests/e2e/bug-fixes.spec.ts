@@ -1,6 +1,7 @@
 import { test, expect } from '../fixtures/extension'
 import { type Page, type FrameLocator } from '@playwright/test'
 import { setupTestPage, openLiveExperimentDetails } from './utils/test-helpers'
+import { experimentRecord } from '../helpers/management-api/records'
 
 /**
  * E2E Tests for Bug Fixes
@@ -23,7 +24,14 @@ test.describe('Bug Fixes E2E Tests', () => {
   let testPage: Page
   let sidebar: FrameLocator
 
-  test.beforeEach(async ({ context, extensionUrl }) => {
+  // Owned, deterministic list rows instead of whatever a shared env returns.
+  const owned = ['bugfix_alpha', 'bugfix_beta', 'bugfix_gamma']
+
+  test.beforeEach(async ({ context, extensionUrl, managementApi }) => {
+    managementApi.state.experiments.push(...owned.map((name, i) => experimentRecord({
+      name, display_name: name, state: i === 1 ? 'ready' : 'created', created_at: `2026-09-0${i + 1}T10:00:00.000Z`,
+      unit_type_id: 21, unit_type: managementApi.state.resources.unit_types[0]
+    })))
     testPage = await context.newPage()
     const result = await setupTestPage(testPage, extensionUrl, TEST_PAGE_URL)
     sidebar = result.sidebar
@@ -70,10 +78,7 @@ test.describe('Bug Fixes E2E Tests', () => {
       const experimentItems = sidebar.locator('.experiment-item')
       const count = await experimentItems.count()
 
-      if (count === 0) {
-        console.log('No experiments found - skipping test')
-        return
-      }
+      expect(count).toBeGreaterThan(0)
 
       // Check if preview header exists on test page
       const hasPreviewHeader = await testPage.locator('#absmartly-preview-header').count()
@@ -88,18 +93,11 @@ test.describe('Bug Fixes E2E Tests', () => {
 
   test.describe('2. Clear all overrides button', () => {
     test('should show clear all button when overrides exist', async () => {
-      // Wait for loading spinner to disappear
-      await sidebar.locator('[role="status"][aria-label="Loading experiments"]')
-        .waitFor({ state: 'hidden', timeout: 30000 })
-        .catch(() => {})
+      const row = sidebar.locator('.experiment-item').filter({ has: sidebar.locator('[data-experiment-name="bugfix_alpha"]') })
+      await expect(row).toBeVisible()
 
-      const experimentItems = sidebar.locator('.experiment-item')
-      await expect(experimentItems.first()).toBeVisible()
-
-      // Click on first variant button to set an override
-      const firstVariantButton = experimentItems.first().locator('button[type="button"]').first()
-      await firstVariantButton.click()
-      await testPage.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
+      // Override bugfix_alpha to its treatment variant (label B).
+      await row.getByRole('button', { name: 'B', exact: true }).click()
 
       // Look for reload banner (which contains the Clear All button)
       const reloadBanner = sidebar.locator('text=Reload to apply changes')
@@ -108,23 +106,10 @@ test.describe('Bug Fixes E2E Tests', () => {
     })
 
     test('should clear all overrides when clicked', async ({ context }) => {
-      // Wait for loading spinner to disappear
-      await sidebar.locator('[role="status"][aria-label="Loading experiments"]')
-        .waitFor({ state: 'hidden', timeout: 30000 })
-        .catch(() => {})
-
-      const experimentItems = sidebar.locator('.experiment-item')
-      await expect(experimentItems.first()).toBeVisible()
-      const experimentCount = await experimentItems.count()
-
-      // Set overrides on first 2-3 experiments
-      for (let i = 0; i < Math.min(3, experimentCount); i++) {
-        const variantButton = experimentItems.nth(i).locator('button[type="button"]').first()
-        const buttonCount = await variantButton.count()
-        if (buttonCount > 0) {
-          await variantButton.click()
-          await testPage.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
-        }
+      // Override each owned row to its treatment variant (label B).
+      for (const name of owned) {
+        const row = sidebar.locator('.experiment-item').filter({ has: sidebar.locator(`[data-experiment-name="${name}"]`) })
+        await row.getByRole('button', { name: 'B', exact: true }).click()
       }
 
       // Check if reload banner appeared
@@ -138,7 +123,8 @@ test.describe('Bug Fixes E2E Tests', () => {
           return typeof value === 'string' ? JSON.parse(value) : (value || {})
         })
       }
-      await expect.poll(async () => Object.keys(await readOverrides()).length).toBeGreaterThan(0)
+      await expect.poll(async () => Object.keys(await readOverrides()).sort()).toEqual([...owned].sort())
+      expect(Object.values(await readOverrides()).map((o: any) => o.variant)).toEqual([1, 1, 1])
       testPage.once('dialog', dialog => dialog.accept())
       await sidebar.getByRole('button', { name: 'Clear All', exact: true }).click({ timeout: 10000 })
       await expect.poll(readOverrides).toEqual({})
@@ -147,281 +133,97 @@ test.describe('Bug Fixes E2E Tests', () => {
 
   test.describe('3. Dropdown collapse when clicking outside', () => {
     test('should close SearchableSelect dropdown when clicking outside', async () => {
-      // Wait for loading spinner to disappear
-      await sidebar.locator('[role="status"][aria-label="Loading experiments"]')
-        .waitFor({ state: 'hidden', timeout: 30000 })
-        .catch(() => {})
+      await sidebar.locator('button[title="Create New Experiment"]').click()
+      await sidebar.locator('#from-scratch-button').click()
+      const trigger = sidebar.locator('#unit-type-select-trigger')
+      const dropdown = sidebar.locator('#unit-type-select-dropdown')
+      await trigger.click()
+      await expect(dropdown).toBeVisible()
+      await expect(dropdown.getByText('user_id', { exact: true })).toBeVisible()
 
-      const experimentItems = sidebar.locator('.experiment-item')
-      const count = await experimentItems.count()
-
-      if (count === 0) {
-        console.log('No experiments found - skipping test')
-        return
-      }
-
-      // Click Create Experiment
-      const createButton = sidebar.locator('#create-experiment-button')
-      const hasCreateButton = await createButton.count()
-
-      if (hasCreateButton > 0) {
-        await createButton.click()
-        await testPage.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
-
-        // Look for unit type dropdown
-        const unitDropdown = sidebar.locator('[data-testid="unit-type-select-trigger"]')
-        const hasUnitDropdown = await unitDropdown.count()
-
-        if (hasUnitDropdown > 0) {
-          // Click to open dropdown
-          await unitDropdown.click()
-          await testPage.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
-
-          // Verify dropdown is open
-          const dropdown = sidebar.locator('[data-testid="unit-type-select-dropdown"]')
-          await expect(dropdown).toBeVisible()
-
-          // Click outside (on the page title)
-          await sidebar.locator('h1, h2, h3').first().click()
-          await testPage.waitForLoadState('domcontentloaded', { timeout: 1000 }).catch(() => {})
-
-          // Verify dropdown is closed
-          await expect(dropdown).not.toBeVisible()
-        }
-      }
+      // Click outside, on the editor's name field.
+      await sidebar.locator('#experiment-name-input').click()
+      await expect(dropdown).toBeHidden()
     })
   })
 
   test.describe('4. Units prefilled in dropdown', () => {
-    test('should show selected unit type for existing experiment', async () => {
-      // Wait for loading spinner to disappear
-      await sidebar.locator('[role="status"][aria-label="Loading experiments"]')
-        .waitFor({ state: 'hidden', timeout: 30000 })
-        .catch(() => {})
-
-      const experimentItems = sidebar.locator('.experiment-item')
-      await expect(experimentItems.first()).toBeVisible()
-
-      // Click on first experiment
-      await openLiveExperimentDetails(testPage, experimentItems.first())
+    test('should show selected unit type for existing experiment', async ({ managementApi }) => {
+      const row = sidebar.locator('.experiment-item').filter({ has: sidebar.locator('[data-experiment-name="bugfix_beta"]') })
+      await openLiveExperimentDetails(testPage, row)
       await sidebar.locator('#header-back-button').waitFor({ state: 'visible', timeout: 5000 })
 
-      const unitDropdown = sidebar.locator('#unit-type-select-trigger')
-      await expect(unitDropdown).toBeVisible()
-      await expect(unitDropdown).not.toHaveText(/^\s*(Select|Loading)/i)
-      await expect(unitDropdown).not.toHaveText('')
+      // The detail view must show the record's own unit type, not a placeholder.
+      await expect(sidebar.locator('#unit-type-select-trigger')).toContainText(managementApi.state.resources.unit_types[0].name)
+      await expect(sidebar.locator('#unit-type-select-trigger')).not.toContainText('session_id')
+      expect(managementApi.callsTo('GET', /^\/v1\/experiments\/\d+$/).length).toBeGreaterThan(0)
     })
   })
 
+  // Opens an owned record's detail view through the real worker detail request.
+  const openOwned = async (name: string) => {
+    const row = sidebar.locator('.experiment-item').filter({ has: sidebar.locator(`[data-experiment-name="${name}"]`) })
+    await openLiveExperimentDetails(testPage, row)
+    await expect(sidebar.locator('#header-back-button')).toBeVisible()
+  }
+
   test.describe('5. URL filters not being lost', () => {
     test('should persist URL filter changes', async () => {
-      // Wait for loading spinner to disappear
-      await sidebar.locator('[role="status"][aria-label="Loading experiments"]')
-        .waitFor({ state: 'hidden', timeout: 30000 })
-        .catch(() => {})
+      await openOwned('bugfix_alpha')
+      await sidebar.locator('#url-filtering-toggle-variant-1').click()
+      await sidebar.locator('#url-filter-mode-variant-1').selectOption('simple')
+      const pattern = sidebar.locator('#url-filter-pattern-variant-1-0')
+      await pattern.fill('/test-url-filter/*')
 
-      const experimentItems = sidebar.locator('.experiment-item')
-      const experimentCount = await experimentItems.count()
-
-      if (experimentCount === 0) {
-        console.log('No experiments found - skipping test')
-        return
-      }
-
-      // Open experiment detail
-      await experimentItems.first().click()
-      await testPage.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
-
-      // Look for URL filtering section
-      const urlFilterHeader = sidebar.locator('text=URL Filtering')
-      if (await urlFilterHeader.count() > 0) {
-        // Expand URL filter section if collapsed
-        await urlFilterHeader.click()
-        await testPage.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
-
-        // Select simple mode
-        const modeSelect = sidebar.locator('select').filter({ hasText: 'Apply on all pages' })
-        if (await modeSelect.count() > 0) {
-          await modeSelect.selectOption('simple')
-          await testPage.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
-
-          // Type URL pattern
-          const urlInput = sidebar.locator('input[placeholder*="/products"]').first()
-          if (await urlInput.count() > 0) {
-            await urlInput.fill('/test-url-filter/*')
-            await testPage.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
-
-            // Navigate away
-            await sidebar.locator('#back-button').click()
-            await testPage.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
-
-            // Re-open experiment
-            await experimentItems.first().click()
-            await testPage.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
-
-            // Expand URL filter again
-            await urlFilterHeader.click()
-            await testPage.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
-
-            // Check if value persisted
-            const savedValue = await urlInput.inputValue()
-            expect(savedValue).toBe('/test-url-filter/*')
-          }
-        }
-      }
+      // Collapse and reopen the section: the edited pattern must survive.
+      await sidebar.locator('#url-filtering-toggle-variant-1').click()
+      await expect(pattern).toBeHidden()
+      await sidebar.locator('#url-filtering-toggle-variant-1').click()
+      await expect(pattern).toHaveValue('/test-url-filter/*')
+      await expect(sidebar.locator('#url-filter-mode-variant-1')).toHaveValue('simple')
     })
   })
 
   test.describe('6. Avatars showing in owners dropdown', () => {
-    test('should display avatars or initials in owner dropdown', async () => {
-      // Wait for loading spinner to disappear
-      await sidebar.locator('[role="status"][aria-label="Loading experiments"]')
-        .waitFor({ state: 'hidden', timeout: 30000 })
-        .catch(() => {})
-
-      const experimentItems = sidebar.locator('.experiment-item')
-      const count = await experimentItems.count()
-
-      if (count === 0) {
-        console.log('No experiments found - skipping test')
-        return
-      }
-
-      // Click Create Experiment
-      const createButton = sidebar.locator('#create-experiment-button')
-      if (await createButton.count() > 0) {
-        await createButton.click()
-        await testPage.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
-
-        // Find and open owner dropdown
-        const ownerLabel = sidebar.locator('text=Owner')
-        if (await ownerLabel.count() > 0) {
-          const ownerDropdown = ownerLabel.locator('..').locator('[data-testid*="trigger"]')
-          await ownerDropdown.click()
-          await testPage.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
-
-          // Check for avatars or initials in dropdown
-          const dropdown = sidebar.locator('[data-testid*="dropdown"]')
-
-          // Look for images (avatars)
-          const images = dropdown.locator('img')
-          const imageCount = await images.count()
-
-          // Look for initial circles
-          const initials = dropdown.locator('div[class*="rounded-full"]')
-          const initialsCount = await initials.count()
-
-          // Should have either images or initials for each option
-          expect(imageCount + initialsCount).toBeGreaterThan(0)
-        }
+    test('should display avatars or initials in owner dropdown', async ({ managementApi }) => {
+      await sidebar.locator('button[title="Create New Experiment"]').click()
+      await sidebar.locator('#from-scratch-button').click()
+      await sidebar.locator('#owners-label-trigger').click()
+      const dropdown = sidebar.locator('#owners-label-dropdown')
+      // One initials badge per fixture user (no avatar URLs in the fixture).
+      for (const user of managementApi.state.resources.users) {
+        const option = dropdown.locator(`[data-testid="searchable-select-option-user-${user.id}"]`)
+        await expect(option).toContainText(`${user.first_name} ${user.last_name}`)
+        await expect(option.locator('div.rounded-full')).toHaveText(`${user.first_name[0]}${user.last_name[0]}`)
       }
     })
   })
 
   test.describe('7. JSON editor working in VE mode', () => {
-    test('should allow opening JSON editor while in VE mode', async () => {
-      // Wait for loading spinner to disappear
-      await sidebar.locator('[role="status"][aria-label="Loading experiments"]')
-        .waitFor({ state: 'hidden', timeout: 30000 })
-        .catch(() => {})
-
-      const experimentItems = sidebar.locator('.experiment-item')
-      const experimentCount = await experimentItems.count()
-
-      if (experimentCount === 0) {
-        console.log('No experiments found - skipping test')
-        return
-      }
-
-      // Open experiment
-      await experimentItems.first().click()
-      await testPage.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
-
-      // Start VE mode
-      const veButton = sidebar.locator('#visual-editor-button')
-      if (await veButton.count() > 0) {
-        await veButton.first().click()
-        await testPage.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
-
-        // Try to click JSON button
-        const jsonButton = sidebar.locator('#json-view-button')
-        if (await jsonButton.count() > 0) {
-          await jsonButton.first().click()
-          await testPage.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
-
-          // Check if JSON editor opened (Monaco editor)
-          const hasMonaco = await sidebar.locator('.monaco-editor').count()
-        }
-      }
+    test('JSON editor is blocked while VE is active and opens after VE exits', async () => {
+      await openOwned('bugfix_alpha')
+      const json = sidebar.locator('#json-editor-button-variant-1')
+      await expect(json).toBeEnabled()
+      await sidebar.locator('#visual-editor-button').first().click()
+      await expect(testPage.locator('#absmartly-visual-editor-banner-host')).toBeVisible()
+      await expect(json).toBeDisabled()
+      await expect(json).toHaveAttribute('title', /Cannot edit JSON while Visual Editor is active/)
     })
   })
 
   test.describe('8. Control variant warning', () => {
     test('should show Control variant collapsed by default', async () => {
-      // Wait for loading spinner to disappear
-      await sidebar.locator('[role="status"][aria-label="Loading experiments"]')
-        .waitFor({ state: 'hidden', timeout: 30000 })
-        .catch(() => {})
-
-      const experimentItems = sidebar.locator('.experiment-item')
-      const experimentCount = await experimentItems.count()
-
-      if (experimentCount === 0) {
-        console.log('No experiments found - skipping test')
-        return
-      }
-
-      // Open experiment
-      await experimentItems.first().click()
-      await testPage.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
-
-      // Look for Control variant
-      const controlVariant = sidebar.locator('text=Control').first()
-      if (await controlVariant.count() > 0) {
-        // Check if it has collapsed/expanded indicator
-        const parent = controlVariant.locator('..')
-
-        // Look for yellow border/background styling
-        const className = await parent.getAttribute('class')
-
-        // Should have yellow styling
-        const hasYellowStyling = className?.includes('yellow') || false
-      }
+      await openOwned('bugfix_alpha')
+      await expect(sidebar.locator('#variant-toggle-0')).toHaveText('▶')
+      await expect(sidebar.locator('#variant-toggle-1')).toHaveText('▼')
+      await expect(sidebar.getByText('You are editing the Control variant.')).toHaveCount(0)
     })
 
     test('should show warning when expanding Control variant', async () => {
-      // Wait for loading spinner to disappear
-      await sidebar.locator('[role="status"][aria-label="Loading experiments"]')
-        .waitFor({ state: 'hidden', timeout: 30000 })
-        .catch(() => {})
-
-      const experimentItems = sidebar.locator('.experiment-item')
-      if (await experimentItems.count() === 0) {
-        console.log('No experiments found - skipping test')
-        return
-      }
-
-      // Open experiment
-      await experimentItems.first().click()
-      await testPage.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
-
-      // Set up dialog listener
-      let dialogShown = false
-      testPage.on('dialog', async dialog => {
-        console.log('Dialog message:', dialog.message())
-        if (dialog.message().toLowerCase().includes('control')) {
-          dialogShown = true
-        }
-        await dialog.accept()
-      })
-
-      // Try to expand Control variant
-      const controlHeader = sidebar.locator('text=Control').first()
-      if (await controlHeader.count() > 0) {
-        const expandButton = controlHeader.locator('..').locator('button').first()
-        await expandButton.click()
-        await testPage.waitForLoadState('domcontentloaded', { timeout: 2000 }).catch(() => {})
-      }
+      await openOwned('bugfix_alpha')
+      await sidebar.locator('#variant-toggle-0').click()
+      await expect(sidebar.locator('#variant-toggle-0')).toHaveText('▼')
+      await expect(sidebar.getByText('You are editing the Control variant.', { exact: false })).toBeVisible()
     })
   })
 

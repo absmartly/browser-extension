@@ -5,9 +5,10 @@ import { type Page, type FrameLocator, type Locator, expect } from '@playwright/
  * row alone does not mean its full detail payload has arrived. */
 export async function openLiveExperimentDetails(page: Page, row: Locator): Promise<void> {
   const nameTarget = row.locator('[data-experiment-name]')
-  const name = await nameTarget.getAttribute('data-experiment-name')
+  const name = await nameTarget.getAttribute('data-experiment-name', { timeout: 10000 })
   expect(name).toBeTruthy()
   const responsePromise = page.context().waitForEvent('response', {
+    timeout: 15000,
     predicate: async response => {
       if (response.request().method() !== 'GET' || !/\/v1\/experiments\/\d+$/.test(new URL(response.url()).pathname)) return false
       if (!response.ok()) return true
@@ -169,7 +170,8 @@ export function setupConsoleLogging(
 export async function waitForExperiments(sidebar: FrameLocator): Promise<boolean> {
   const experimentItem = sidebar.locator('[data-testid="experiment-list-item"]').first()
 
-  return await experimentItem.isVisible({ timeout: 10000 }).catch(() => false)
+  // isVisible() does not wait; a cold list load needs an actual wait.
+  return await experimentItem.waitFor({ state: 'visible', timeout: 30000 }).then(() => true, () => false)
 }
 
 /**

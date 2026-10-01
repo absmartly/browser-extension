@@ -1,6 +1,7 @@
 import { test, expect } from '../fixtures/extension'
 import { type Page } from '@playwright/test'
 import { injectSidebar, debugWait, setupConsoleLogging } from './utils/test-helpers'
+import { controlledConfigSeed } from '../helpers/management-api/server'
 
 /**
  * E2E Tests for Variant List Performance (React.memo)
@@ -17,13 +18,8 @@ test.describe('Variant List Performance Tests (React.memo)', () => {
   let testPage: Page
   let allConsoleMessages: Array<{type: string, text: string}> = []
 
-  test.beforeEach(async ({ context, seedStorage }) => {
-    await seedStorage({
-      'absmartly-apikey': process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || 'BxYKd1U2DlzOLJ74gdvaIkwy4qyOCkXi_YJFFdE1EDyovjEsQ__iiX0IM1ONfHKB',
-      'absmartly-endpoint': process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT || 'https://dev-1.absmartly.com/v1',
-      'absmartly-env': process.env.PLASMO_PUBLIC_ABSMARTLY_ENVIRONMENT || 'development',
-      'absmartly-auth-method': 'apikey'
-    })
+  test.beforeEach(async ({ context, seedStorage, managementApi }) => {
+    await seedStorage(controlledConfigSeed(managementApi))
 
     testPage = await context.newPage()
 

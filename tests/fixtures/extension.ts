@@ -2,10 +2,15 @@ import { test as base, chromium, type BrowserContext } from '@playwright/test'
 import path from 'path'
 import fs from 'fs'
 import { ensureExtensionBuilt } from './setup'
-import { buildExperimentsCacheSeed } from '../helpers/experiments-cache-seed'
 import { waitForConfigInitialization } from '../helpers/config-readiness'
 import { createProviderServer, createLiveProvider, type ProviderController } from '../helpers/provider-server'
 import { installProviderGuard } from '../helpers/provider-network'
+import { createManagementApi, type ManagementApi } from '../helpers/management-api/server'
+import { installNetworkBoundary, type NetworkBoundary } from '../helpers/network-boundary'
+import { installNodeEgressGuard, nodeEgressViolations } from '../helpers/node-egress-guard'
+
+// Origin of the local static server for extension-owned target pages.
+export const TEST_PAGE_ORIGIN = 'http://localhost:3456'
 
 // In CI we run e2e against the production bundle (chrome-mv3-prod) so any
 // Plasmo/Parcel bundling regression surfaces before reaching Chrome Web Store.
@@ -36,7 +41,11 @@ function ensureSeedFileExists() {
 
 type ExtFixtures = {
   liveAI: boolean
+  // Manual integration only: talk to the environment's real management API.
+  liveBackend: boolean
   aiProvider: ProviderController
+  managementApi: ManagementApi
+  networkBoundary: NetworkBoundary
   context: BrowserContext
   extensionId: string
   extensionUrl: (p: string) => string
@@ -47,13 +56,23 @@ type ExtFixtures = {
 
 export const test = base.extend<ExtFixtures>({
   liveAI: [false, { option: true }],
+  liveBackend: [false, { option: true }],
+  managementApi: async ({ liveBackend }, use) => {
+    // Worker-process Node guard: test code may only reach loopback.
+    if (!liveBackend) installNodeEgressGuard()
+    const api = await createManagementApi()
+    try { await use(api) } finally { await api.close() }
+  },
   aiProvider: async ({ liveAI }, use) => {
     const provider = liveAI
       ? createLiveProvider(process.env.PLASMO_PUBLIC_ANTHROPIC_ENDPOINT, process.env.PLASMO_PUBLIC_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY)
       : await createProviderServer()
     try { await use(provider); provider.assertComplete() } finally { await provider.close() }
   },
-  context: async ({ aiProvider, liveAI }, use, testInfo) => {
+  networkBoundary: async ({ context }, use) => {
+    await use((context as BrowserContext & { __boundary: NetworkBoundary }).__boundary)
+  },
+  context: async ({ aiProvider, liveAI, liveBackend, managementApi }, use, testInfo) => {
     // Extension build is already ensured in global setup
     // Don't rebuild here to avoid multiple rebuilds per test
 
@@ -83,6 +102,17 @@ export const test = base.extend<ExtFixtures>({
       viewport: { width: 1920, height: 1080 },
     })
 
+    // Deterministic mode: the management API is a local stateful fixture
+    // behind an allow-listed synthetic origin, the AI provider is scripted,
+    // and every other http(s) request (pages and service worker) is aborted.
+    let boundary: NetworkBoundary | undefined
+    if (!liveBackend) {
+      boundary = await installNetworkBoundary(context, {
+        allowedOrigins: [TEST_PAGE_ORIGIN, new URL(aiProvider.endpoint).origin],
+        forwards: { [managementApi.origin]: managementApi.url }
+      })
+      ;(context as BrowserContext & { __boundary?: NetworkBoundary }).__boundary = boundary
+    }
     if (!liveAI) await installProviderGuard(context, aiProvider)
 
     // Keep timing/status evidence for live flakes without headers, keys,
@@ -131,9 +161,9 @@ export const test = base.extend<ExtFixtures>({
     const anthropicApiKey = aiProvider.apiKey
 
     const defaultConfig = {
-      apiKey: process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || '',
-      apiEndpoint: process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT || '',
-      authMethod: process.env.PLASMO_PUBLIC_ABSMARTLY_AUTH_METHOD || 'apikey',
+      apiKey: liveBackend ? process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || '' : managementApi.apiKey,
+      apiEndpoint: liveBackend ? process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT || '' : managementApi.origin,
+      authMethod: 'apikey',
       domChangesFieldName: '__dom_changes',
       vibeStudioEnabled: true,
       aiProvider: 'anthropic-api',
@@ -149,34 +179,9 @@ export const test = base.extend<ExtFixtures>({
       'plasmo:absmartly-config': defaultConfig
     }
 
-    // Seed editor resources cache from globalSetup pre-fetch (one real
-    // /v1/* call per resource at suite start, not per sidebar mount).
-    // Without this, every sidebar mount fires 6 concurrent /v1/* calls and
-    // under workers=4 + 4 CI shards = 16 sidebars in flight the API
-    // saturates; the unit-type dropdown stays disabled for 30-90s. With
-    // pre-fetch the dropdown enables in <100ms from cache.
-    //
-    // Note: chrome.storage.sync has an 8KB per-item limit which the full
-    // cache blows past; the seed.js helper routes editor-resources-cache
-    // to chrome.storage.local instead via the LOCAL_AREA_KEYS allowlist.
-    const editorResourcesPath = path.join(__dirname, '..', '..', '.editor-resources-cache.json')
-    let editorResourcesCache: unknown = null
-    if (fs.existsSync(editorResourcesPath)) {
-      try {
-        editorResourcesCache = JSON.parse(fs.readFileSync(editorResourcesPath, 'utf-8'))
-      } catch {
-        // Pre-fetch unavailable; fall back to live API calls per sidebar.
-      }
-    }
-
-    // The ABsmartly API key lives in the local-area secret store (not in
-    // sync alongside the rest of the config) — getConfig overrides
-    // config.apiKey with whatever's at `absmartly-apikey` in local. If the
-    // seeded apiKey only lands in the sync `absmartly-config` record,
-    // getConfig returns config with apiKey:'', which fails the
-    // SettingsView "API key required" validator and breaks any test that
-    // tries to save settings. Seed the secret keyring entry too.
-    const absmartlyApiKey = process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY
+    // The ABsmartly API key lives in the local-area secret store; getConfig
+    // overrides config.apiKey with `absmartly-apikey`, so seed both.
+    const absmartlyApiKey = defaultConfig.apiKey
     if (absmartlyApiKey) {
       seedData['absmartly-apikey'] = absmartlyApiKey
       seedData['plasmo:absmartly-apikey'] = absmartlyApiKey
@@ -189,48 +194,6 @@ export const test = base.extend<ExtFixtures>({
 
     await seedPage.evaluate((data) => (window as any).seed(data), seedData)
 
-    // Editor resources cache is too large for chrome.storage.sync (8KB
-    // per-item limit), so write it directly to chrome.storage.local. The
-    // useEditorResources hook reads from `localAreaStorage`.
-    if (editorResourcesCache) {
-      await seedPage.evaluate(
-        (cache) =>
-          chrome.storage.local.set({
-            'editor-resources-cache': JSON.stringify(cache),
-            'plasmo:editor-resources-cache': JSON.stringify(cache)
-          }),
-        editorResourcesCache
-      )
-
-      // The experiments list slice of the cache lands in chrome.storage.sync
-      // under `experiments-cache` — that's where useExperimentLoading's
-      // `loadCachedExperiments()` reads from. The Storage instance routes
-      // sync by default, so we mirror that path here. Without this seed
-      // every sidebar mount fires a live `/v1/experiments` call and under
-      // shard concurrency (4 shards × 4 workers = 16 sidebars) the API
-      // throttles, and `.experiment-item` stays hidden for 5-60s.
-      //
-      // Schema: { version: 1, experiments: [...], timestamp: number } per
-      // src/lib/validation-schemas.ts:ExperimentsCacheSchema. Each experiment
-      // is minimized like setExperimentsCache so the payload fits a single
-      // non-chunked sync record (~25 items ≈ 5KB). Plasmo Storage stores
-      // JSON strings in chrome.storage, so the value is serialized here too.
-      const cacheBundle = editorResourcesCache as { experiments?: unknown[] }
-      const experimentsCache = buildExperimentsCacheSeed(
-        Array.isArray(cacheBundle.experiments) ? cacheBundle.experiments : []
-      )
-      if (experimentsCache) {
-        await seedPage.evaluate(
-          (payload) =>
-            chrome.storage.sync.set({
-              'experiments-cache': JSON.stringify(payload),
-              'plasmo:experiments-cache': JSON.stringify(payload)
-            }),
-          experimentsCache
-        )
-      }
-    }
-
     await seedPage.close()
 
     try {
@@ -240,11 +203,26 @@ export const test = base.extend<ExtFixtures>({
       fs.mkdirSync(path.dirname(timingPath), {recursive: true})
       fs.writeFileSync(timingPath, JSON.stringify(network, null, 2))
       await testInfo.attach('request-timings', {path: timingPath, contentType: 'application/json'})
+      if (!liveBackend) {
+        await testInfo.attach('management-api-calls', { body: JSON.stringify({ calls: managementApi.calls, issues: managementApi.issues, egress: boundary?.violations }, null, 2), contentType: 'application/json' })
+      }
     }
     await Promise.race([
       context.close(),
       new Promise<void>(resolve => setTimeout(resolve, 30000))
     ])
+    // Fail the test (after teardown evidence) on contract issues, missing
+    // fixture routes or any blocked egress, even if every assertion passed.
+    if (!liveBackend) {
+      managementApi.assertClean()
+      if (nodeEgressViolations().length) throw new Error(`Node egress attempted: ${JSON.stringify(nodeEgressViolations())}`)
+      // A spec may declare exact origins it probes on purpose; all other
+      // egress still fails the test.
+      const expected = testInfo.annotations.filter(a => a.type === 'expected-boundary-violation')
+        .flatMap(a => (a.description || '').split(/\s+/).filter(Boolean))
+      const unexpected = (boundary?.violations || []).filter(v => !expected.includes(new URL(v.url).origin))
+      if (unexpected.length) throw new Error(`Unexpected network egress:\n${unexpected.map(v => `- ${v.method} ${v.url} (${v.source})`).join('\n')}`)
+    }
   },
 
   extensionId: async ({ context }, use) => {

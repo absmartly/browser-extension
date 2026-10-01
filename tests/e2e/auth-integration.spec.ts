@@ -1,5 +1,6 @@
 import { test, expect } from '../fixtures/extension'
 import { setupTestPage } from './utils/test-helpers'
+import { controlledConfigSeed } from '../helpers/management-api/server'
 
 const TEST_PAGE_URL = '/visual-editor-test.html'
 
@@ -32,13 +33,8 @@ test.describe('Authentication Utils - JWT (Extension Context)', () => {
     await page.close()
   })
 
-  test('checkAuthentication with API Key - real API call via background SW', async ({ context, extensionUrl, seedStorage }) => {
-    await seedStorage({
-      'absmartly-apikey': process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || 'BxYKd1U2DlzOLJ74gdvaIkwy4qyOCkXi_YJFFdE1EDyovjEsQ__iiX0IM1ONfHKB',
-      'absmartly-endpoint': process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT || 'https://dev-1.absmartly.com/v1',
-      'absmartly-env': process.env.PLASMO_PUBLIC_ABSMARTLY_ENVIRONMENT || 'development',
-      'absmartly-auth-method': 'apikey'
-    })
+  test('checkAuthentication with API Key - real API call via background SW', async ({ context, extensionUrl, seedStorage, managementApi }) => {
+    await seedStorage(controlledConfigSeed(managementApi))
 
     const page = await context.newPage()
     const { sidebar } = await setupTestPage(page, extensionUrl, TEST_PAGE_URL)

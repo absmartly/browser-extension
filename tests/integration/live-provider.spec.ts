@@ -3,7 +3,7 @@ import { setupTestPage, click } from '../e2e/utils/test-helpers'
 import { createExperiment, fillMetadataForSave, saveExperiment } from '../e2e/helpers/ve-experiment-setup'
 
 // Explicitly opt in through the separate integration config. Never run in routine CI.
-test.use({ liveAI: true })
+test.use({ liveAI: true, liveBackend: true })
 
 test.describe('Live provider compatibility', () => {
   test('extension generates DOM changes via Anthropic API', async ({ context, extensionUrl }) => {

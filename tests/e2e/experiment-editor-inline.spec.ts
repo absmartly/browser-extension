@@ -20,6 +20,7 @@ import {
   injectSidebar,
   setupConsoleLogging
 } from "./utils/test-helpers"
+import { controlledConfigSeed } from '../helpers/management-api/server'
 
 const TEST_PAGE_PATH = path.join(
   __dirname,
@@ -31,18 +32,8 @@ const TEST_PAGE_PATH = path.join(
 test.describe("Experiment editor — inline form (FT-1905)", () => {
   let testPage: Page
 
-  test.beforeEach(async ({ context, seedStorage }) => {
-    await seedStorage({
-      "absmartly-apikey":
-        process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY ||
-        "BxYKd1U2DlzOLJ74gdvaIkwy4qyOCkXi_YJFFdE1EDyovjEsQ__iiX0IM1ONfHKB",
-      "absmartly-endpoint":
-        process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT ||
-        "https://dev-1.absmartly.com/v1",
-      "absmartly-env":
-        process.env.PLASMO_PUBLIC_ABSMARTLY_ENVIRONMENT || "development",
-      "absmartly-auth-method": "apikey"
-    })
+  test.beforeEach(async ({ context, seedStorage, managementApi }) => {
+    await seedStorage(controlledConfigSeed(managementApi))
 
     testPage = await context.newPage()
     setupConsoleLogging(
@@ -65,8 +56,12 @@ test.describe("Experiment editor — inline form (FT-1905)", () => {
   test("inline sections render in the sidebar editor", async ({
     extensionUrl
   }) => {
-    test.setTimeout(8000)
-
+    // test.setTimeout() also counts fixture setup (persistent browser launch,
+    // worker readiness, storage seed) and beforeEach. Under CI load that alone
+    // consumed the old 8s budget before the editor was reached. Bound the
+    // behaviour under test instead: each UI step below has its own 3s limit,
+    // and the editor must render within 8s of sidebar injection.
+    const startedAt = Date.now()
     const sidebar = await injectSidebar(testPage, extensionUrl)
 
     // Open create experiment from scratch.
@@ -93,5 +88,6 @@ test.describe("Experiment editor — inline form (FT-1905)", () => {
     await expect(
       sidebar.locator("#experiment-metrics-section")
     ).toBeVisible({ timeout: 3000 })
+    expect(Date.now() - startedAt, "inline editor ready after injection (ms)").toBeLessThan(8000)
   })
 })
