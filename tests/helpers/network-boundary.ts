@@ -13,19 +13,19 @@ export interface NetworkBoundary {
 // Forward with the original method/headers/body and fulfill from a buffered
 // copy, so a page or worker that goes away mid-request cannot leave Playwright
 // fulfilling from a disposed response.
-const forward = async (route: Route, target: string) => {
+const GONE = /closed|disposed|Target page/
+export const forward = async (route: Route, target: string) => {
   const url = new URL(route.request().url())
-  let response
   try {
-    response = await route.fetch({ url: target + url.pathname + url.search, maxRedirects: 0 })
+    const response = await route.fetch({ url: target + url.pathname + url.search, maxRedirects: 0 })
+    const body = await response.body()
+    await route.fulfill({ status: response.status(), headers: response.headers(), body })
   } catch (error) {
-    if (/closed|disposed|Target page/.test(String(error))) return
+    // The requesting page/worker went away mid-forward (test teardown). The
+    // fixture server still validated and recorded the request itself.
+    if (GONE.test(String(error))) return
     throw error
   }
-  const body = await response.body()
-  await route.fulfill({ status: response.status(), headers: response.headers(), body }).catch(error => {
-    if (!/closed|disposed|Target page/.test(String(error))) throw error
-  })
 }
 
 export async function installNetworkBoundary(
