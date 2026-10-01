@@ -1,5 +1,6 @@
 import type { Page } from "@playwright/test"
 
+import { TEST_IMAGES } from "../../src/lib/__tests__/test-images"
 import { expect, test } from "../fixtures/extension"
 
 const SLOW_MODE = process.env.SLOW === "1"
@@ -299,5 +300,79 @@ test.describe("AI Session Recovery After Page Reload", () => {
     })
 
     console.log("Error test completed")
+  })
+
+  // Review 5385550449: an image-only turn restored after reload must not be
+  // sent back to the provider as an empty historical text message.
+  test("image-only turn survives reload as valid provider history", async ({
+    extensionUrl,
+    aiProvider
+  }) => {
+    const textParts = (content: unknown) =>
+      typeof content === "string"
+        ? [content]
+        : (content as any[]).filter((p) => p.type === "text").map((p) => p.text)
+    aiProvider.script([
+      {
+        assertRequest: (body) => {
+          const parts = body.messages.at(-1)!.content as any[]
+          expect(parts.filter((p) => p.type === "image")).toHaveLength(1)
+        },
+        response: { text: "The image says HELLO." }
+      },
+      {
+        promptIncludes: "Make the heading say HELLO",
+        assertRequest: (body) => {
+          expect(body.messages.map((m: any) => m.role)).toEqual(["user", "assistant", "user"])
+          for (const m of body.messages) {
+            for (const text of textParts(m.content)) expect(text.trim()).not.toBe("")
+          }
+          expect(body.messages[0].content).toBe("[1 image attached]")
+          expect(body.messages[1].content).toBe("The image says HELLO.")
+        },
+        response: { text: "Updated the heading." }
+      }
+    ])
+
+    const openAIPage = async () => {
+      await testPage.locator("#experiments-heading, #display-name-label, #ai-dom-generator-heading").first().waitFor({ state: "visible" })
+      if (await testPage.locator("#experiments-heading").isVisible()) {
+        await testPage.locator('button[title="Create New Experiment"]').click()
+        await testPage.locator("#from-scratch-button").click()
+      }
+      if (!(await testPage.locator("#ai-dom-generator-heading").isVisible())) {
+        await testPage.locator("#generate-with-ai-button").first().click()
+      }
+      await expect(testPage.locator("#ai-dom-generator-heading")).toBeVisible()
+      await expect(testPage.locator('button[title="Conversation History"]')).toBeAttached()
+    }
+    const waitIdle = () => testPage.locator('#ai-generate-button[data-loading="false"]').waitFor({ state: "attached" })
+
+    await testPage.goto(extensionUrl("tabs/sidebar.html"), { waitUntil: "domcontentloaded" })
+    await openAIPage()
+
+    // Image only, empty prompt (the supported paste flow).
+    await testPage.locator("#ai-prompt").evaluate(async (textarea, uri) => {
+      const blob = await (await fetch(uri)).blob()
+      const file = new File([blob], "hello.png", { type: "image/png" })
+      const event = new ClipboardEvent("paste", { bubbles: true, cancelable: true })
+      Object.defineProperty(event, "clipboardData", { value: { items: [{ kind: "file", type: "image/png", getAsFile: () => file }] } })
+      textarea.dispatchEvent(event)
+    }, TEST_IMAGES.HELLO)
+    await expect(testPage.locator('img[alt^="Attachment"]')).toBeVisible()
+    await expect(testPage.locator("#ai-prompt")).toHaveValue("")
+    await testPage.locator("#ai-generate-button").click()
+    await waitIdle()
+    await expect(testPage.locator("[data-message-index]").last()).toContainText("The image says HELLO.")
+
+    await testPage.reload({ waitUntil: "domcontentloaded" })
+    await openAIPage()
+    await expect(testPage.locator("[data-message-index]")).toHaveCount(2)
+
+    await testPage.locator("#ai-prompt").fill("Make the heading say HELLO")
+    await testPage.locator("#ai-generate-button").click()
+    await waitIdle()
+    await expect(testPage.locator("[data-message-index]")).toHaveCount(4)
+    await expect(testPage.locator("[data-message-index]").last()).toContainText("Updated the heading.")
   })
 })
