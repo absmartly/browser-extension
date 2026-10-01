@@ -696,4 +696,30 @@ describe("ExtensionUI", () => {
       expect(screen.getByTestId("mock-list-view")).toBeInTheDocument()
     })
   })
+
+  describe("Pagination state", () => {
+    it("keeps the loaded page instead of resetting it to 1 in the list view", () => {
+      const useExperimentLoading =
+        require("~src/hooks/useExperimentLoading").useExperimentLoading
+      const setCurrentPage = jest.fn()
+      useExperimentLoading.mockReturnValue({
+        filteredExperiments: [],
+        experimentsLoading: false,
+        currentPage: 2,
+        pageSize: 50,
+        totalExperiments: 125,
+        hasMore: false,
+        loadExperiments: jest.fn(),
+        loadCachedExperiments: jest.fn(),
+        handlePageChange: jest.fn(),
+        handlePageSizeChange: jest.fn(),
+        setCurrentPage
+      })
+
+      render(<ExtensionUI />)
+
+      expect(screen.getByTestId("mock-list-view")).toBeInTheDocument()
+      expect(setCurrentPage).not.toHaveBeenCalled()
+    })
+  })
 })

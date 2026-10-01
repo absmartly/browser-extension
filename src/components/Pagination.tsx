@@ -40,6 +40,7 @@ export function Pagination({
         <div className="flex items-center space-x-2">
           <div style={{ minWidth: "120px" }}>
             <Select
+              id="pagination-page-size"
               value={pageSize}
               onChange={(e) => onPageSizeChange(Number(e.target.value))}
               disabled={loading}
@@ -53,7 +54,7 @@ export function Pagination({
           </div>
         </div>
 
-        <div className="text-xs text-gray-600">
+        <div id="pagination-range" className="text-xs text-gray-600">
           {totalItems
             ? `${startItem}-${endItem} of ${totalItems}`
             : `Page ${currentPage}${hasMore ? "+" : ""}`}
@@ -63,6 +64,7 @@ export function Pagination({
       {/* Bottom row: Navigation */}
       <div className="flex items-center justify-center space-x-1">
         <button
+          id="pagination-previous"
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage <= 1 || loading}
           className="p-1 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -76,6 +78,7 @@ export function Pagination({
             <>
               {currentPage > 1 && (
                 <button
+                  id="pagination-first-page"
                   onClick={() => onPageChange(1)}
                   disabled={loading}
                   className="px-2 py-1 text-xs rounded hover:bg-gray-200 text-gray-600">
@@ -87,7 +90,10 @@ export function Pagination({
                 <span className="text-xs text-gray-400">...</span>
               )}
 
-              <span className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded font-medium">
+              <span
+                id="pagination-current-page"
+                aria-current="page"
+                className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded font-medium">
                 {currentPage}
               </span>
 
@@ -98,6 +104,7 @@ export function Pagination({
                   )}
                   {totalPages > currentPage && (
                     <button
+                      id="pagination-last-page"
                       onClick={() => onPageChange(totalPages)}
                       disabled={loading}
                       className="px-2 py-1 text-xs rounded hover:bg-gray-200 text-gray-600">
@@ -115,6 +122,7 @@ export function Pagination({
         </div>
 
         <button
+          id="pagination-next"
           onClick={() => onPageChange(currentPage + 1)}
           disabled={(!hasMore && currentPage >= totalPages) || loading}
           className="p-1 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
