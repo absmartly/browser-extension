@@ -339,7 +339,7 @@ export async function testAllVisualEditorActions(page: Page): Promise<void> {
   expect(menuStillVisible).toBe(false)
   log('  ✓ Context menu closed after opening image dialog')
 
-  const newImageUrl = 'https://via.placeholder.com/200'
+  const newImageUrl = 'http://localhost:3456/assets/new-image.svg'
   await page.evaluate((url) => {
     const dialogHost = document.querySelector('#absmartly-image-dialog-host')
     if (dialogHost?.shadowRoot) {

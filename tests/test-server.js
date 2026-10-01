@@ -49,9 +49,13 @@ const server = http.createServer((req, res) => {
   }
 
   const safeRel = path.normalize(pathname).replace(/^(\.\.[/\\])+/, '')
-  const filePath = path.join(root, safeRel)
+  // Lockfile-pinned browser SDK for target pages, instead of a public CDN.
+  const vendored = pathname === '/vendor/absmartly.min.js'
+    ? path.join(__dirname, '..', 'node_modules', '@absmartly', 'javascript-sdk', 'dist', 'absmartly.min.js')
+    : null
+  const filePath = vendored || path.join(root, safeRel)
 
-  if (!filePath.startsWith(root)) {
+  if (!vendored && !filePath.startsWith(root)) {
     res.writeHead(403, { 'Content-Type': 'text/plain' })
     return res.end('Forbidden')
   }
