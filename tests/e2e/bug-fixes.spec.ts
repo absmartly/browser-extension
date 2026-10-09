@@ -39,11 +39,14 @@ test.describe('Bug Fixes E2E Tests', () => {
       await sidebar.locator('#from-scratch-button').click({ timeout: 10000 })
       await expect(sidebar.locator('#experiment-name-input')).toBeVisible()
 
-      // Wait for VE button to appear
-      await sidebar.locator('#visual-editor-button').first().waitFor({ state: 'visible', timeout: 5000 })
+      // A fresh draft has Control (collapsed) and Variant 1 (expanded), so only
+      // the treatment renders a VE button
+      const visualEditorButton = sidebar.locator('#visual-editor-button')
+      await expect(visualEditorButton).toHaveCount(1)
+      await expect(visualEditorButton).toBeVisible()
 
       // Start VE mode
-      await sidebar.locator('#visual-editor-button').first().click()
+      await visualEditorButton.click()
       await expect(testPage.locator('#absmartly-visual-editor-banner-host')).toBeVisible()
 
       // Click back button
