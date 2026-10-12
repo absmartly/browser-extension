@@ -310,15 +310,12 @@ test.describe('AI Chat Component Mount - Diagnostic Test', () => {
     const snapshots: DiagnosticSnapshot[] = []
     snapshots.push(await captureSnapshot(page, sidebar, '01-baseline'))
 
-    // Find first experiment in the list
-    const firstExperiment = sidebar.locator('.experiment-item').first()
-    await firstExperiment.waitFor({ state: 'visible', timeout: 60000 })
-    console.log('[Test] Found first experiment')
-
-    // Click on the experiment to open detail view
-    await firstExperiment.click()
-    await page.waitForFunction(() => true, { timeout: 2000 }).catch(() => {})
-    console.log('[Test] Clicked experiment')
+    // Mounting needs a fresh editable draft, not an arbitrary live experiment
+    // that may be archived or have no editable variant.
+    await sidebar.locator('button[title="Create New Experiment"]').click({ timeout: 10000 })
+    await sidebar.locator('#from-scratch-button').click({ timeout: 10000 })
+    await expect(sidebar.locator('#experiment-name-input')).toBeVisible()
+    await sidebar.locator('#experiment-name-input').fill(`e2e_mount_${Date.now()}`)
 
     snapshots.push(await captureSnapshot(page, sidebar, '02-experiment-detail'))
 
@@ -457,10 +454,10 @@ test.describe('AI Chat Component Mount - Diagnostic Test', () => {
     })
 
     // Navigate to AI page
-    const firstExperiment = sidebar.locator('.experiment-item').first()
-    await firstExperiment.waitFor({ state: 'visible', timeout: 60000 })
-    await firstExperiment.click()
-    await page.waitForFunction(() => true, { timeout: 2000 }).catch(() => {})
+    await sidebar.locator('button[title="Create New Experiment"]').click({ timeout: 10000 })
+    await sidebar.locator('#from-scratch-button').click({ timeout: 10000 })
+    await expect(sidebar.locator('#experiment-name-input')).toBeVisible()
+    await sidebar.locator('#experiment-name-input').fill(`e2e_mount_monitor_${Date.now()}`)
 
     const generateButton = sidebar.locator('#generate-with-ai-button').first()
     await generateButton.waitFor({ state: 'visible', timeout: 10000 })
@@ -469,8 +466,8 @@ test.describe('AI Chat Component Mount - Diagnostic Test', () => {
     await generateButton.click()
     console.log('[Test] Clicked Generate with AI at', clickTime)
 
-    // Wait and check
-    await page.waitForFunction(() => true, { timeout: 3000 }).catch(() => {})
+    // Assert meaningful mounted state before checking iframe persistence.
+    await expect(sidebar.locator('#ai-dom-generator-heading')).toBeVisible({ timeout: 10000 })
 
     // Check if iframe was removed
     const removalData = await page.evaluate(() => {
