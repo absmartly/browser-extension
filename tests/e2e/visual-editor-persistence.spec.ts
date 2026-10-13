@@ -2768,9 +2768,9 @@ test.describe('Visual Editor - Change Persistence and Restoration', () => {
     await page.route('**/*', route => {
       // Simulate network failures for API calls
       if (route.request().url().includes('api.absmartly.com')) {
-        route.abort('failed')
+        return route.abort('failed')
       } else {
-        route.continue()
+        return route.fallback()
       }
     })
 

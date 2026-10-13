@@ -1,5 +1,5 @@
 import { FunnelIcon, XMarkIcon } from "@heroicons/react/24/outline"
-import React, { useEffect, useState } from "react"
+import React, { useEffect, useRef, useState } from "react"
 
 import { Badge } from "./ui/Badge"
 import { Button } from "./ui/Button"
@@ -73,6 +73,7 @@ export function ExperimentFilter({
   const [searchDebounce, setSearchDebounce] = useState(
     initialFilters?.search || ""
   )
+  const currentFilters = useRef(filters)
 
   // Call onFilterChange with initial filters on mount
   useEffect(() => {
@@ -94,7 +95,9 @@ export function ExperimentFilter({
   }, [searchDebounce])
 
   const updateFilter = (key: keyof FilterState, value: any) => {
-    const newFilters = { ...filters, [key]: value }
+    // A search timer may have been scheduled before another filter changed.
+    // Merge into the latest selection without restarting its debounce budget.
+    const newFilters = { ...currentFilters.current, [key]: value }
     if (
       value === undefined ||
       value === "" ||
@@ -102,6 +105,7 @@ export function ExperimentFilter({
     ) {
       delete newFilters[key]
     }
+    currentFilters.current = newFilters
     setFilters(newFilters)
     onFilterChange(newFilters)
   }
@@ -116,6 +120,7 @@ export function ExperimentFilter({
 
   const clearFilters = () => {
     const defaultFilters = { state: ["created", "ready"] }
+    currentFilters.current = defaultFilters
     setFilters(defaultFilters)
     setSearchDebounce("")
     onFilterChange(defaultFilters)

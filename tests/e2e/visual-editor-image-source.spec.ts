@@ -188,7 +188,7 @@ test.describe('Visual Editor - Change Image Source', () => {
       return document.getElementById('absmartly-image-dialog-host') !== null
     }, { timeout: 5000 })
 
-    const newUrl = 'https://via.placeholder.com/200x150/95E1D3/FFFFFF?text=New+Image'
+    const newUrl = 'http://localhost:3456/assets/new-image.svg'
     await interactWithDialog(testPage, 'apply', newUrl)
 
     await testPage.waitForFunction((url) => {
@@ -217,7 +217,7 @@ test.describe('Visual Editor - Change Image Source', () => {
       return document.getElementById('absmartly-image-dialog-host') !== null
     }, { timeout: 5000 })
 
-    const newUrl = 'https://via.placeholder.com/300x200/F38181/FFFFFF?text=New+BG'
+    const newUrl = 'http://localhost:3456/assets/new-bg.svg'
     await interactWithDialog(testPage, 'apply', newUrl)
 
     await testPage.waitForFunction((url) => {

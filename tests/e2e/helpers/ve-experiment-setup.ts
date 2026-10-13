@@ -22,8 +22,10 @@ export async function createExperiment(
   await debugWait()
 
   const experimentName = `E2E Test Experiment ${Date.now()}`
-  await sidebar.locator('input[placeholder*="xperiment"], input[name="name"], input[type="text"]').first().fill(experimentName)
-  await debugWait()
+  // Fill the display name; with synced names the editor derives the unique
+  // experiment name from it. A generic text-input match filled another field.
+  await sidebar.locator('#display-name-input').fill(experimentName)
+  await expect(sidebar.locator('#experiment-name-input')).toHaveValue(experimentName.toLowerCase().replace(/\s+/g, '_'))
 
   const unitTypeTrigger = sidebar.locator('#unit-type-select-trigger')
   await unitTypeTrigger.waitFor({ state: 'visible', timeout: 5000 })
@@ -375,9 +377,9 @@ export async function saveExperiment(sidebar: FrameLocator, testPage: Page, expe
     await saveButton.waitFor({ state: 'visible', timeout: 5000 })
   }
 
-  await form.evaluate((f) => {
-    ;(f as HTMLFormElement).requestSubmit()
-  })
+  await assertNativeFormValid(sidebar)
+  await expect(saveButton).toBeEnabled()
+  await saveButton.click()
   await debugWait()
 
   await testPage.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {})
@@ -397,6 +399,8 @@ export async function saveExperiment(sidebar: FrameLocator, testPage: Page, expe
     await sidebar.locator('#experiments-heading').waitFor({ state: 'visible', timeout: 15000 })
     log('  ✓ Experiment saved successfully', 'info')
   } catch (e) {
+    const saveStep = await sidebar.locator('[data-testid="experiment-save-status"]').getAttribute('data-step', { timeout: 1000 }).catch(() => 'not-started')
+    log(`  Save stage: ${saveStep}`)
     const bodyText = await sidebar.locator('body').innerText().catch(() => '')
     const errorLines = bodyText.split('\n').filter((l: string) => /error|required|must select|please|is required|invalid/i.test(l))
     log(`  Save failed. Error lines found: ${errorLines.length}`)
@@ -418,4 +422,12 @@ export async function saveExperiment(sidebar: FrameLocator, testPage: Page, expe
   if (process.env.SLOW === '1') {
     await testPage.waitForFunction(() => document.readyState === 'complete', { timeout: 5000 }).catch(() => {})
   }
+}
+
+export async function assertNativeFormValid(sidebar: FrameLocator): Promise<void> {
+  const invalid = await sidebar.locator('form').evaluate(form =>
+    [...form.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>('input,select,textarea')]
+      .filter(field => !field.validity.valid)
+      .map(field => ({ id: field.id, type: field.type, message: field.validationMessage })))
+  expect(invalid, 'Native form validation prevents submission (IDs/types/messages only)').toEqual([])
 }

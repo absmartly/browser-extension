@@ -7,6 +7,7 @@
 import { test, expect } from '../fixtures/extension'
 import { type Page, type FrameLocator } from '@playwright/test'
 import { setupTestPage, debugWait, click } from './utils/test-helpers'
+import { controlledConfigSeed } from '../helpers/management-api/server'
 
 const TEST_PAGE_URL = '/visual-editor-test.html'
 
@@ -20,17 +21,8 @@ test.describe('Experiment Code Injection UI', () => {
   let sidebar: FrameLocator
   let experimentName: string
 
-  test.beforeEach(async ({ context, extensionUrl, seedStorage }) => {
-    await seedStorage({
-      'absmartly-config': {
-        apiKey: process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || '',
-        apiEndpoint: process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT || '',
-        authMethod: 'apikey',
-        domChangesFieldName: '__dom_changes',
-        htmlInjectionEnabled: true,
-        vibeStudioEnabled: true
-      }
-    })
+  test.beforeEach(async ({ context, extensionUrl, seedStorage, managementApi }) => {
+    await seedStorage(controlledConfigSeed(managementApi, { domChangesFieldName: '__dom_changes', vibeStudioEnabled: true, htmlInjectionEnabled: true }))
 
     testPage = await context.newPage()
 

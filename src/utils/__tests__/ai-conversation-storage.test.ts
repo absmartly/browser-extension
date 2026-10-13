@@ -126,7 +126,64 @@ describe("ai-conversation-storage", () => {
         "variant-a",
         "conv-123"
       )
-      expect(result).toEqual(mockConversation)
+      expect(result).toEqual({
+        ...mockConversation,
+        conversationSession: {
+          ...mockConversation.conversationSession,
+          messages: [{ role: "user", content: "Test message" }]
+        }
+      })
+    })
+
+    it("restores provider history after a sanitized save without duplicating it on disk", async () => {
+      const conversation = createMockConversation({
+        messages: [
+          { role: "user", content: "Make the buttons blue", timestamp: 1 },
+          {
+            role: "assistant",
+            content: "Changed the buttons to blue",
+            timestamp: 2
+          }
+        ],
+        conversationSession: {
+          id: unsafeSessionId("persistent-session"),
+          htmlSent: true,
+          messages: [{ role: "user", content: "Original provider context" }]
+        }
+      })
+      mockIdbStorage.saveConversation.mockResolvedValue(undefined)
+      await saveConversation(conversation)
+      const stored = mockIdbStorage.saveConversation.mock.calls[0][0]
+      expect(stored.conversationSession.messages).toEqual([])
+      mockIdbStorage.loadConversation.mockResolvedValue(stored)
+      const restored = await loadConversation("variant-a", "conv-123")
+      expect(restored!.conversationSession).toEqual({
+        id: "persistent-session",
+        htmlSent: true,
+        messages: [
+          { role: "user", content: "Make the buttons blue" },
+          { role: "assistant", content: "Changed the buttons to blue" }
+        ]
+      })
+      expect(stored.conversationSession.messages).toEqual([])
+      expect(conversation.conversationSession.messages).toEqual([
+        { role: "user", content: "Original provider context" }
+      ])
+    })
+
+    it("preserves provider history from legacy unsanitized sessions", async () => {
+      const conversation = createMockConversation({
+        conversationSession: {
+          id: unsafeSessionId("legacy-session"),
+          htmlSent: true,
+          messages: [{ role: "user", content: "Provider-specific context" }]
+        }
+      })
+      mockIdbStorage.loadConversation.mockResolvedValue(conversation)
+      const restored = await loadConversation("variant-a", "conv-123")
+      expect(restored!.conversationSession.messages).toEqual(
+        conversation.conversationSession.messages
+      )
     })
 
     it("should return null on error", async () => {

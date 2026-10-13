@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk"
 
+import { AI_DOM_GENERATION_SYSTEM_PROMPT } from "~src/prompts/ai-dom-generation-system-prompt"
 import { unsafeSessionId } from "~src/types/branded"
 
 import { AnthropicProvider } from "../anthropic"
@@ -134,6 +135,53 @@ describe("AnthropicProvider", () => {
   })
 
   describe("generate", () => {
+    it.each([
+      ["Which heading can I change?", "Which heading do you mean?"],
+      [
+        "Show a JSON example without applying it",
+        '```json\n{"domChanges":[{"selector":"h1","type":"text","value":"Example"}],"action":"append","response":"Example only"}\n```'
+      ]
+    ])(
+      "clarifies native tool arguments without executing conversational text: %s",
+      async (prompt, text) => {
+        const sharedPrompt = `Keep this custom instruction.\n${AI_DOM_GENERATION_SYSTEM_PROMPT}`
+        jest.mocked(utils.getSystemPrompt).mockResolvedValue(sharedPrompt)
+        mockMessages.create.mockResolvedValue({
+          content: [{ type: "text", text }]
+        })
+
+        const provider = new AnthropicProvider(createConfig())
+        const result = await provider.generate(
+          "<h1>Fixture</h1>",
+          prompt,
+          [],
+          undefined,
+          {}
+        )
+        const request = mockMessages.create.mock.calls[0][0]
+        expect(request.system).toContain("Keep this custom instruction.")
+        expect(request.system).not.toContain(
+          "You must return a JSON object with the following structure:"
+        )
+        expect(request.system).not.toContain(
+          "Always prioritize returning valid JSON."
+        )
+        expect(request.system).toContain(
+          "JSON examples above describe tool arguments, not text responses"
+        )
+        expect(request.system).toContain("call dom_changes_generator")
+        expect(request.system).toContain(
+          "Questions and clarifications without changes may use normal text"
+        )
+        expect(request.tool_choice).toBeUndefined()
+        expect(result).toMatchObject({
+          action: "none",
+          domChanges: [],
+          response: text
+        })
+      }
+    )
+
     it("should create Anthropic client with API key", async () => {
       const provider = new AnthropicProvider(createConfig())
 

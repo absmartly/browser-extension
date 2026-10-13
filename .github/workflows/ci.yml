@@ -2,13 +2,68 @@ name: CI
 
 on:
   pull_request:
-    branches: [main]
+    # No branch filter: stacked PRs targeting a feature branch must be
+    # tested on their actual merged head, not only PRs into main.
 
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  deterministic-repeats:
+    # Formerly live-flaky paths, now against the local contract-validated
+    # management API and scripted AI: repeated without retries to catch races.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      CI: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: bun install --frozen-lockfile
+      - run: bunx playwright install chromium --with-deps
+      - run: bun run build
+      - run: node scripts/fetch-api-contract.js
+      - name: Three no-retry repetitions of the formerly flaky paths (incl. FT-1905 inline editor)
+        run: >-
+          API_CONTRACT_OFFLINE=1 bunx playwright test
+          --grep 'inline sections render in the sidebar editor|should handle append action|extension generates DOM changes via Anthropic API|checkAuthentication with API Key|should persist and reload all experiment metadata including unit type|Test API_REQUEST message|Complete filter workflow: toggle panel, state filters, significance, alerts, search, clear'
+          --repeat-each=3 --retries=0 --workers=4
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: deterministic-repeat-results
+          path: test-results/
+          retention-days: 7
+
+  launchpad-regressions:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: bun install --frozen-lockfile
+      - run: bunx playwright install chromium --with-deps
+      - run: bun run build
+      - run: bunx playwright test -c tests/reproductions/playwright.config.ts
+        env:
+          REPRO_OUTPUT_DIR: ${{ runner.temp }}/launchpad-regressions
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: launchpad-regression-results
+          path: ${{ runner.temp }}/launchpad-regressions/
+          retention-days: 7
+
   typecheck:
     runs-on: ubuntu-latest
     steps:
@@ -29,6 +84,7 @@ jobs:
         with:
           node-version: 22
       - run: bun install --frozen-lockfile
+      - run: node scripts/fetch-api-contract.js
       - run: bun run test:unit
 
   build:
@@ -51,10 +107,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      # Each shard already has four concurrent browser workers. Running all
-      # four shards together creates16 live clients against the same test-1
-      # API and provider quota. Keep within-shard races, bound aggregate load.
-      max-parallel: 1
+      # Each test owns a fresh local management API and scripted AI provider,
+      # so shards no longer share external state and run in parallel.
       matrix:
         shard: [1/4, 2/4, 3/4, 4/4]
     name: e2e-tests (${{ matrix.shard }})
@@ -71,27 +125,20 @@ jobs:
       # diverge in ways that ship broken: v1.4.2 had a content script that
       # threw "Cannot find module '@plasmohq/storage'" only in the prod
       # bundle, which the dev-build-based e2e suite never exercised. Always
-      # test what we ship.
+      # test what we ship. No Office or AI credentials are provided.
       - run: bun run build
         env:
           NODE_ENV: production
-          PLASMO_PUBLIC_ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          PLASMO_PUBLIC_ANTHROPIC_ENDPOINT: ${{ secrets.ANTHROPIC_ENDPOINT }}
-          PLASMO_PUBLIC_ABSMARTLY_API_KEY: ${{ secrets.ABSMARTLY_API_KEY }}
-          PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT: ${{ vars.ABSMARTLY_ENDPOINT }}
+      # Pinned published Web Console contract (sha512 + sha256 verified).
+      - run: node scripts/fetch-api-contract.js
       - run: bunx playwright test --shard=${{ matrix.shard }}
         env:
           CI: true
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          PLASMO_PUBLIC_ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          PLASMO_PUBLIC_ANTHROPIC_ENDPOINT: ${{ secrets.ANTHROPIC_ENDPOINT }}
-          PLASMO_PUBLIC_ABSMARTLY_API_KEY: ${{ secrets.ABSMARTLY_API_KEY }}
-          PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT: ${{ vars.ABSMARTLY_ENDPOINT }}
+          API_CONTRACT_OFFLINE: 1
       - uses: actions/upload-artifact@v4
-        if: failure()
+        # Successful shards can contain failed attempts; retain their evidence.
+        if: always()
         with:
           name: playwright-report-shard-${{ strategy.job-index }}
-          path: |
-            playwright-report/
-            test-results/
+          path: test-results/
           retention-days: 7

@@ -1,8 +1,14 @@
-import { test, expect } from '../fixtures/extension'
-import type { Page } from '@playwright/test'
-import path from 'path'
+import path from "path"
+import type { Page } from "@playwright/test"
 
-const TEST_PAGE_PATH = path.join(__dirname, '..', 'test-pages', 'visual-editor-test.html')
+import { expect, test } from "../fixtures/extension"
+
+const TEST_PAGE_PATH = path.join(
+  __dirname,
+  "..",
+  "test-pages",
+  "visual-editor-test.html"
+)
 
 /**
  * Comprehensive test suite for the message bridge system
@@ -11,9 +17,9 @@ const TEST_PAGE_PATH = path.join(__dirname, '..', 'test-pages', 'visual-editor-t
  * NOTE: These tests use chrome.runtime.sendMessage directly in the sidebar iframe context
  * instead of dynamic imports (which don't work with bundled/built extensions)
  */
-test.describe('Message Bridge System', () => {
+test.describe("Message Bridge System", () => {
   let testPage: Page
-  let allConsoleMessages: Array<{type: string, text: string}> = []
+  let allConsoleMessages: Array<{ type: string; text: string }> = []
 
   test.beforeEach(async ({ context }) => {
     testPage = await context.newPage()
@@ -24,42 +30,46 @@ test.describe('Message Bridge System', () => {
       const msgText = msg.text()
       allConsoleMessages.push({ type: msgType, text: msgText })
 
-      if (msgText.includes('[message-bridge]') ||
-          msgText.includes('[index.tsx]') ||
-          msgText.includes('[Background]') ||
-          msgText.includes('Received polyfilled message') ||
-          msgText.includes('Using postMessage') ||
-          msgText.includes('Using chrome.runtime')) {
+      if (
+        msgText.includes("[message-bridge]") ||
+        msgText.includes("[index.tsx]") ||
+        msgText.includes("[Background]") ||
+        msgText.includes("Received polyfilled message") ||
+        msgText.includes("Using postMessage") ||
+        msgText.includes("Using chrome.runtime")
+      ) {
         console.log(`  📝 [${msgType}] ${msgText}`)
       }
     }
-    testPage.on('console', consoleHandler)
+    testPage.on("console", consoleHandler)
 
-    testPage.on('frameattached', async (frame) => {
-      ;(frame as any).on('console', consoleHandler)
+    testPage.on("frameattached", async (frame) => {
+      ;(frame as any).on("console", consoleHandler)
     })
 
     const [serviceWorker] = context.serviceWorkers()
     if (serviceWorker) {
-      console.log('✅ Service worker found, attaching console listener')
-      ;(serviceWorker as any).on('console', (msg: any) => {
+      console.log("✅ Service worker found, attaching console listener")
+      ;(serviceWorker as any).on("console", (msg: any) => {
         console.log(`  🔧 [ServiceWorker] [${msg.type()}] ${msg.text()}`)
       })
     } else {
-      console.log('⚠️  No service worker found yet, waiting...')
-      context.on('serviceworker', (worker) => {
-        console.log('✅ Service worker attached, setting up console listener')
-        ;(worker as any).on('console', (msg: any) => {
+      console.log("⚠️  No service worker found yet, waiting...")
+      context.on("serviceworker", (worker) => {
+        console.log("✅ Service worker attached, setting up console listener")
+        ;(worker as any).on("console", (msg: any) => {
           console.log(`  🔧 [ServiceWorker] [${msg.type()}] ${msg.text()}`)
         })
       })
     }
 
-    await testPage.goto(`file://${TEST_PAGE_PATH}?use_shadow_dom_for_visual_editor_context_menu=1`)
+    await testPage.goto(
+      `file://${TEST_PAGE_PATH}?use_shadow_dom_for_visual_editor_context_menu=1`
+    )
     await testPage.setViewportSize({ width: 1920, height: 1080 })
-    await testPage.waitForLoadState('networkidle')
+    await testPage.waitForLoadState("networkidle")
 
-    console.log('✅ Test page loaded')
+    console.log("✅ Test page loaded")
     console.log(`  📋 Console messages so far: ${allConsoleMessages.length}`)
   })
 
@@ -67,12 +77,15 @@ test.describe('Message Bridge System', () => {
     if (testPage) await testPage.close()
   })
 
-  test('Test PING message (background ↔ sidebar)', async ({ extensionId, extensionUrl }) => {
+  test("Test PING message (background ↔ sidebar)", async ({
+    extensionId,
+    extensionUrl
+  }) => {
     test.setTimeout(30000)
 
     await testPage.evaluate((extUrl) => {
-      const container = document.createElement('div')
-      container.id = 'absmartly-sidebar-root'
+      const container = document.createElement("div")
+      container.id = "absmartly-sidebar-root"
       container.style.cssText = `
         position: fixed;
         top: 0;
@@ -82,63 +95,74 @@ test.describe('Message Bridge System', () => {
         z-index: 2147483647;
       `
 
-      const iframe = document.createElement('iframe')
-      iframe.id = 'absmartly-sidebar-iframe'
-      iframe.style.cssText = 'width: 100%; height: 100%; border: none;'
+      const iframe = document.createElement("iframe")
+      iframe.id = "absmartly-sidebar-iframe"
+      iframe.style.cssText = "width: 100%; height: 100%; border: none;"
       iframe.src = extUrl
 
       container.appendChild(iframe)
       document.body.appendChild(container)
-    }, extensionUrl('tabs/sidebar.html'))
+    }, extensionUrl("tabs/sidebar.html"))
 
-    const sidebar = testPage.frameLocator('#absmartly-sidebar-iframe')
-    await sidebar.locator('body').waitFor({ timeout: 10000 })
+    const sidebar = testPage.frameLocator("#absmartly-sidebar-iframe")
+    await sidebar.locator("body").waitFor({ timeout: 10000 })
 
-    const pingResult = await sidebar.locator('body').evaluate(async () => {
+    const pingResult = await sidebar.locator("body").evaluate(async () => {
       try {
         return new Promise((resolve) => {
-          chrome.runtime.sendMessage({ type: 'PING' }, (response) => {
+          chrome.runtime.sendMessage({ type: "PING" }, (response) => {
             if (chrome.runtime.lastError) {
-              resolve({ success: false, error: chrome.runtime.lastError.message })
+              resolve({
+                success: false,
+                error: chrome.runtime.lastError.message
+              })
             } else {
               resolve({ success: true, response })
             }
           })
         })
       } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : String(error) }
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : String(error)
+        }
       }
     })
 
-    console.log('PING result:', pingResult)
+    console.log("PING result:", pingResult)
     const pingData = pingResult as { success: boolean; response: any }
     expect(pingData.success).toBe(true)
-    expect(pingData.response).toHaveProperty('pong', true)
+    expect(pingData.response).toHaveProperty("pong", true)
   })
 
-  test('Test CAPTURE_HTML message (sidebar → content script)', async ({ extensionUrl }) => {
+  test("Test CAPTURE_HTML message (sidebar → content script)", async ({
+    extensionUrl
+  }) => {
     test.setTimeout(30000)
 
     await testPage.evaluate((extUrl) => {
-      const container = document.createElement('div')
-      container.id = 'absmartly-sidebar-root'
-      const iframe = document.createElement('iframe')
-      iframe.id = 'absmartly-sidebar-iframe'
-      iframe.style.cssText = 'width: 100%; height: 100%; border: none;'
+      const container = document.createElement("div")
+      container.id = "absmartly-sidebar-root"
+      const iframe = document.createElement("iframe")
+      iframe.id = "absmartly-sidebar-iframe"
+      iframe.style.cssText = "width: 100%; height: 100%; border: none;"
       iframe.src = extUrl
       container.appendChild(iframe)
       document.body.appendChild(container)
-    }, extensionUrl('tabs/sidebar.html'))
+    }, extensionUrl("tabs/sidebar.html"))
 
-    const sidebar = testPage.frameLocator('#absmartly-sidebar-iframe')
-    await sidebar.locator('body').waitFor({ timeout: 10000 })
+    const sidebar = testPage.frameLocator("#absmartly-sidebar-iframe")
+    await sidebar.locator("body").waitFor({ timeout: 10000 })
 
-    const captureResult = await sidebar.locator('body').evaluate(async () => {
+    const captureResult = await sidebar.locator("body").evaluate(async () => {
       try {
         return new Promise((resolve) => {
-          chrome.runtime.sendMessage({ type: 'CAPTURE_HTML' }, (response) => {
+          chrome.runtime.sendMessage({ type: "CAPTURE_HTML" }, (response) => {
             if (chrome.runtime.lastError) {
-              resolve({ success: false, error: chrome.runtime.lastError.message })
+              resolve({
+                success: false,
+                error: chrome.runtime.lastError.message
+              })
             } else {
               resolve({
                 success: response?.success || false,
@@ -148,113 +172,177 @@ test.describe('Message Bridge System', () => {
           })
         })
       } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : String(error) }
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : String(error)
+        }
       }
     })
 
-    console.log('CAPTURE_HTML result:', captureResult)
-    const captureData = captureResult as { success: boolean; htmlLength: number }
+    console.log("CAPTURE_HTML result:", captureResult)
+    const captureData = captureResult as {
+      success: boolean
+      htmlLength: number
+    }
     expect(captureData.success).toBe(true)
     expect(captureData.htmlLength).toBeGreaterThan(0)
   })
 
-  test('Test AI_GENERATE_DOM_CHANGES message flow', async ({ extensionUrl }) => {
+  test("Test AI_GENERATE_DOM_CHANGES message flow", async ({
+    extensionUrl,
+    aiProvider
+  }) => {
     test.setTimeout(60000)
 
+    aiProvider.script([
+      {
+        promptIncludes:
+          'Change the text in the paragraph with id "test-paragraph" to say "Test"',
+        response: {
+          tools: [
+            {
+              id: "bridge-text",
+              name: "dom_changes_generator",
+              input: {
+                action: "append",
+                domChanges: [
+                  { selector: "#test-paragraph", type: "text", value: "Test" }
+                ],
+                response: "Updated through the message bridge."
+              }
+            }
+          ]
+        }
+      }
+    ])
+
     await testPage.evaluate((extUrl) => {
-      const container = document.createElement('div')
-      container.id = 'absmartly-sidebar-root'
-      const iframe = document.createElement('iframe')
-      iframe.id = 'absmartly-sidebar-iframe'
-      iframe.style.cssText = 'width: 100%; height: 100%; border: none;'
+      const container = document.createElement("div")
+      container.id = "absmartly-sidebar-root"
+      const iframe = document.createElement("iframe")
+      iframe.id = "absmartly-sidebar-iframe"
+      iframe.style.cssText = "width: 100%; height: 100%; border: none;"
       iframe.src = extUrl
       container.appendChild(iframe)
       document.body.appendChild(container)
-    }, extensionUrl('tabs/sidebar.html'))
+    }, extensionUrl("tabs/sidebar.html"))
 
-    const sidebar = testPage.frameLocator('#absmartly-sidebar-iframe')
-    await sidebar.locator('body').waitFor({ timeout: 10000 })
+    const sidebar = testPage.frameLocator("#absmartly-sidebar-iframe")
+    await sidebar.locator("body").waitFor({ timeout: 10000 })
 
-    console.log('Sending AI_GENERATE_DOM_CHANGES message...')
+    console.log("Sending AI_GENERATE_DOM_CHANGES message...")
 
-    const aiResult = await sidebar.locator('body').evaluate(async () => {
+    const aiResult = await sidebar.locator("body").evaluate(async () => {
       try {
-        const testPrompt = 'Change the text in the paragraph with id "test-paragraph" to say "Test"'
-        const testHtml = '<html><body><p id="test-paragraph">Original</p></body></html>'
-        const testApiKey = 'test-key'
+        const testPrompt =
+          'Change the text in the paragraph with id "test-paragraph" to say "Test"'
+        const testHtml =
+          '<html><body><p id="test-paragraph">Original</p></body></html>'
+        const testApiKey = "test-key"
 
-        console.log('[Test] About to send AI_GENERATE_DOM_CHANGES')
+        console.log("[Test] About to send AI_GENERATE_DOM_CHANGES")
 
         return new Promise((resolve) => {
-          chrome.runtime.sendMessage({
-            type: 'AI_GENERATE_DOM_CHANGES',
-            html: testHtml,
-            prompt: testPrompt,
-            apiKey: testApiKey
-          }, (response) => {
-            console.log('[Test] AI response received:', response)
-            if (chrome.runtime.lastError) {
-              resolve({ success: false, error: chrome.runtime.lastError.message })
-            } else {
-              resolve({ success: true, response })
+          chrome.runtime.sendMessage(
+            {
+              type: "AI_GENERATE_DOM_CHANGES",
+              html: testHtml,
+              prompt: testPrompt,
+              apiKey: testApiKey
+            },
+            (response) => {
+              console.log("[Test] AI response received:", response)
+              if (chrome.runtime.lastError) {
+                resolve({
+                  success: false,
+                  error: chrome.runtime.lastError.message
+                })
+              } else {
+                resolve({ success: true, response })
+              }
             }
-          })
+          )
         })
       } catch (error) {
-        console.error('[Test] AI generation failed:', error)
-        return { success: false, error: error instanceof Error ? error.message : String(error) }
+        console.error("[Test] AI generation failed:", error)
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : String(error)
+        }
       }
     })
 
-    console.log('AI_GENERATE_DOM_CHANGES result:', aiResult)
+    console.log("AI_GENERATE_DOM_CHANGES result:", aiResult)
 
-    const errors = allConsoleMessages.filter(m => m.type === 'error')
+    const errors = allConsoleMessages.filter((m) => m.type === "error")
     if (errors.length > 0) {
-      console.log('Console errors:', errors)
+      console.log("Console errors:", errors)
     }
 
     const aiData = aiResult as { success: boolean; response: any }
     expect(aiData.success).toBe(true)
+    expect(aiData.response.success).toBe(true)
+    expect(aiData.response.result.domChanges).toEqual([
+      { selector: "#test-paragraph", type: "text", value: "Test" }
+    ])
+    expect(aiData.response.result.action).toBe("append")
   })
 
-  test('Test API_REQUEST message (sidebar → background)', async ({ extensionUrl }) => {
+  test("Test API_REQUEST message (sidebar → background)", async ({
+    extensionUrl
+  }) => {
     test.setTimeout(60000)
 
     await testPage.evaluate((extUrl) => {
-      const container = document.createElement('div')
-      container.id = 'absmartly-sidebar-root'
-      const iframe = document.createElement('iframe')
-      iframe.id = 'absmartly-sidebar-iframe'
-      iframe.style.cssText = 'width: 100%; height: 100%; border: none;'
+      const container = document.createElement("div")
+      container.id = "absmartly-sidebar-root"
+      const iframe = document.createElement("iframe")
+      iframe.id = "absmartly-sidebar-iframe"
+      iframe.style.cssText = "width: 100%; height: 100%; border: none;"
       iframe.src = extUrl
       container.appendChild(iframe)
       document.body.appendChild(container)
-    }, extensionUrl('tabs/sidebar.html'))
+    }, extensionUrl("tabs/sidebar.html"))
 
-    const sidebar = testPage.frameLocator('#absmartly-sidebar-iframe')
-    await sidebar.locator('body').waitFor({ timeout: 10000 })
+    const sidebar = testPage.frameLocator("#absmartly-sidebar-iframe")
+    await sidebar.locator("body").waitFor({ timeout: 10000 })
 
-    const apiResult = await sidebar.locator('body').evaluate(async () => {
+    const apiResult = await sidebar.locator("body").evaluate(async () => {
       try {
         return new Promise((resolve) => {
-          chrome.runtime.sendMessage({
-            type: 'API_REQUEST',
-            method: 'GET',
-            path: '/experiments',
-            // Exercise the live bridge contract without downloading the
-            // server's default 1500 experiments for a message receipt check.
-            data: { items: 1, page: 1 }
-          }, (response) => {
-            resolve({ success: !chrome.runtime.lastError, receivedResponse: !!response, response })
-          })
+          chrome.runtime.sendMessage(
+            {
+              type: "API_REQUEST",
+              method: "GET",
+              path: "/experiments",
+              // Exercise the live bridge contract without downloading the
+              // server's default 1500 experiments for a message receipt check.
+              data: { items: 1, page: 1 }
+            },
+            (response) => {
+              resolve({
+                success: !chrome.runtime.lastError,
+                receivedResponse: !!response,
+                response
+              })
+            }
+          )
         })
       } catch (error) {
-        return { success: false, receivedResponse: false, error: error instanceof Error ? error.message : String(error) }
+        return {
+          success: false,
+          receivedResponse: false,
+          error: error instanceof Error ? error.message : String(error)
+        }
       }
     })
 
-    console.log('API_REQUEST result:', apiResult)
-    const apiData = apiResult as { success: boolean; receivedResponse: boolean; response?: any }
+    console.log("API_REQUEST result:", apiResult)
+    const apiData = apiResult as {
+      success: boolean
+      receivedResponse: boolean
+      response?: any
+    }
     expect(apiData.success).toBe(true)
     expect(apiData.receivedResponse).toBe(true)
     expect(apiData.response?.success).toBe(true)
@@ -262,126 +350,153 @@ test.describe('Message Bridge System', () => {
     expect(apiData.response.data.experiments.length).toBeLessThanOrEqual(1)
   })
 
-  test('Test CHECK_AUTH message', async ({ extensionUrl }) => {
+  test("Test CHECK_AUTH message", async ({ extensionUrl }) => {
     test.setTimeout(30000)
 
     await testPage.evaluate((extUrl) => {
-      const container = document.createElement('div')
-      container.id = 'absmartly-sidebar-root'
-      const iframe = document.createElement('iframe')
-      iframe.id = 'absmartly-sidebar-iframe'
-      iframe.style.cssText = 'width: 100%; height: 100%; border: none;'
+      const container = document.createElement("div")
+      container.id = "absmartly-sidebar-root"
+      const iframe = document.createElement("iframe")
+      iframe.id = "absmartly-sidebar-iframe"
+      iframe.style.cssText = "width: 100%; height: 100%; border: none;"
       iframe.src = extUrl
       container.appendChild(iframe)
       document.body.appendChild(container)
-    }, extensionUrl('tabs/sidebar.html'))
+    }, extensionUrl("tabs/sidebar.html"))
 
-    const sidebar = testPage.frameLocator('#absmartly-sidebar-iframe')
-    await sidebar.locator('body').waitFor({ timeout: 10000 })
+    const sidebar = testPage.frameLocator("#absmartly-sidebar-iframe")
+    await sidebar.locator("body").waitFor({ timeout: 10000 })
 
-    const authResult = await sidebar.locator('body').evaluate(async () => {
+    const authResult = await sidebar.locator("body").evaluate(async () => {
       try {
         return new Promise((resolve) => {
-          chrome.runtime.sendMessage({ type: 'CHECK_AUTH' }, (response) => {
+          chrome.runtime.sendMessage({ type: "CHECK_AUTH" }, (response) => {
             if (chrome.runtime.lastError) {
-              resolve({ success: false, error: chrome.runtime.lastError.message })
+              resolve({
+                success: false,
+                error: chrome.runtime.lastError.message
+              })
             } else {
               resolve({ success: true, response })
             }
           })
         })
       } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : String(error) }
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : String(error)
+        }
       }
     })
 
-    console.log('CHECK_AUTH result:', authResult)
+    console.log("CHECK_AUTH result:", authResult)
     const authData = authResult as { success: boolean; response: any }
     expect(authData.success).toBe(true)
-    expect(authData.response).toHaveProperty('success')
+    expect(authData.response).toHaveProperty("success")
   })
 
-  test('Test message flow: content script → sidebar → content script', async ({ extensionUrl }) => {
+  test("Test message flow: content script → sidebar → content script", async ({
+    extensionUrl
+  }) => {
     test.setTimeout(30000)
 
     await testPage.evaluate((extUrl) => {
-      const container = document.createElement('div')
-      container.id = 'absmartly-sidebar-root'
-      const iframe = document.createElement('iframe')
-      iframe.id = 'absmartly-sidebar-iframe'
-      iframe.style.cssText = 'width: 100%; height: 100%; border: none;'
+      const container = document.createElement("div")
+      container.id = "absmartly-sidebar-root"
+      const iframe = document.createElement("iframe")
+      iframe.id = "absmartly-sidebar-iframe"
+      iframe.style.cssText = "width: 100%; height: 100%; border: none;"
       iframe.src = extUrl
       container.appendChild(iframe)
       document.body.appendChild(container)
-    }, extensionUrl('tabs/sidebar.html'))
+    }, extensionUrl("tabs/sidebar.html"))
 
-    const sidebar = testPage.frameLocator('#absmartly-sidebar-iframe')
-    await sidebar.locator('body').waitFor({ timeout: 10000 })
+    const sidebar = testPage.frameLocator("#absmartly-sidebar-iframe")
+    await sidebar.locator("body").waitFor({ timeout: 10000 })
 
-    const statusResult = await sidebar.locator('body').evaluate(async () => {
+    const statusResult = await sidebar.locator("body").evaluate(async () => {
       try {
         return new Promise((resolve) => {
-          chrome.runtime.sendMessage({
-            type: 'CHECK_VISUAL_EDITOR_ACTIVE'
-          }, (response) => {
-            if (chrome.runtime.lastError) {
-              resolve({ success: false, error: chrome.runtime.lastError.message })
-            } else {
-              resolve({ success: true, response })
+          chrome.runtime.sendMessage(
+            {
+              type: "CHECK_VISUAL_EDITOR_ACTIVE"
+            },
+            (response) => {
+              if (chrome.runtime.lastError) {
+                resolve({
+                  success: false,
+                  error: chrome.runtime.lastError.message
+                })
+              } else {
+                resolve({ success: true, response })
+              }
             }
-          })
+          )
 
-          setTimeout(() => resolve({ success: false, error: 'Timeout' }), 5000)
+          setTimeout(() => resolve({ success: false, error: "Timeout" }), 5000)
         })
       } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : String(error) }
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : String(error)
+        }
       }
     })
 
-    console.log('Visual editor status check result:', statusResult)
+    console.log("Visual editor status check result:", statusResult)
   })
 
-  test('Verify message-bridge sends messages correctly', async ({ extensionUrl }) => {
+  test("Verify message-bridge sends messages correctly", async ({
+    extensionUrl
+  }) => {
     test.setTimeout(30000)
 
     await testPage.evaluate((extUrl) => {
-      const container = document.createElement('div')
-      container.id = 'absmartly-sidebar-root'
-      const iframe = document.createElement('iframe')
-      iframe.id = 'absmartly-sidebar-iframe'
-      iframe.style.cssText = 'width: 100%; height: 100%; border: none;'
+      const container = document.createElement("div")
+      container.id = "absmartly-sidebar-root"
+      const iframe = document.createElement("iframe")
+      iframe.id = "absmartly-sidebar-iframe"
+      iframe.style.cssText = "width: 100%; height: 100%; border: none;"
       iframe.src = extUrl
       container.appendChild(iframe)
       document.body.appendChild(container)
-    }, extensionUrl('tabs/sidebar.html'))
+    }, extensionUrl("tabs/sidebar.html"))
 
-    const sidebar = testPage.frameLocator('#absmartly-sidebar-iframe')
-    await sidebar.locator('body').waitFor({ timeout: 10000 })
+    const sidebar = testPage.frameLocator("#absmartly-sidebar-iframe")
+    await sidebar.locator("body").waitFor({ timeout: 10000 })
 
-    const modeCheckResult = await sidebar.locator('body').evaluate(async () => {
+    const modeCheckResult = await sidebar.locator("body").evaluate(async () => {
       try {
         return new Promise((resolve) => {
-          chrome.runtime.sendMessage({ type: 'PING' }, (response) => {
+          chrome.runtime.sendMessage({ type: "PING" }, (response) => {
             if (chrome.runtime.lastError) {
-              resolve({ success: false, error: chrome.runtime.lastError.message })
+              resolve({
+                success: false,
+                error: chrome.runtime.lastError.message
+              })
             } else {
               resolve({ success: true })
             }
           })
         })
       } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : String(error) }
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : String(error)
+        }
       }
     })
 
     const modeCheckData = modeCheckResult as { success: boolean }
     expect(modeCheckData.success).toBe(true)
 
-    const bridgeLogs = allConsoleMessages.filter(m =>
-      m.text.includes('[message-bridge]') &&
-      (m.text.includes('Using postMessage') || m.text.includes('Using chrome.runtime'))
+    const bridgeLogs = allConsoleMessages.filter(
+      (m) =>
+        m.text.includes("[message-bridge]") &&
+        (m.text.includes("Using postMessage") ||
+          m.text.includes("Using chrome.runtime"))
     )
 
-    console.log('Message bridge transport logs:', bridgeLogs)
+    console.log("Message bridge transport logs:", bridgeLogs)
   })
 })

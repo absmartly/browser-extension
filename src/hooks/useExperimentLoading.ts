@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 import type { Experiment } from "~src/types/absmartly"
 import type { ExperimentFilters } from "~src/types/storage-state"
 import { debugError, debugLog, debugWarn } from "~src/utils/debug"
 import { getExperimentsCache, setExperimentsCache } from "~src/utils/storage"
 
-import { buildFilterParams } from "./useExperimentFilters"
+import { getFilteredExperiments } from "./useExperimentFilters"
 
 interface UseExperimentLoadingParams {
   getExperiments: (params: Record<string, unknown>) => Promise<{
@@ -16,13 +16,17 @@ interface UseExperimentLoadingParams {
   requestPermissionsIfNeeded: (forceRequest: boolean) => Promise<boolean>
   onAuthExpired: (expired: boolean) => void
   onError: (error: string | null) => void
+  // Loaded list filters. Reloads that run before the first filtered load
+  // (e.g. after saving from the editor) must not fall back to no filters.
+  filters?: ExperimentFilters | null
 }
 
 export function useExperimentLoading({
   getExperiments,
   requestPermissionsIfNeeded,
   onAuthExpired,
-  onError
+  onError,
+  filters = null
 }: UseExperimentLoadingParams) {
   const [experiments, setExperiments] = useState<Experiment[]>([])
   const [filteredExperiments, setFilteredExperiments] = useState<Experiment[]>(
@@ -33,13 +37,20 @@ export function useExperimentLoading({
   const [pageSize, setPageSize] = useState(50)
   const [totalExperiments, setTotalExperiments] = useState<number | undefined>()
   const [hasMore, setHasMore] = useState(false)
+  const activeFilters = useRef<ExperimentFilters | null>(null)
+  const loadedFilters = useRef(filters)
+  loadedFilters.current = filters
+  // Responses can complete out of order (a slower earlier request finishing
+  // after a newer one). Only the newest load may publish results or errors.
+  const loadSequence = useRef(0)
 
   const loadExperiments = useCallback(
     async (
       forceRefresh = false,
       page = currentPage,
       size = pageSize,
-      customFilters: ExperimentFilters | null = null
+      customFilters: ExperimentFilters | null = activeFilters.current ??
+        loadedFilters.current
     ) => {
       const stack = new Error().stack
       debugLog("=== loadExperiments called ===")
@@ -53,11 +64,18 @@ export function useExperimentLoading({
 
       setExperimentsLoading(true)
       onError(null)
+      activeFilters.current = customFilters
+      const sequence = ++loadSequence.current
+      const isCurrent = () => sequence === loadSequence.current
 
       try {
-        const params = buildFilterParams(customFilters, page, size)
-
-        const response = await getExperiments(params)
+        const response = await getFilteredExperiments(
+          getExperiments,
+          customFilters,
+          page,
+          size
+        )
+        if (!isCurrent()) return
         const experimentsData = response.experiments || []
 
         setExperiments(experimentsData)
@@ -76,19 +94,20 @@ export function useExperimentLoading({
           }
         }
       } catch (err: unknown) {
+        if (!isCurrent()) return
         const error = err as { isAuthError?: boolean; message?: string }
         if (error.isAuthError || error.message === "AUTH_EXPIRED") {
           debugLog("[loadExperiments] AUTH_EXPIRED error detected")
           onAuthExpired(true)
 
           const permissionsGranted = await requestPermissionsIfNeeded(true)
+          if (!isCurrent()) return
 
           if (permissionsGranted) {
             debugLog("[loadExperiments] Retrying after permissions granted...")
-            setTimeout(
-              () => loadExperiments(true, page, size, customFilters),
-              500
-            )
+            setTimeout(() => {
+              if (isCurrent()) loadExperiments(true, page, size, customFilters)
+            }, 500)
           } else {
             onError("Your session has expired. Please log in again.")
           }
@@ -99,7 +118,7 @@ export function useExperimentLoading({
         setExperiments([])
         setFilteredExperiments([])
       } finally {
-        setExperimentsLoading(false)
+        if (isCurrent()) setExperimentsLoading(false)
       }
     },
     [

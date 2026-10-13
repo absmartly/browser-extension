@@ -276,7 +276,10 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
         }, 500)
       }
 
-      if (result.domChanges && result.domChanges.length > 0) {
+      const updatesChanges =
+        result.action !== "none" &&
+        (result.action !== "append" || result.domChanges.length > 0)
+      if (updatesChanges) {
         const finalChanges = applyDOMChangeAction(latestDomChanges, result)
         debugLog(
           "[AIDOMChangesPage] Applied action:",
@@ -379,7 +382,8 @@ export const AIDOMChangesPage = React.memo(function AIDOMChangesPage({
 
           if (
             result.action === "replace_all" ||
-            result.action === "replace_specific"
+            result.action === "replace_specific" ||
+            result.action === "remove_specific"
           ) {
             debugLog(
               "[AIDOMChangesPage] Clearing old changes before applying new ones"

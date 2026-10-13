@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from "@testing-library/react"
+import { act, renderHook, waitFor } from "@testing-library/react"
 
 import type {
   ABsmartlyConfig,
@@ -30,6 +30,16 @@ const defaultConfig: ABsmartlyConfig = {
 } as ABsmartlyConfig
 
 const defaultFilters: ExperimentFilters = { state: ["created", "ready"] }
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  let reject!: (error: Error) => void
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise
+    reject = rejectPromise
+  })
+  return { promise, resolve, reject }
+}
 
 interface HookDeps {
   config?: ABsmartlyConfig | null
@@ -235,6 +245,100 @@ describe("useExperimentInitialization", () => {
         defaultFilters
       )
     })
+  })
+
+  describe("filters changed during initialization", () => {
+    const currentFilters = {
+      state: ["running"],
+      search: "owned",
+      significance: ["positive"],
+      applications: [7]
+    }
+
+    it.each(["empty", "rejected"])(
+      "uses the latest filters after a delayed %s applications result",
+      async (result) => {
+        const applications = deferred<Application[]>()
+        const { hook, deps } = renderInit({
+          getApplications: jest.fn().mockReturnValue(applications.promise)
+        })
+
+        deps.hasInitialized = true
+        deps.filters = currentFilters
+        hook.rerender()
+        await act(async () => {
+          if (result === "empty") applications.resolve([])
+          else applications.reject(new Error("applications unavailable"))
+        })
+
+        expect(deps.loadExperiments).toHaveBeenCalledTimes(1)
+        expect(deps.loadExperiments).toHaveBeenCalledWith(
+          false,
+          1,
+          50,
+          currentFilters
+        )
+        expect(deps.setFilters).not.toHaveBeenCalled()
+      }
+    )
+
+    it.each([
+      { appName: null, app: { id: 42, name: "www" }, applicationId: null },
+      { appName: "missing", app: { id: 42, name: "www" }, applicationId: null },
+      { appName: "www", app: { name: "www" }, applicationId: null },
+      { appName: "www", app: { id: 42, name: "www" }, applicationId: 42 },
+      {
+        appName: "www",
+        app: { application_id: 43, name: "www" },
+        applicationId: 43
+      }
+    ])(
+      "preserves current filters when delayed pending app $appName resolves with $app",
+      async ({ appName, app, applicationId }) => {
+        const pendingApp = deferred<string | null>()
+        ;(localAreaStorage.get as jest.Mock).mockReturnValue(pendingApp.promise)
+        const { hook, deps } = renderInit({
+          getApplications: jest.fn().mockResolvedValue([app as Application])
+        })
+        await waitFor(() => {
+          expect(localAreaStorage.get).toHaveBeenCalledWith(
+            "pendingApplicationFilter"
+          )
+        })
+
+        // Change filters after applications are already available, while the
+        // nested storage read is still pending. Capturing them in the outer
+        // applications callback would also lose these changes.
+        deps.hasInitialized = true
+        deps.filters = currentFilters
+        hook.rerender()
+        await act(async () => pendingApp.resolve(appName))
+
+        const expectedFilters = applicationId
+          ? { ...currentFilters, applications: [applicationId] }
+          : currentFilters
+        expect(deps.loadExperiments).toHaveBeenCalledTimes(1)
+        expect(deps.loadExperiments).toHaveBeenCalledWith(
+          false,
+          1,
+          50,
+          expectedFilters
+        )
+        if (applicationId) {
+          expect(deps.setFilters).toHaveBeenCalledWith(expectedFilters)
+          expect(localAreaStorage.set).toHaveBeenCalledWith(
+            "experimentFilters",
+            expectedFilters
+          )
+          expect(localAreaStorage.remove).toHaveBeenCalledWith(
+            "pendingApplicationFilter"
+          )
+        } else {
+          expect(deps.setFilters).not.toHaveBeenCalled()
+          expect(localAreaStorage.set).not.toHaveBeenCalled()
+        }
+      }
+    )
   })
 
   describe("initialization gating", () => {

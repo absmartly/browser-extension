@@ -2,6 +2,7 @@ import type { FullConfig } from '@playwright/test'
 import path from 'path'
 import fs from 'fs'
 import { execSync } from 'child_process'
+import { installNodeEgressGuard } from './helpers/node-egress-guard'
 
 const getLatestMtimeMs = (targetPath: string): number => {
   if (!fs.existsSync(targetPath)) return 0
@@ -156,116 +157,13 @@ async function globalSetup(config: FullConfig) {
     console.log('✅ Copied local-test-page.html to build directory')
   }
 
-  // 3. Load environment variables from .env.dev.local
-  const envPath = path.join(rootDir, '.env.dev.local')
-  if (fs.existsSync(envPath)) {
-    const envContent = fs.readFileSync(envPath, 'utf-8')
-    envContent.split('\n').forEach(line => {
-      // Skip comments and empty lines
-      if (line.trim().startsWith('#') || !line.trim()) return
-
-      const [key, value] = line.split('=')
-      if (key && value) {
-        process.env[key.trim()] = value.trim()
-      }
-    })
-    console.log('✅ Loaded environment variables from .env.dev.local')
-  }
-
-  // 4. Verify API credentials are available
-  const apiKey = process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY
-  const apiEndpoint = process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT
-
-  if (!apiKey || !apiEndpoint) {
-    console.warn('⚠️ API credentials not found in environment variables')
-    console.warn('   Tests will use default test credentials')
-  } else {
-    console.log('✅ API credentials found in environment')
-  }
-
-  // 5. Pre-fetch /v1/* editor resources ONCE so every test context can
-  // seed its cache instead of triggering 6 concurrent calls per sidebar
-  // mount. Under workers=4 + 4 CI shards = 16 sidebars in flight that
-  // burst saturates the API and the unit-type-select dropdown stays
-  // disabled for 30-90s. Pre-fetch reduces it to 6 calls total per CI
-  // shard at suite start.
-  if (apiKey && apiEndpoint) {
-    const cachePath = path.join(rootDir, '.editor-resources-cache.json')
-    // Endpoint env var sometimes ends in /v1 and sometimes doesn't, depending
-    // on which environment the workflow points at. Strip the trailing slash
-    // and the optional /v1 so we can append /v1/<resource> deterministically.
-    const baseEndpoint = apiEndpoint.replace(/\/+$/, '').replace(/\/v1$/, '')
-    const fetchOne = async (resource: string): Promise<unknown[]> => {
-      // Retry transient errors. 525 = Cloudflare "SSL handshake failed" —
-      // we've observed bursts of these from this endpoint at suite start
-      // (likely warm-up of the CDN edge), and they evaporate within a few
-      // seconds. Without retries the cache lands empty, every sidebar
-      // mount falls through to a live /v1/* call, and the
-      // unit-type-select-trigger waitFor (10s) times out under workers=2-4
-      // contention. 5xx and 429 are also transient by definition.
-      const maxAttempts = 5
-      const isRetriable = (status: number) =>
-        status === 429 || status === 525 || (status >= 500 && status < 600)
-
-      let lastErr = ""
-      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-        const controller = new AbortController()
-        // Per-attempt 8s socket timeout. Without it a half-open
-        // connection (TCP RST never delivered, server stalled) blocks
-        // forever and the surrounding retry loop never gets a chance
-        // to run, hanging the entire suite at globalSetup before
-        // Playwright's per-test timer can fire.
-        const timer = setTimeout(() => controller.abort(), 8000)
-        try {
-          const res = await fetch(`${baseEndpoint}/v1/${resource}?items=200`, {
-            headers: {
-              Authorization: `Api-Key ${apiKey}`,
-              Accept: 'application/json'
-            },
-            signal: controller.signal
-          })
-          if (res.ok) {
-            const data = await res.json()
-            const arr = data?.[resource] ?? (Array.isArray(data) ? data : [])
-            return Array.isArray(arr) ? arr : []
-          }
-          lastErr = `HTTP ${res.status}`
-          if (!isRetriable(res.status)) {
-            console.warn(`[globalSetup] Pre-fetch ${resource} failed: ${lastErr} (non-retriable)`)
-            return []
-          }
-        } catch (err) {
-          lastErr = (err as Error).message
-        } finally {
-          clearTimeout(timer)
-        }
-        if (attempt < maxAttempts) {
-          // Jittered exponential backoff: random delay in [base/2, 1.5*base]
-          // for base = 250ms · 2^(attempt-1). Spreads concurrent retries
-          // so multiple workers don't synchronously re-burst at the
-          // endpoint.
-          const base = 250 * 2 ** (attempt - 1)
-          const delay = Math.floor(Math.random() * base) + base / 2
-          await new Promise((r) => setTimeout(r, delay))
-        }
-      }
-      console.warn(`[globalSetup] Pre-fetch ${resource} failed after ${maxAttempts} attempts: ${lastErr}`)
-      return []
-    }
-    const [applications, unitTypes, metrics, tags, owners, teams] = await Promise.all([
-      fetchOne('applications'),
-      fetchOne('unit_types'),
-      fetchOne('metrics'),
-      fetchOne('experiment_tags'),
-      fetchOne('users'),
-      fetchOne('teams')
-    ])
-    fs.writeFileSync(
-      cachePath,
-      JSON.stringify({ applications, unitTypes, metrics, tags, owners, teams, timestamp: Date.now() })
-    )
-    console.log(`✅ Pre-fetched editor resources (apps:${applications.length}, unitTypes:${unitTypes.length}, metrics:${metrics.length}, tags:${tags.length}, owners:${owners.length}, teams:${teams.length}) → ${cachePath}`)
-  }
+  // Required E2E never reads environment credentials or calls a shared
+  // backend: the management API is a local fixture validated against the
+  // pinned published contract, fetched/verified here (cached afterwards).
+  // Contract acquisition is explicit preparation, done before the guard.
+  execSync('node scripts/fetch-api-contract.js', { cwd: rootDir, stdio: 'inherit' })
+  fs.rmSync(path.join(rootDir, '.editor-resources-cache.json'), { force: true })
+  if (process.env.E2E_LIVE_BACKEND !== '1') installNodeEgressGuard()
 
   console.log('✅ Global setup completed successfully')
   console.log('---')

@@ -165,9 +165,30 @@ export function ExperimentEditor({
     experiment,
     domFieldName
   })
-  const { save: saveExperiment } = useExperimentSave({
+  // Rendering and saving share definitions even when Save is clicked while
+  // the initial request is pending. Failed loads remain retryable.
+  const customFieldsRequest = useRef<Promise<
+    ExperimentCustomSectionField[]
+  > | null>(null)
+  const loadCustomFields = useCallback(() => {
+    if (!customFieldsRequest.current) {
+      customFieldsRequest.current = new BackgroundAPIClient()
+        .getCustomSectionFields()
+        .catch((error) => {
+          customFieldsRequest.current = null
+          throw error
+        })
+    }
+    return customFieldsRequest.current
+  }, [])
+  const {
+    save: saveExperiment,
+    saving,
+    saveStatus
+  } = useExperimentSave({
     experiment,
-    domFieldName
+    domFieldName,
+    loadCustomFields
   })
 
   const [namesSynced, setNamesSynced] = useState(!experiment) // Start synced for new experiments, unsynced for existing
@@ -355,8 +376,7 @@ export function ExperimentEditor({
     let cancelled = false
     ;(async () => {
       try {
-        const client = new BackgroundAPIClient()
-        const fields = await client.getCustomSectionFields()
+        const fields = await loadCustomFields()
         if (!cancelled) setCustomFields(fields)
       } catch (err) {
         debugWarn("[ExperimentEditor] failed to load custom fields", err)
@@ -528,7 +548,13 @@ export function ExperimentEditor({
       return
     }
 
-    await saveExperiment(formData, currentVariants, undefined, onSave)
+    try {
+      await saveExperiment(formData, currentVariants, undefined, onSave)
+    } catch {
+      // The hook retains the error in saveStatus and re-enables Save. React
+      // does not consume rejected async event handlers; keep the draft here
+      // for correction/retry instead of leaking an unhandled rejection.
+    }
   }
 
   const handleCancel = async () => {
@@ -738,6 +764,14 @@ export function ExperimentEditor({
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
+        {saveStatus.step !== "idle" && (
+          <p
+            role="status"
+            data-testid="experiment-save-status"
+            data-step={saveStatus.step}>
+            {saveStatus.message}
+          </p>
+        )}
         {/* Basic Information */}
         <div className="space-y-3">
           {/* Name fields with sync lock */}
@@ -959,7 +993,7 @@ export function ExperimentEditor({
               id="create-experiment-button"
               type="submit"
               variant="primary"
-              disabled={loading}>
+              disabled={loading || saving}>
               {experiment?.id ? "Update Experiment" : "Create Experiment Draft"}
             </Button>
             <Button

@@ -2,6 +2,7 @@ import { test, expect } from '../fixtures/extension'
 import { injectSidebar } from './utils/test-helpers'
 import path from 'path'
 import type { FrameLocator } from '@playwright/test'
+import { controlledConfigSeed } from '../helpers/management-api/server'
 
 const TEST_PAGE_PATH = path.join(__dirname, '..', 'test-pages', 'visual-editor-test.html')
 
@@ -21,20 +22,12 @@ async function openSettings(sidebar: FrameLocator): Promise<void> {
 }
 
 test.describe('AI Provider Settings', () => {
-  test('should display AI provider selection with Claude Subscription by default', async ({ page, extensionId, extensionUrl, seedStorage }) => {
+  test('should display AI provider selection with Claude Subscription by default', async ({ page, extensionId, extensionUrl, seedStorage, managementApi }) => {
     // This test asserts the first-install default. The shared fixture seeds
     // aiProvider=anthropic-api whenever ANTHROPIC_API_KEY is set in the env,
     // which masks the default. Explicitly re-seed a config that has no
     // aiProvider so the UI falls back to its claude-subscription default.
-    await seedStorage({
-      'absmartly-config': {
-        apiKey: '',
-        apiEndpoint: process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT || '',
-        authMethod: process.env.PLASMO_PUBLIC_ABSMARTLY_AUTH_METHOD || 'apikey',
-        domChangesFieldName: '__dom_changes',
-        vibeStudioEnabled: true
-      }
-    })
+    await seedStorage(controlledConfigSeed(managementApi, { domChangesFieldName: '__dom_changes', vibeStudioEnabled: true }))
 
     await page.goto(`file://${TEST_PAGE_PATH}`)
     await page.waitForLoadState('networkidle')

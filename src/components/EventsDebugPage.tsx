@@ -174,6 +174,7 @@ export default function EventsDebugPage({ onBack }: EventsDebugPageProps) {
         actions={
           <div className="flex gap-2">
             <button
+              id="events-debug-pause-button"
               onClick={() => setIsPaused(!isPaused)}
               className="p-2 text-gray-700 hover:bg-gray-200 rounded"
               title={isPaused ? "Resume" : "Pause"}>
@@ -184,6 +185,7 @@ export default function EventsDebugPage({ onBack }: EventsDebugPageProps) {
               )}
             </button>
             <button
+              id="events-debug-clear-button"
               onClick={handleClearClick}
               className="p-2 text-gray-700 hover:bg-gray-200 rounded"
               title="Clear all events">

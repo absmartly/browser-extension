@@ -61,6 +61,17 @@ export async function saveConversation(
   }
 }
 
+// Provider history is text-only and providers reject empty text turns. An
+// image-only turn keeps its place in the conversation with a short note
+// instead of becoming an empty message; the images are not resent.
+function restoredText(content: string, images?: string[]): string {
+  if (content.trim()) return content
+  const count = images?.length ?? 0
+  return count > 0
+    ? `[${count} image${count === 1 ? "" : "s"} attached]`
+    : "(empty message)"
+}
+
 export async function loadConversation(
   variantName: string,
   conversationId: string
@@ -73,6 +84,22 @@ export async function loadConversation(
 
     if (conversation) {
       debugLog(`[ConversationStorage] Loaded conversation ${conversationId}`)
+      // Saving removes duplicate provider messages. Rebuild the text history
+      // in memory so reloading or switching chats preserves conversational context.
+      if (conversation.conversationSession.messages.length === 0) {
+        return {
+          ...conversation,
+          conversationSession: {
+            ...conversation.conversationSession,
+            messages: conversation.messages.map(
+              ({ role, content, images }) => ({
+                role,
+                content: restoredText(content, images)
+              })
+            )
+          }
+        }
+      }
     } else {
       debugWarn(
         `[ConversationStorage] Conversation ${conversationId} not found`

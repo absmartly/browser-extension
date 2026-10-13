@@ -2,8 +2,7 @@ import { test, expect } from '../fixtures/extension'
 import { type Page } from '@playwright/test'
 import path from 'path'
 import { injectSidebar } from './utils/test-helpers'
-import http from 'http'
-import fs from 'fs'
+import { controlledConfigSeed } from '../helpers/management-api/server'
 
 /**
  * E2E Tests for Events Debug Page
@@ -22,57 +21,15 @@ import fs from 'fs'
  * SDK events triggered via window.postMessage() and do not depend on external API availability.
  */
 
-const TEST_PAGE_PATH = path.join(__dirname, '..', 'test-pages', 'sdk-events-test.html')
-
-// Simple HTTP server to serve test page (needed because content scripts don't work reliably with file:// URLs)
-let testServer: http.Server | null = null
-let testServerUrl: string | null = null
-
-// HTTP server lifecycle is owned by beforeAll/afterAll at file scope; tests
-// share the server URL. Run serially so the server isn't torn down mid-suite.
-test.describe.configure({ mode: 'serial' })
-
-test.beforeAll(async () => {
-  // Start a simple HTTP server
-  const testPageContent = fs.readFileSync(TEST_PAGE_PATH, 'utf-8')
-  testServer = http.createServer((req, res) => {
-    res.writeHead(200, { 'Content-Type': 'text/html' })
-    res.end(testPageContent)
-  })
-
-  await new Promise<void>((resolve) => {
-    testServer!.listen(0, '127.0.0.1', () => {
-      const address = testServer!.address() as any
-      testServerUrl = `http://127.0.0.1:${address.port}`
-      resolve()
-    })
-  })
-})
-
-test.afterAll(async () => {
-  if (testServer) {
-    await new Promise<void>((resolve) => testServer!.close(() => resolve()))
-  }
-})
+// Served by the shared local test-page server (content scripts need http, not file://).
+const testServerUrl = 'http://localhost:3456/sdk-events-test.html'
 
 test.describe('Events Debug Page', () => {
-  test('sidebar loads with config (main UI)', async ({ context, extensionUrl, seedStorage }) => {
-    const config = {
-      apiKey: 'pq2xUUeL3LZecLplTLP3T8qQAG77JnHc3Ln-wa8Uf3WQqFIy47uFLSNmyVBKd3uk',
-      apiEndpoint: 'https://demo-2.absmartly.com/v1',
-      applicationId: null,
-      authMethod: 'apikey',
-      domChangesStorageType: null,
-      domChangesFieldName: null
-    }
-
-    await seedStorage({
-      'absmartly-config': config,
-      'plasmo:absmartly-config': config
-    })
+  test('sidebar loads with config (main UI)', async ({ context, extensionUrl, seedStorage, managementApi }) => {
+    await seedStorage(controlledConfigSeed(managementApi))
 
     const page = await context.newPage()
-    await page.goto(testServerUrl!)
+    await page.goto(testServerUrl)
 
     const sidebar = await injectSidebar(page, extensionUrl)
 
@@ -97,19 +54,14 @@ test.describe('Events Debug Page', () => {
     let testPage: Page
     let sidebar: any
 
-    test.beforeEach(async ({ context, extensionUrl, seedStorage }) => {
+    test.beforeEach(async ({ context, extensionUrl, seedStorage, managementApi }) => {
       // Seed config FIRST, before creating page
-      await seedStorage({
-        'absmartly-apikey': process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY || 'pq2xUUeL3LZecLplTLP3T8qQAG77JnHc3Ln-wa8Uf3WQqFIy47uFLSNmyVBKd3uk',
-        'absmartly-endpoint': process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT || 'https://demo-2.absmartly.com/v1',
-        'absmartly-env': 'production',
-        'absmartly-auth-method': 'apikey'
-      })
+      await seedStorage(controlledConfigSeed(managementApi))
 
       testPage = await context.newPage()
 
       // Use HTTP server instead of file:// URL so content scripts work properly
-      await testPage.goto(testServerUrl!)
+      await testPage.goto(testServerUrl)
       await testPage.waitForSelector('body', { timeout: 5000 })
 
       sidebar = await injectSidebar(testPage, extensionUrl)
