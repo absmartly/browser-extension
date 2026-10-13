@@ -1,7 +1,8 @@
-import { test, expect } from '../fixtures/extension'
+import { test, expect, TEST_PAGE_ORIGIN } from '../fixtures/extension'
 import { type Page } from '@playwright/test'
 
-const TARGET_URL = 'https://example.com/absmartly-csp-preview-test'
+// Serve the synthetic CSP page on the fixture's controlled local origin.
+const TARGET_URL = `${TEST_PAGE_ORIGIN}/absmartly-csp-preview-test`
 
 const fixturePage = () => `
 <!doctype html>
