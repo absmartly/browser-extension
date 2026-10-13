@@ -274,6 +274,32 @@ describe('config-manager', () => {
       }))
     })
 
+    it('preserves settings saved while the fallback key write is pending', async () => {
+      process.env.PLASMO_PUBLIC_ABSMARTLY_API_KEY = 'synthetic-build-default'
+      process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT = 'https://fixture.absmartly.com'
+      let current: any = null
+      let finishWrite!: () => void
+      let signalWrite!: () => void
+      const writeStarted = new Promise<void>(resolve => { signalWrite = resolve })
+      jest.spyOn(storage, 'get').mockImplementation(async () => current)
+      const saveConfig = jest.spyOn(storage, 'set').mockImplementation(async (_key, value) => { current = value; return null })
+      jest.spyOn(secureStorage, 'get').mockResolvedValue(null)
+      jest.spyOn(secureStorage, 'set').mockImplementation(() => new Promise(resolve => {
+        finishWrite = () => resolve(null)
+        signalWrite()
+      }))
+
+      const initialization = initializeConfig(storage, secureStorage)
+      await writeStarted
+      const saved = { apiEndpoint: 'https://saved.absmartly.com', authMethod: 'jwt', vibeStudioEnabled: true }
+      current = saved
+      finishWrite()
+      await initialization
+
+      expect(current).toEqual(saved)
+      expect(saveConfig).not.toHaveBeenCalled()
+    })
+
     it('does not write stale defaults when the config recheck fails and allows initialization retry', async () => {
       process.env.PLASMO_PUBLIC_ABSMARTLY_API_ENDPOINT = 'https://fixture.absmartly.com'
       const get = jest.spyOn(storage, 'get').mockResolvedValueOnce(null).mockRejectedValueOnce(new Error('fixture read failure')).mockResolvedValue(null)

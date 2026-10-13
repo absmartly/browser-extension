@@ -1,5 +1,6 @@
 import type { BrowserContext } from "@playwright/test"
 
+import type { NetworkBoundary } from "./network-boundary"
 import { providerProbeResponse } from "./provider-probes"
 import type { ProviderController } from "./provider-server"
 
@@ -59,7 +60,8 @@ function hasInferenceProtocol(
 
 export async function installProviderGuard(
   context: BrowserContext,
-  provider: ProviderController
+  provider: ProviderController,
+  boundary?: NetworkBoundary
 ) {
   if (process.env.PLAYWRIGHT_DISABLE_SERVICE_WORKER_NETWORK)
     throw new Error(
@@ -73,7 +75,8 @@ export async function installProviderGuard(
   const guard = async (
     route: import("@playwright/test").Route
   ): Promise<boolean> => {
-    if (!blocked(route.request())) return false
+    if (!blocked(route.request()))
+      return boundary ? boundary.handleRoute(route) : false
     const url = new URL(route.request().url())
     const probe = providerProbeResponse(route.request().method(), url)
     if (probe) {
@@ -97,7 +100,9 @@ export async function installProviderGuard(
   await originalContextRoute("**/*", defaultGuard)
 
   // Page routes take priority over context routes. Wrap later registrations
-  // so a broad scenario route using continue() cannot bypass this boundary.
+  // so a broad scenario route using continue() cannot bypass either boundary.
+  // The restored defaultGuard also retains forwarding and non-provider egress
+  // checks when unroute removes the original network-boundary route.
   const wrapRoutes = (
     target: BrowserContext | import("@playwright/test").Page
   ) => {

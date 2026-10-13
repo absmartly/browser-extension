@@ -142,6 +142,19 @@ const coerce = (schema: Json, raw: string): unknown => {
   return raw
 }
 
+// Cached operations retain their parameter objects. Compile each parameter
+// once instead of feeding Ajv a new schema object on every request.
+const queryValidators = new WeakMap<Json, { schema: Json; validate: ValidateFunction }>()
+const queryValidator = (param: Json) => {
+  let entry = queryValidators.get(param)
+  if (!entry) {
+    const schema = normalize(param.schema || {})
+    entry = { schema, validate: loadContract().ajv.compile(refs(schema)) }
+    queryValidators.set(param, entry)
+  }
+  return entry
+}
+
 export function validateRequest(method: string, url: URL, body: unknown): ContractIssue[] {
   const path = url.pathname.replace(/^\/v1(?=\/)/, '')
   const operation = getOperation(method, path)
@@ -155,12 +168,11 @@ export function validateRequest(method: string, url: URL, body: unknown): Contra
       if (!known.includes(name)) issues.push({ kind: 'coverage', message: `${method} ${operation.template}: query parameter "${name}" missing from contract` })
       continue
     }
-    const schema = normalize(param.schema || {})
+    const { schema, validate } = queryValidator(param)
     const raw = url.searchParams.getAll(name)
     const value = schema.type === 'array'
       ? (param.explode === false || raw.length === 1 ? raw.join(',').split(',') : raw).map(v => coerce(schema.items || {}, v))
       : coerce(schema, raw[raw.length - 1])
-    const validate = ajv.compile(refs(schema))
     if (!validate(value)) issues.push({ kind: 'request', message: `${method} ${operation.template} query ${name}=${raw.join(',')}: ${ajv.errorsText(validate.errors)}` })
   }
   for (const [name, param] of Object.entries(operation.params)) {

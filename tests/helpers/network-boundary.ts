@@ -7,6 +7,7 @@ export type EgressViolation = { method: string; url: string; source: string }
 
 export interface NetworkBoundary {
   violations: EgressViolation[]
+  handleRoute(route: Route): Promise<boolean>
   assertNoViolations(): void
 }
 
@@ -34,18 +35,26 @@ export async function installNetworkBoundary(
 ): Promise<NetworkBoundary> {
   const violations: EgressViolation[] = []
   const allowed = new Set(options.allowedOrigins)
-  await context.route('**/*', async route => {
+  const handleRoute = async (route: Route): Promise<boolean> => {
     const url = new URL(route.request().url())
-    if (!/^https?:$/.test(url.protocol)) return route.fallback()
+    if (!/^https?:$/.test(url.protocol)) return false
     const target = options.forwards[url.origin]
-    if (target) return forward(route, target)
-    if (allowed.has(url.origin)) return route.fallback()
+    if (target) {
+      await forward(route, target)
+      return true
+    }
+    if (allowed.has(url.origin)) return false
     const worker = route.request().serviceWorker()
     violations.push({ method: route.request().method(), url: `${url.origin}${url.pathname}`, source: worker ? 'service-worker' : (route.request().frame()?.url() || 'unknown') })
-    return route.abort('blockedbyclient')
+    await route.abort('blockedbyclient')
+    return true
+  }
+  await context.route('**/*', async route => {
+    if (!(await handleRoute(route))) await route.fallback()
   })
   return {
     violations,
+    handleRoute,
     assertNoViolations: () => {
       if (violations.length) throw new Error(`Unexpected network egress:\n${violations.map(v => `- ${v.method} ${v.url} (${v.source})`).join('\n')}`)
     }

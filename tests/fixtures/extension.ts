@@ -113,7 +113,7 @@ export const test = base.extend<ExtFixtures>({
       })
       ;(context as BrowserContext & { __boundary?: NetworkBoundary }).__boundary = boundary
     }
-    if (!liveAI) await installProviderGuard(context, aiProvider)
+    if (!liveAI) await installProviderGuard(context, aiProvider, boundary)
 
     // Keep timing/status evidence for live flakes without headers, keys,
     // request bodies or customer response data.

@@ -26,6 +26,22 @@ describe('contract: published bundle as compiled', () => {
 })
 
 describe('contract: provider-pinned query deviations', () => {
+  test('repeated query validation reuses compiled schemas without weakening validation', () => {
+    const valid = u('/experiments?state=running&items=25&page=1&search=needle')
+    expect(validateRequest('GET', valid, undefined)).toEqual([])
+    const compile = jest.spyOn(loadContract().ajv, 'compile')
+    try {
+      for (let page = 1; page <= 20; page++) {
+        expect(validateRequest('GET', u(`/experiments?state=running&items=25&page=${page}&search=needle`), undefined)).toEqual([])
+      }
+      expect(validateRequest('GET', u('/experiments?state=full_on&items=not-a-number'), undefined)
+        .filter(issue => issue.kind === 'request')).toHaveLength(2)
+      expect(compile).not.toHaveBeenCalled()
+    } finally {
+      compile.mockRestore()
+    }
+  })
+
   test('state enum follows the provider allow-list', () => {
     for (const state of PROVIDER_EXPERIMENT_STATES) expect(validateRequest('GET', u(`/experiments?state=${state}`), undefined)).toEqual([])
     expect(validateRequest('GET', u('/experiments?state=full_on'), undefined)[0].kind).toBe('request')
