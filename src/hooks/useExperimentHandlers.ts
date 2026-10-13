@@ -244,9 +244,11 @@ export function useExperimentHandlers({
   )
 
   const handleUpdateExperiment = useCallback(
-    async (id: number, updates: Partial<Experiment>) => {
+    async (id: number, updates: Partial<Experiment>): Promise<boolean> => {
+      let persisted = false
       try {
         await updateExperiment(id, updates)
+        persisted = true
 
         const fullExperiment = await getExperiment(id)
         setSelectedExperiment(fullExperiment)
@@ -264,6 +266,9 @@ export function useExperimentHandlers({
         }
         debugError("Failed to update experiment:", error)
       }
+      // The error was already shown above; tell the detail save whether the
+      // update itself persisted so it can keep unsaved edits after a failure.
+      return persisted
     },
     [
       updateExperiment,
