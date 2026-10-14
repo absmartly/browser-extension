@@ -36,6 +36,10 @@ Coverage:
   reference and the earlier fixture's aliases are exercised to isolate alias
   effects. Repeated goals, pause/resume and clear are also exercised.
 - Missing API-key validation focuses the visible field.
+- Experiments list pager (FT-2250): the range and active page follow numbered,
+  Next and Previous navigation, reset on page-size/search changes and survive
+  Back from detail; header actions and the template panel stay inside and
+  usable at 240/280/320/384 px sidebar widths (routed synthetic list API).
 
 The iframe is programmatically mounted: this is **not native toolbar coverage**
 or a reproduction of the personal-browser connector attachment. Settings are

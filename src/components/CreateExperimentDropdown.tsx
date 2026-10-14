@@ -76,6 +76,7 @@ interface CreateExperimentDropdownPanelProps {
   onCreateFromScratch: () => void
   onTemplateSelect: (id: number) => void
   config: any
+  positionClassName?: string
 }
 
 export function CreateExperimentDropdownPanel({
@@ -86,7 +87,8 @@ export function CreateExperimentDropdownPanel({
   onSearchChange,
   onCreateFromScratch,
   onTemplateSelect,
-  config
+  config,
+  positionClassName = "left-0 right-0 top-[60px]"
 }: CreateExperimentDropdownPanelProps) {
   const [failedImages, setFailedImages] = useState<Set<string>>(new Set())
   const [avatarBlobUrls, setAvatarBlobUrls] = useState<Map<string, string>>(
@@ -155,7 +157,7 @@ export function CreateExperimentDropdownPanel({
 
   return (
     <div
-      className="absolute left-0 right-0 top-[60px] bg-white border border-gray-200 shadow-lg z-50"
+      className={`absolute ${positionClassName} bg-white border border-gray-200 shadow-lg z-50`}
       data-create-experiment-panel="true">
       {/* Warning message */}
       <div className="px-4 py-3 bg-yellow-50 border-b border-yellow-100 flex items-start gap-2">
@@ -331,6 +333,7 @@ export function CreateExperimentDropdown({
   return (
     <div ref={dropdownRef} className="relative">
       <button
+        id="create-experiment-menu-button"
         onClick={() => setIsOpen(!isOpen)}
         className="p-2 hover:bg-gray-100 rounded-md transition-colors"
         aria-label="Create Experiment"
