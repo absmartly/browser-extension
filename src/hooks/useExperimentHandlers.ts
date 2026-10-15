@@ -7,6 +7,16 @@ import type { View } from "~src/types/view"
 import { debugError, debugWarn } from "~src/utils/debug"
 import { clearAllExperimentStorage } from "~src/utils/storage-cleanup"
 
+// Unsaved drafts are still selected (template drafts carry id 0, drafts
+// restored from sidebar state carry no id), so selection alone does not mean
+// the experiment exists server-side.
+function isPersistedExperiment(
+  experiment: Experiment | null
+): experiment is Experiment {
+  const id = experiment?.id
+  return Number.isInteger(id) && id > 0
+}
+
 interface UseExperimentHandlersProps {
   getExperiment: (id: number) => Promise<Experiment>
   startExperiment: (id: number) => Promise<Experiment>
@@ -208,7 +218,7 @@ export function useExperimentHandlers({
   const handleSaveExperiment = useCallback(
     async (experiment: Partial<Experiment>) => {
       try {
-        if (selectedExperiment) {
+        if (isPersistedExperiment(selectedExperiment)) {
           await updateExperiment(selectedExperiment.id, experiment)
         } else {
           await createExperiment(experiment)
