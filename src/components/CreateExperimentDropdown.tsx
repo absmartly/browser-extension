@@ -221,6 +221,7 @@ export function CreateExperimentDropdownPanel({
                   </div>
                   <button
                     type="button"
+                    id={`load-template-${template.id}-button`}
                     onClick={() => onTemplateSelect(template.id)}
                     className="px-3 py-1 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-colors">
                     Load

@@ -389,7 +389,10 @@ function SidebarContent() {
 
       {view === "detail" &&
         (selectedExperiment ? (
+          // Detail's useState initializers do not rerun when its props change.
+          // A new experiment ID must create fresh form state.
           <ExperimentDetail
+            key={selectedExperiment.id}
             experiment={selectedExperiment}
             onBack={() => setView("list")}
             onStart={handleStartExperiment}
