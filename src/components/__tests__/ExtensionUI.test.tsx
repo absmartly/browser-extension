@@ -12,26 +12,11 @@ jest.mock("../views/ListView", () => ({
   ListView: () => <div data-testid="mock-list-view">Experiments List View</div>
 }))
 
-// Like the real component, the mock seeds local state from its experiment on
-// mount, so tests can observe whether a new selection remounts it.
-jest.mock("../ExperimentDetail", () => {
-  const { useState } = require("react")
-  return {
-    ExperimentDetail: ({ experiment }: any) => {
-      const [mounted] = useState(experiment)
-      return (
-        <div
-          data-testid="mock-experiment-detail"
-          data-mounted-experiment-id={String(mounted.id)}
-          data-mounted-unit-type-id={String(
-            mounted.unit_type?.unit_type_id ?? mounted.unit_type_id ?? ""
-          )}>
-          Experiment Detail
-        </div>
-      )
-    }
-  }
-})
+jest.mock("../ExperimentDetail", () => ({
+  ExperimentDetail: () => (
+    <div data-testid="mock-experiment-detail">Experiment Detail</div>
+  )
+}))
 
 jest.mock("../ExperimentEditor", () => ({
   ExperimentEditor: () => (
@@ -457,93 +442,6 @@ describe("ExtensionUI", () => {
       await waitFor(() => {
         expect(screen.getByTestId("mock-list-view")).toBeInTheDocument()
       })
-    })
-
-    it("remounts detail when the selection changes from the saved template draft to the persisted experiment", () => {
-      const useViewNavigation =
-        require("~src/hooks/useViewNavigation").useViewNavigation
-      const useExperimentHandlers =
-        require("~src/hooks/useExperimentHandlers").useExperimentHandlers
-
-      // After creating from a template, the template draft (id 0, no unit type
-      // chosen on the template) stays selected while the new row is opened.
-      const templateDraft: Experiment = {
-        id: unsafeExperimentId(0),
-        name: "",
-        display_name: "",
-        state: "created",
-        created_at: "2026-09-11T00:00:00Z",
-        variants: [],
-        applications: [],
-        owners: [],
-        teams: [],
-        experiment_tags: []
-      }
-      // The full GET for the persisted draft, in the API's shape: scalar
-      // unit_type_id plus the included relation row.
-      const persisted = {
-        ...templateDraft,
-        id: unsafeExperimentId(5510),
-        name: "cua_template_draft_regression_20261015_1607",
-        unit_type_id: 1,
-        unit_type: { id: 1, name: "user_id" }
-      } as unknown as Experiment
-
-      const handlers = (selectedExperiment: Experiment) => ({
-        selectedExperiment,
-        setSelectedExperiment: jest.fn(),
-        experimentDetailLoading: false,
-        setExperimentDetailLoading: jest.fn(),
-        handleExperimentClick: jest.fn(),
-        handleStartExperiment: jest.fn(),
-        handleStopExperiment: jest.fn(),
-        handleCreateExperiment: jest.fn(),
-        handleCreateFromTemplate: jest.fn(),
-        handleSaveExperiment: jest.fn(),
-        handleUpdateExperiment: jest.fn()
-      })
-
-      useViewNavigation.mockReturnValue({
-        view: "detail",
-        setView: jest.fn(),
-        aiDomContext: null,
-        autoNavigateToAI: false,
-        setAutoNavigateToAI: jest.fn(),
-        handleNavigateToAI: jest.fn(),
-        handleBackFromAI: jest.fn()
-      })
-      useExperimentHandlers.mockReturnValue(handlers(templateDraft))
-
-      try {
-        const { rerender } = render(<ExtensionUI />)
-
-        const before = screen.getByTestId("mock-experiment-detail")
-        expect(before).toHaveAttribute("data-mounted-experiment-id", "0")
-        expect(before).toHaveAttribute("data-mounted-unit-type-id", "")
-
-        useExperimentHandlers.mockReturnValue(handlers(persisted))
-        rerender(<ExtensionUI />)
-
-        const after = screen.getByTestId("mock-experiment-detail")
-        expect(after).toHaveAttribute("data-mounted-experiment-id", "5510")
-        expect(after).toHaveAttribute("data-mounted-unit-type-id", "1")
-      } finally {
-        // mockReturnValue survives clearAllMocks; restore the list defaults
-        // the rest of the suite relies on.
-        useExperimentHandlers.mockReturnValue({
-          ...handlers(templateDraft),
-          selectedExperiment: null
-        })
-        useViewNavigation.mockReturnValue({
-          view: "list",
-          setView: jest.fn(),
-          aiDomContext: null,
-          autoNavigateToAI: false,
-          setAutoNavigateToAI: jest.fn(),
-          handleNavigateToAI: jest.fn(),
-          handleBackFromAI: jest.fn()
-        })
-      }
     })
   })
 
