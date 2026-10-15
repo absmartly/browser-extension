@@ -389,10 +389,8 @@ function SidebarContent() {
 
       {view === "detail" &&
         (selectedExperiment ? (
-          // Detail seeds its form state from the experiment on mount. Opening
-          // another experiment can render it with the previous selection
-          // (e.g. the template draft just saved) until the fetch resolves, so
-          // remount per experiment rather than keep the previous form state.
+          // Detail's useState initializers do not rerun when its props change.
+          // A new experiment ID must create fresh form state.
           <ExperimentDetail
             key={selectedExperiment.id}
             experiment={selectedExperiment}
