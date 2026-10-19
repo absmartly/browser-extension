@@ -4,6 +4,16 @@ import { debugLog, debugError } from "~src/utils/debug"
 const EVENT_BUFFER_KEY = "sdk_events_buffer"
 const MAX_BUFFER_SIZE = 1000
 
+// Buffer mutations are read-modify-write on chrome.storage.session. Run them
+// one at a time so concurrent SDK_EVENT messages cannot overwrite each other.
+let bufferQueue: Promise<unknown> = Promise.resolve()
+
+function enqueue<T>(operation: () => Promise<T>): Promise<T> {
+  const result = bufferQueue.then(operation)
+  bufferQueue = result.catch(() => undefined)
+  return result
+}
+
 export interface SDKEvent {
   id: string
   eventName: string
@@ -11,7 +21,15 @@ export interface SDKEvent {
   timestamp: number | string
 }
 
-export async function bufferSDKEvent(payload: {
+export function bufferSDKEvent(payload: {
+  eventName: string
+  data: any
+  timestamp: number | string
+}): Promise<void> {
+  return enqueue(() => appendEvent(payload))
+}
+
+async function appendEvent(payload: {
   eventName: string
   data: any
   timestamp: number | string
@@ -38,7 +56,7 @@ export async function bufferSDKEvent(payload: {
 
     chrome.runtime.sendMessage({
       type: "SDK_EVENT_BROADCAST",
-      payload: { eventName, data, timestamp }
+      payload: { id: newEvent.id, eventName, data, timestamp }
     }).catch((error) => {
       if (!error?.message?.includes('Receiving end does not exist') &&
           !error?.message?.includes('message port closed')) {
@@ -64,7 +82,11 @@ export async function getBufferedEvents(): Promise<SDKEvent[]> {
   }
 }
 
-export async function clearBufferedEvents(): Promise<void> {
+export function clearBufferedEvents(): Promise<void> {
+  return enqueue(removeBufferedEvents)
+}
+
+async function removeBufferedEvents(): Promise<void> {
   const sessionStorage = new Storage({ area: "session" })
 
   try {

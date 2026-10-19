@@ -134,9 +134,11 @@ describe("event-buffer", () => {
       const timestamp = Date.now()
       await bufferSDKEvent({ eventName: "exposure", data: { experiment: "test" }, timestamp })
 
+      const storedId = mockSessionStorage.set.mock.calls[0][1][0].id
       expect(mockSendMessage).toHaveBeenCalledWith({
         type: "SDK_EVENT_BROADCAST",
         payload: {
+          id: storedId,
           eventName: "exposure",
           data: { experiment: "test" },
           timestamp
@@ -182,6 +184,86 @@ describe("event-buffer", () => {
       expect(savedBuffer[savedBuffer.length - 1]).toMatchObject({
         eventName: "newest"
       })
+    })
+  })
+
+  describe("concurrent writes", () => {
+    let stored: SDKEvent[] | null
+
+    const tick = () => new Promise((resolve) => setTimeout(resolve, 0))
+
+    beforeEach(() => {
+      stored = null
+      // Async storage like chrome.storage.session: each call yields, so
+      // unsynchronised read-modify-write sequences can interleave.
+      mockSessionStorage.get.mockImplementation(async () => {
+        await tick()
+        return stored ? [...stored] : stored
+      })
+      mockSessionStorage.set.mockImplementation(async (_key, value) => {
+        await tick()
+        stored = value
+      })
+      mockSessionStorage.remove.mockImplementation(async () => {
+        await tick()
+        stored = null
+      })
+    })
+
+    it("keeps every event sent in the same tick, in order", async () => {
+      await Promise.all([
+        bufferSDKEvent({ eventName: "exposure", data: { n: 0 }, timestamp: 1 }),
+        bufferSDKEvent({ eventName: "goal", data: { n: 1 }, timestamp: 1 }),
+        ...Array.from({ length: 28 }, (_, i) =>
+          bufferSDKEvent({ eventName: "goal", data: { n: i + 2 }, timestamp: 1 })
+        )
+      ])
+
+      expect(stored).toHaveLength(30)
+      expect(stored!.map((e) => e.data.n)).toEqual(
+        Array.from({ length: 30 }, (_, i) => i)
+      )
+      expect(mockSendMessage).toHaveBeenCalledTimes(30)
+    })
+
+    it("keeps the cap and newest events under concurrent writes", async () => {
+      stored = Array.from({ length: 995 }, (_, i) => ({
+        id: `old-${i}`,
+        eventName: "old",
+        data: { n: i },
+        timestamp: i
+      }))
+
+      await Promise.all(
+        Array.from({ length: 10 }, (_, i) =>
+          bufferSDKEvent({ eventName: "new", data: { n: 995 + i }, timestamp: 1 })
+        )
+      )
+
+      expect(stored).toHaveLength(1000)
+      expect(stored![0].data.n).toBe(5)
+      expect(stored![999].data.n).toBe(1004)
+    })
+
+    it("clear is ordered with pending writes and does not resurrect old events", async () => {
+      const before = bufferSDKEvent({ eventName: "before", data: {}, timestamp: 1 })
+      const clear = clearBufferedEvents()
+      const after = bufferSDKEvent({ eventName: "after", data: {}, timestamp: 2 })
+      await Promise.all([before, clear, after])
+
+      expect(stored!.map((e) => e.eventName)).toEqual(["after"])
+    })
+
+    it("a failed write does not block later writes", async () => {
+      mockSessionStorage.set.mockImplementationOnce(async () => {
+        throw new Error("quota")
+      })
+      const failed = bufferSDKEvent({ eventName: "lost", data: {}, timestamp: 1 })
+      const next = bufferSDKEvent({ eventName: "kept", data: {}, timestamp: 2 })
+
+      await expect(failed).rejects.toThrow("quota")
+      await next
+      expect(stored!.map((e) => e.eventName)).toEqual(["kept"])
     })
   })
 
