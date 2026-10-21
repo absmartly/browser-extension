@@ -1,4 +1,6 @@
 import { act, renderHook, waitFor } from "@testing-library/react"
+import { createElement, startTransition, Suspense } from "react"
+import type { ReactNode } from "react"
 
 import type { ABsmartlyConfig } from "~src/types/absmartly"
 import { getConfig } from "~src/utils/storage"
@@ -129,4 +131,67 @@ describe("useABsmartly auth recovery after a corrected config", () => {
       expect(sendMessage).toHaveBeenCalledTimes(2)
     }
   )
+
+  it("ignores config from a render that suspends without committing", async () => {
+    let finishCommitted!: () => void
+    sendMessage.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishCommitted = () =>
+            resolve({ success: true, data: { user: USER } })
+        })
+    )
+    let releaseRender!: () => void
+    const suspended = new Promise<void>((resolve) => {
+      releaseRender = resolve
+    })
+    let suspendGoodConfig = true
+    const { result } = renderHook(
+      () => {
+        const api = useABsmartly()
+        if (suspendGoodConfig && api.config === goodConfig) throw suspended
+        return api
+      },
+      {
+        wrapper: ({ children }: { children: ReactNode }) =>
+          createElement(Suspense, { fallback: null }, children)
+      }
+    )
+    await waitFor(() => expect(sendMessage).toHaveBeenCalledTimes(1))
+
+    act(() => startTransition(() => result.current.updateConfig(goodConfig)))
+    await act(async () => finishCommitted())
+
+    expect(result.current.config).toBe(badConfig)
+    expect(result.current.user).toEqual(USER)
+    expect(result.current.isAuthenticated).toBe(true)
+    expect(sendMessage).toHaveBeenCalledTimes(1)
+
+    storedKey = "synthetic-good-key"
+    suspendGoodConfig = false
+    await act(async () => releaseRender())
+
+    await waitFor(() => expect(sendMessage).toHaveBeenCalledTimes(2))
+    expect(result.current.config).toBe(goodConfig)
+    expect(result.current.isAuthenticated).toBe(true)
+  })
+
+  it("re-checks when an authenticated config is replaced by an invalid one", async () => {
+    storedKey = "synthetic-good-key"
+    ;(getConfig as jest.Mock).mockResolvedValue(goodConfig)
+    const { result } = renderHook(() => useABsmartly())
+    await waitFor(() => expect(result.current.isAuthenticated).toBe(true))
+    expect(sendMessage).toHaveBeenCalledTimes(1)
+
+    storedKey = badConfig.apiKey!
+    act(() => result.current.updateConfig(badConfig))
+
+    await waitFor(() =>
+      expect(result.current.authErrorType).toBe("not-authenticated")
+    )
+    expect(result.current.isAuthenticated).toBe(false)
+    expect(result.current.user).toBeNull()
+    await act(async () => {})
+    expect(sendMessage).toHaveBeenCalledTimes(2)
+  })
 })

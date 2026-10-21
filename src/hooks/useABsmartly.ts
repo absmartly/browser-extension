@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState
+} from "react"
 
 import { BackgroundAPIClient } from "~src/lib/background-api-client"
 import type {
@@ -41,7 +47,6 @@ export function useABsmartly() {
   // be checked, otherwise correcting an invalid API key shortly after saving
   // it leaves the list stuck on "You are not logged in".
   const configRef = useRef<ABsmartlyConfig | null>(null)
-  configRef.current = config
   const lastCheckedConfigRef = useRef<ABsmartlyConfig | null>(null)
   const checkAuthRef = useRef<() => Promise<void>>(async () => {})
 
@@ -105,17 +110,26 @@ export function useABsmartly() {
       }
     }
   }, [config])
-  checkAuthRef.current = checkAuth
+
+  // Only committed values may reach the refs: a render that is suspended or
+  // discarded must not make an in-flight check look stale or start a check
+  // for a config that never took effect.
+  useLayoutEffect(() => {
+    configRef.current = config
+    checkAuthRef.current = checkAuth
+  }, [config, checkAuth])
 
   useEffect(() => {
     loadConfig()
   }, [])
 
+  // Check every committed config, including one that replaces an already
+  // authenticated config.
   useEffect(() => {
-    if (config && !isAuthenticated) {
+    if (config) {
       checkAuth()
     }
-  }, [config, isAuthenticated, checkAuth])
+  }, [config, checkAuth])
 
   useEffect(() => {
     if (!config) return
