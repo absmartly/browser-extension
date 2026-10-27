@@ -255,6 +255,13 @@ describe("ExperimentDetail metadata edits (FT-2251)", () => {
   })
 
   it("opens the same modal from Cancel, and Discard clears the draft before leaving", async () => {
+    let finishCleanup!: () => void
+    jest.mocked(clearAllExperimentStorage).mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finishCleanup = resolve
+        })
+    )
     render(<ExperimentDetail {...props} />)
     fireEvent.change(trafficInput(), { target: { value: "42" } })
     fireEvent.click(document.getElementById("experiment-detail-cancel")!)
@@ -265,6 +272,10 @@ describe("ExperimentDetail metadata edits (FT-2251)", () => {
       fireEvent.click(document.getElementById("unsaved-changes-discard")!)
     })
     expect(clearAllExperimentStorage).toHaveBeenCalledWith(experiment.id)
+    expect(props.onBack).not.toHaveBeenCalled()
+    await act(async () => {
+      finishCleanup()
+    })
     expect(props.onBack).toHaveBeenCalledTimes(1)
     expect(mockSave).not.toHaveBeenCalled()
   })

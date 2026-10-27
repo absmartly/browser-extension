@@ -5,6 +5,7 @@ import "@testing-library/jest-dom"
 
 import { localAreaStorage } from "~src/utils/storage"
 
+import { ExperimentCodeInjection } from "../ExperimentCodeInjection"
 import { VariantList } from "../VariantList"
 
 jest.mock("~src/lib/messaging", () => ({
@@ -43,19 +44,44 @@ const variant = (name: string, pattern: string) => ({
 const server = [{ name: "Control", config: {} }, variant("Variant 1", "/old/*")]
 const restored = [server[0], variant("Draft B", "/new/*")]
 
-function Parent({ initial = server }: { initial?: any[] }) {
+function Parent({
+  initial = server,
+  withInjection = false
+}: {
+  initial?: any[]
+  withInjection?: boolean
+}) {
   const [variants, setVariants] = useState(initial)
   return (
-    <VariantList
-      experimentId={501}
-      experimentName="synthetic"
-      domFieldName="__dom_changes"
-      initialVariants={variants}
-      onVariantsChange={(next) => {
-        update(next)
-        setVariants(next)
-      }}
-    />
+    <>
+      <VariantList
+        experimentId={501}
+        experimentName="synthetic"
+        domFieldName="__dom_changes"
+        initialVariants={variants}
+        onVariantsChange={(next) => {
+          update(next)
+          setVariants(next)
+        }}
+      />
+      {withInjection && (
+        <ExperimentCodeInjection
+          experimentId={501}
+          variantIndex={0}
+          canEdit={true}
+          initialCode={variants[0].config.__inject_html}
+          onChange={(code) =>
+            setVariants((current) => [
+              {
+                ...current[0],
+                config: { ...current[0].config, __inject_html: code }
+              },
+              ...current.slice(1)
+            ])
+          }
+        />
+      )}
+    </>
   )
 }
 
@@ -133,6 +159,36 @@ it("refreshes child inputs when an external replacement changes a variant config
   await act(async () => {})
   fireEvent.click(el("url-filtering-toggle-variant-1"))
   expect(el("url-filter-pattern-variant-1-0")).toHaveValue("/new/*")
+})
+
+it("preserves an unfinished sibling DOM change through a Control injection update", async () => {
+  render(<Parent withInjection />)
+  await act(async () => {})
+  fireEvent.click(el("add-dom-change-button"))
+  fireEvent.change(el("dom-change-type-1-new"), {
+    target: { value: "text" }
+  })
+  fireEvent.change(el("dom-change-selector-1-new"), {
+    target: { value: "#unsaved-heading" }
+  })
+  fireEvent.change(el("dom-change-text-1-new"), {
+    target: { value: "Updated heading" }
+  })
+  fireEvent.click(el("custom-code-injection-button"))
+  fireEvent.click(el("code-injection-url-filter-toggle"))
+  fireEvent.change(el("code-injection-url-filter-mode"), {
+    target: { value: "simple" }
+  })
+  await act(async () => {})
+  expect(el("dom-change-selector-1-new")).toHaveValue("#unsaved-heading")
+  expect(el("dom-change-text-1-new")).toHaveValue("Updated heading")
+  fireEvent.click(el("dom-change-save-1-new"))
+  expect(update.mock.calls.at(-1)[0][1].config.__dom_changes.changes).toEqual([
+    expect.objectContaining({
+      selector: "#unsaved-heading",
+      value: "Updated heading"
+    })
+  ])
 })
 
 it.each(["VISUAL_EDITOR_CHANGES", "VISUAL_EDITOR_CHANGES_COMPLETE", "storage"])(

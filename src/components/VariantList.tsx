@@ -68,12 +68,16 @@ export function VariantList({
     )
     setVariantsState(nextVariants)
   }, [])
-  // Local typing retains focus. Replacing the draft resets child editor state
-  // so controls and listeners cannot retain values from the previous draft.
+  // Reset replaced rows while retaining unfinished edits in unchanged siblings.
   const replaceVariants = useCallback((nextVariants: Variant[]) => {
     if (nextVariants === variantsRef.current) return
+    const previousVariants = variantsRef.current
+    variantKeys.current = nextVariants.map((variant, index) =>
+      variant === previousVariants[index]
+        ? variantKeys.current[index]
+        : nextVariantKey.current++
+    )
     variantsRef.current = nextVariants
-    variantKeys.current = nextVariants.map(() => nextVariantKey.current++)
     setVariantsState(nextVariants)
   }, [])
   const [activeVEVariant, setActiveVEVariant] = useState<string | null>(null)

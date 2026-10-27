@@ -463,6 +463,28 @@ for (const width of [384, 320]) {
 }
 
 for (const width of [384, 320]) {
+  test(`detail retains an unfinished sibling DOM change after injection update at ${width}px`, async ({ page, sidebar }) => {
+    test.setTimeout(10000)
+    const state = await openNavigationDraft(page, sidebar, width)
+    await sidebar.locator('#add-dom-change-button').click()
+    await sidebar.locator('#dom-change-type-1-new').selectOption('text')
+    await sidebar.locator('#dom-change-selector-1-new').fill('#unsaved-heading')
+    await sidebar.locator('#dom-change-text-1-new').fill('Updated heading')
+    await sidebar.locator('#custom-code-injection-button').click()
+    await sidebar.locator('#code-injection-url-filter-toggle').click()
+    await sidebar.locator('#code-injection-url-filter-mode').selectOption('simple')
+    await expect(sidebar.locator('#code-injection-url-match-type')).toBeVisible()
+    await expect(sidebar.locator('#dom-change-selector-1-new')).toHaveValue('#unsaved-heading')
+    await expect(sidebar.locator('#dom-change-text-1-new')).toHaveValue('Updated heading')
+    await sidebar.locator('#dom-change-save-1-new').click()
+    await sidebar.locator('#experiment-detail-save').click()
+    await expect.poll(() => state.puts.length).toBe(1)
+    expect(JSON.parse(state.puts[0].variants[1].config).__dom_changes.changes).toEqual([
+      expect.objectContaining({ selector: '#unsaved-heading', type: 'text', value: 'Updated heading' })
+    ])
+    await expect(sidebar.locator('#experiment-detail-save')).toBeDisabled()
+  })
+
   for (const field of ['__dom_changes', 'custom_dom']) {
     test(`detail rejects malformed DOM entries in ${field} and recovers at ${width}px`, async ({ page, sidebar }) => {
       test.setTimeout(10000)
