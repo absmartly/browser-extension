@@ -68,6 +68,15 @@ describe("UnsavedChangesModal", () => {
     expect(cancelButton).toBeDisabled()
   })
 
+  it("disables only Save when saving is unavailable for the current form", () => {
+    render(<UnsavedChangesModal {...defaultProps} saveDisabled />)
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled()
+    expect(screen.getByRole("button", { name: "Discard" })).toBeEnabled()
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeEnabled()
+    fireEvent.click(screen.getByRole("button", { name: "Save" }))
+    expect(defaultProps.onSave).not.toHaveBeenCalled()
+  })
+
   it("does not call handlers when buttons are clicked while saving", () => {
     render(<UnsavedChangesModal {...defaultProps} saving={true} />)
     fireEvent.click(screen.getByRole("button", { name: "Discard" }))

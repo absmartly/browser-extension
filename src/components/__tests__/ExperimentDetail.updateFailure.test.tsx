@@ -69,7 +69,6 @@ const saveButton = () => screen.getByRole("button", { name: /Save Changes/ })
 
 describe("ExperimentDetail with the real update handler (FT-2251)", () => {
   beforeEach(() => {
-    window.confirm = jest.fn(() => false)
     ;(global as any).chrome.runtime = {
       onMessage: { addListener: jest.fn(), removeListener: jest.fn() },
       sendMessage: jest.fn((message: any) =>
@@ -129,12 +128,13 @@ describe("ExperimentDetail with the real update handler (FT-2251)", () => {
       "Test-owned update rejected"
     )
     expect(handlerProps.onSuccess).not.toHaveBeenCalled()
-    expect(saveButton()).toHaveTextContent("• Save Changes")
+    expect(saveButton()).toBeEnabled()
 
     fireEvent.click(document.getElementById("header-back-button")!)
-    expect(window.confirm).toHaveBeenCalled()
+    expect(screen.getByRole("dialog", { name: "Save changes?" })).toBeVisible()
     expect(onBack).not.toHaveBeenCalled()
     expect(trafficInput()).toHaveValue(42)
+    fireEvent.click(document.getElementById("unsaved-changes-cancel")!)
 
     await act(async () => {
       fireEvent.click(saveButton())
@@ -143,6 +143,6 @@ describe("ExperimentDetail with the real update handler (FT-2251)", () => {
     expect(updateExperiment.mock.calls[1][1]).toMatchObject({
       percentage_of_traffic: 42
     })
-    expect(saveButton()).toHaveTextContent(/^Save Changes$/)
+    expect(saveButton()).toBeDisabled()
   })
 })

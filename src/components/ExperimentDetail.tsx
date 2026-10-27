@@ -32,6 +32,7 @@ import { ExperimentMetadata } from "./ExperimentMetadata"
 import { Header } from "./Header"
 import { Badge } from "./ui/Badge"
 import { Button } from "./ui/Button"
+import { UnsavedChangesModal } from "./UnsavedChangesModal"
 import { VariantList } from "./VariantList"
 import type { Variant } from "./VariantList"
 
@@ -95,32 +96,31 @@ export function ExperimentDetail({
   )
 
   const [editingName, setEditingName] = useState(false)
+  const [showUnsavedModal, setShowUnsavedModal] = useState(false)
+  const [leaving, setLeaving] = useState(false)
   const [displayName, setDisplayName] = useState(
     experiment.display_name || experiment.name
   )
   const [domFieldName, setDomFieldName] = useState<string>("__dom_changes")
 
-  const {
-    initialVariants,
-    currentVariants,
-    hasUnsavedChanges,
-    setHasUnsavedChanges,
-    handleVariantsChange
-  } = useExperimentVariants({
-    experiment,
-    domFieldName
-  })
+  const { initialVariants, currentVariants, handleVariantsChange } =
+    useExperimentVariants({
+      experiment,
+      domFieldName
+    })
 
+  const [savedDisplayName, setSavedDisplayName] = useState(displayName)
+  const [savedVariants, setSavedVariants] = useState(initialVariants)
   useEffect(() => {
-    if (displayName !== (experiment.display_name || experiment.name)) {
-      setHasUnsavedChanges(true)
-    }
-  }, [
-    displayName,
-    experiment.display_name,
-    experiment.name,
-    setHasUnsavedChanges
-  ])
+    setSavedDisplayName(experiment.display_name || experiment.name)
+  }, [experiment.display_name, experiment.name])
+  useEffect(() => {
+    setSavedVariants((previous) =>
+      JSON.stringify(previous) === JSON.stringify(initialVariants)
+        ? previous
+        : initialVariants
+    )
+  }, [initialVariants])
   const { save, saving } = useExperimentSave({
     experiment,
     domFieldName,
@@ -142,7 +142,10 @@ export function ExperimentDetail({
   const [savedMetadata, setSavedMetadata] = useState(metadata)
   const metadataChanged =
     JSON.stringify(metadata) !== JSON.stringify(savedMetadata)
-  const isDirty = hasUnsavedChanges || metadataChanged
+  const isDirty =
+    metadataChanged ||
+    displayName !== savedDisplayName ||
+    JSON.stringify(currentVariants) !== JSON.stringify(savedVariants)
   const traffic = metadata.percentage_of_traffic
   const trafficError =
     Number.isFinite(traffic) && traffic >= 0 && traffic <= 100
@@ -172,17 +175,31 @@ export function ExperimentDetail({
     loadConfig()
   }, [])
 
-  const handleSaveDisplayName = () => {
-    if (onUpdate && displayName !== experiment.display_name) {
-      onUpdate(experiment.id, { display_name: displayName })
+  const handleSaveDisplayName = async () => {
+    try {
+      if (onUpdate && displayName !== savedDisplayName) {
+        const updated = await onUpdate(experiment.id, {
+          display_name: displayName
+        })
+        if (updated === false) return
+        setSavedDisplayName(displayName)
+      }
+      setEditingName(false)
+    } catch (error) {
+      onError?.(
+        error instanceof Error
+          ? error.message
+          : "Failed to save experiment name"
+      )
     }
-    setEditingName(false)
   }
 
   const handleSaveChanges = async () => {
+    if (saving || leaving || loading || !isDirty || !canAddVariants)
+      return false
     if (trafficError) {
       document.getElementById("traffic-percentage-input")?.focus()
-      return
+      return false
     }
     try {
       const formData = {
@@ -196,7 +213,7 @@ export function ExperimentDetail({
       }
 
       const saved = await save(formData, currentVariants, onUpdate)
-      if (saved === false) return
+      if (saved === false) return false
 
       try {
         await clearAllExperimentStorage(experiment.id)
@@ -208,8 +225,10 @@ export function ExperimentDetail({
         debugError("Failed to clear storage after save:", error)
       }
 
-      setHasUnsavedChanges(false)
+      setSavedDisplayName(displayName)
+      setSavedVariants(currentVariants)
       setSavedMetadata(metadata)
+      return true
     } catch (error) {
       debugError("Failed to save experiment:", error)
       if (onError) {
@@ -217,6 +236,7 @@ export function ExperimentDetail({
           error instanceof Error ? error.message : "Failed to save experiment"
         onError(errorMessage)
       }
+      return false
     }
   }
 
@@ -268,7 +288,7 @@ export function ExperimentDetail({
     experiment.state !== "development" &&
     experiment.status !== "running"
 
-  const handleBack = () => {
+  const leaveDetail = () => {
     const cleanup = async () => {
       try {
         await sendToContent({
@@ -285,33 +305,43 @@ export function ExperimentDetail({
       }
     }
 
+    void cleanup()
+    onBack()
+  }
+
+  const handleBack = () => {
+    if (saving || leaving) return
     if (isDirty) {
-      if (
-        window.confirm("You have unsaved changes. Do you want to discard them?")
-      ) {
-        debugLog(
-          "🧹 User chose to discard changes for experiment",
-          experiment.id
-        )
-        clearAllExperimentStorage(experiment.id)
-          .then(() => {
-            debugLog(
-              "🧹 Cleared all DOM changes storage (session + local) when discarding for experiment",
-              experiment.id
-            )
-            cleanup()
-            onBack()
-          })
-          .catch((error) => {
-            debugError("Failed to clear storage when discarding:", error)
-            cleanup()
-            onBack()
-          })
-      }
-    } else {
-      cleanup()
-      onBack()
+      setShowUnsavedModal(true)
+      return
     }
+    leaveDetail()
+  }
+
+  const handleUnsavedSave = async () => {
+    if (trafficError) {
+      setShowUnsavedModal(false)
+      // Focus the invalid field after the dialog restores its opener's focus.
+      requestAnimationFrame(() => {
+        document.getElementById("traffic-percentage-input")?.focus()
+      })
+      return
+    }
+    if (await handleSaveChanges()) {
+      setShowUnsavedModal(false)
+      leaveDetail()
+    }
+  }
+
+  const handleUnsavedDiscard = async () => {
+    setShowUnsavedModal(false)
+    setLeaving(true)
+    try {
+      await clearAllExperimentStorage(experiment.id)
+    } catch (error) {
+      debugError("Failed to clear storage when discarding:", error)
+    }
+    leaveDetail()
   }
 
   const titleContent = (
@@ -394,6 +424,14 @@ export function ExperimentDetail({
 
   return (
     <div className="p-4">
+      <UnsavedChangesModal
+        isOpen={showUnsavedModal}
+        onSave={handleUnsavedSave}
+        onDiscard={handleUnsavedDiscard}
+        onCancel={() => setShowUnsavedModal(false)}
+        saving={saving}
+        saveDisabled={loading || !canAddVariants}
+      />
       <Header title={titleContent} onBack={handleBack} />
 
       <div className="mb-4 flex items-center justify-between gap-2">
@@ -483,16 +521,26 @@ export function ExperimentDetail({
 
         <div className="pt-4 flex gap-2">
           <Button
+            id="experiment-detail-cancel"
+            onClick={handleBack}
+            variant="secondary"
+            size="sm"
+            disabled={loading || saving || leaving}>
+            Cancel
+          </Button>
+          <Button
+            id="experiment-detail-save"
             onClick={handleSaveChanges}
-            variant="primary"
+            variant={isDirty ? "primary" : "secondary"}
             size="sm"
             disabled={
+              !isDirty ||
               loading ||
               saving ||
+              leaving ||
               experiment.state === "running" ||
               experiment.state === "development"
             }
-            className={isDirty ? "ring-2 ring-yellow-400" : ""}
             title={
               experiment.state === "running" ||
               experiment.state === "development"
@@ -503,7 +551,7 @@ export function ExperimentDetail({
                     ? "Save your changes"
                     : "No changes to save"
             }>
-            {saving ? "Saving..." : isDirty ? "• Save Changes" : "Save Changes"}
+            {saving ? "Saving..." : "Save Changes"}
           </Button>
         </div>
       </div>
