@@ -3,6 +3,7 @@ import React, { useState } from "react"
 
 import "@testing-library/jest-dom"
 
+import { sendToContent } from "~src/lib/messaging"
 import { localAreaStorage } from "~src/utils/storage"
 
 import { ExperimentCodeInjection } from "../ExperimentCodeInjection"
@@ -30,6 +31,7 @@ jest.mock("~src/utils/storage-cleanup", () => ({
 let listeners: Set<any>
 let storageListeners: Set<any>
 let update: jest.Mock
+let currentVariants: any[]
 const el = (id: string) => document.getElementById(id)!
 const variant = (name: string, pattern: string) => ({
   name,
@@ -52,6 +54,7 @@ function Parent({
   withInjection?: boolean
 }) {
   const [variants, setVariants] = useState(initial)
+  currentVariants = variants
   return (
     <>
       <VariantList
@@ -190,6 +193,70 @@ it("preserves an unfinished sibling DOM change through a Control injection updat
     })
   ])
 })
+
+it.each([
+  "VISUAL_EDITOR_CHANGES",
+  "VISUAL_EDITOR_CHANGES_COMPLETE",
+  "storage",
+  "window"
+])(
+  "retains a Control injection edit when an unchanged sibling receives %s",
+  async (type) => {
+    render(<Parent withInjection />)
+    await act(async () => {})
+    fireEvent.click(el("custom-code-injection-button"))
+    fireEvent.click(el("code-injection-url-filter-toggle"))
+    fireEvent.change(el("code-injection-url-filter-mode"), {
+      target: { value: "simple" }
+    })
+    fireEvent.change(
+      document.querySelector('input[placeholder="/products/*"]')!,
+      {
+        target: { value: "/injection/*" }
+      }
+    )
+    await act(async () => {})
+    const controlBefore = structuredClone(currentVariants[0])
+    expect(controlBefore.config.__inject_html.urlFilter.include).toEqual([
+      "/injection/*"
+    ])
+    await act(async () => {
+      fireEvent.click(el("visual-editor-button"))
+    })
+    expect(sendToContent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "START_VISUAL_EDITOR",
+        variantName: "Variant 1"
+      })
+    )
+    const change = { selector: "#heading", type: "text", value: "VE update" }
+    const message = { type, variantName: "Variant 1", changes: [change] }
+    await act(async () => {
+      if (type === "storage") {
+        for (const fn of [...storageListeners]) {
+          fn({ visualEditorChanges: { newValue: message } })
+        }
+      } else if (type === "window") {
+        window.dispatchEvent(
+          new MessageEvent("message", {
+            source: window,
+            origin: window.location.origin,
+            data: {
+              ...message,
+              type: "VISUAL_EDITOR_CHANGES",
+              source: "absmartly-visual-editor"
+            }
+          })
+        )
+      } else {
+        for (const fn of [...listeners]) fn(message, {}, () => {})
+      }
+    })
+    const saved = update.mock.calls.at(-1)[0]
+    expect(saved[1].config.__dom_changes.changes).toEqual([change])
+    expect(saved[0]).toEqual(controlBefore)
+  }
+)
 
 it.each(["VISUAL_EDITOR_CHANGES", "VISUAL_EDITOR_CHANGES_COMPLETE", "storage"])(
   "does not restore a deleted variant when surviving B receives %s",

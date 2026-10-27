@@ -463,6 +463,29 @@ for (const width of [384, 320]) {
 }
 
 for (const width of [384, 320]) {
+  test(`detail preserves Control injection config after a sibling VE return at ${width}px`, async ({ page, sidebar }) => {
+    test.setTimeout(10000)
+    const state = await openNavigationDraft(page, sidebar, width)
+    await sidebar.locator('#custom-code-injection-button').click()
+    await sidebar.locator('#code-injection-url-filter-toggle').click()
+    await sidebar.locator('#code-injection-url-filter-mode').selectOption('simple')
+    await sidebar.getByPlaceholder('/products/*', { exact: true }).fill('/injection/*')
+    await expect(sidebar.locator('#experiment-detail-save')).toBeEnabled()
+    await sidebar.locator('body').evaluate(() => window.postMessage({ source: 'absmartly-visual-editor', type: 'VISUAL_EDITOR_CHANGES', variantName: 'Variant 1', changes: [{ selector: '#main-title', type: 'text', value: 'VE update' }] }, window.location.origin))
+    await expect(sidebar.locator('#dom-change-checkbox-0')).toBeVisible()
+    await sidebar.locator('#experiment-detail-save').click()
+    await expect.poll(() => state.puts.length).toBe(1)
+    expect(JSON.parse(state.puts[0].variants[0].config).__inject_html.urlFilter).toEqual({ include: ['/injection/*'], mode: 'simple', matchType: 'path' })
+    expect(JSON.parse(state.puts[0].variants[1].config).__dom_changes.changes).toEqual([{ selector: '#main-title', type: 'text', value: 'VE update' }])
+    await expect(sidebar.locator('#experiment-detail-save')).toBeDisabled()
+    await sidebar.locator('#header-back-button').press('Enter')
+    await sidebar.locator('[data-experiment-name="ft_2251_navigation"]').click()
+    await sidebar.locator('#custom-code-injection-button').click()
+    await sidebar.locator('#code-injection-url-filter-toggle').click()
+    await expect(sidebar.getByPlaceholder('/products/*', { exact: true })).toHaveValue('/injection/*')
+    await expect(sidebar.locator('#dom-change-checkbox-0')).toBeVisible()
+  })
+
   test(`detail retains an unfinished sibling DOM change after injection update at ${width}px`, async ({ page, sidebar }) => {
     test.setTimeout(10000)
     const state = await openNavigationDraft(page, sidebar, width)
