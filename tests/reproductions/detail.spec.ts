@@ -163,6 +163,53 @@ async function openNavigationDraft(page: Page, sidebar: FrameLocator, width: num
 }
 
 for (const width of [384, 320]) {
+  test(`detail modal stays busy until storage cleanup finishes at ${width}px`, async ({ page, sidebar }) => {
+    test.setTimeout(10000)
+    const state = await openNavigationDraft(page, sidebar, width)
+    const body = sidebar.locator('body')
+    const dialog = sidebar.locator('#unsaved-changes-modal')
+    await body.evaluate(() => {
+      const originalRemove = chrome.storage.local.remove.bind(chrome.storage.local)
+      let release!: () => void
+      const pending = new Promise<void>(resolve => { release = resolve })
+      const gate = { started: false, release: () => { chrome.storage.local.remove = originalRemove; release() } }
+      ;(window as any).__ft2251Cleanup = gate
+      chrome.storage.local.remove = ((keys: string | string[]) => {
+        if ((Array.isArray(keys) ? keys : [keys]).includes('experiment-503-variants')) {
+          gate.started = true
+          return pending.then(() => originalRemove(keys))
+        }
+        return originalRemove(keys)
+      }) as typeof chrome.storage.local.remove
+    })
+    try {
+      await sidebar.locator('#traffic-percentage-input').fill('42')
+      await sidebar.locator('#experiment-detail-cancel').click()
+      await sidebar.locator('#unsaved-changes-save').click()
+      await expect.poll(() => body.evaluate(() => (window as any).__ft2251Cleanup.started)).toBe(true)
+      expect(state.puts).toHaveLength(1)
+      expect(state.puts[0].percentage_of_traffic).toBe(42)
+      await body.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+      await expect(sidebar.locator('#unsaved-changes-cancel')).toBeDisabled()
+      await expect(sidebar.locator('#unsaved-changes-discard')).toBeDisabled()
+      await expect(sidebar.locator('#unsaved-changes-save')).toBeDisabled()
+      await expect(sidebar.locator('#unsaved-changes-save')).toHaveText('Saving...')
+      await page.keyboard.press('Escape')
+      await expect(dialog).toBeVisible()
+      await page.keyboard.press('Tab')
+      expect(await dialog.evaluate(dialog => dialog.contains(document.activeElement))).toBe(true)
+
+      await body.evaluate(() => (window as any).__ft2251Cleanup.release())
+      await expect(sidebar.locator('[data-experiment-name="ft_2251_navigation"]')).toBeVisible()
+      expect(state.puts).toHaveLength(1)
+      await sidebar.locator('[data-experiment-name="ft_2251_navigation"]').click()
+      await expect(sidebar.locator('#traffic-percentage-input')).toHaveValue('42')
+      await expect(sidebar.locator('#experiment-detail-save')).toBeDisabled()
+    } finally {
+      await body.evaluate(() => (window as any).__ft2251Cleanup?.release()).catch(() => {})
+    }
+  })
+
   test(`detail Save, Cancel, visible modal and keyboard navigation at ${width}px`, async ({ page, sidebar }) => {
     const state = await openNavigationDraft(page, sidebar, width)
     const traffic = sidebar.locator('#traffic-percentage-input')

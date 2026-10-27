@@ -3,7 +3,7 @@ import {
   ExclamationTriangleIcon,
   XMarkIcon
 } from "@heroicons/react/24/outline"
-import React, { useEffect, useState } from "react"
+import React, { useEffect, useRef, useState } from "react"
 
 import {
   useExperimentSave,
@@ -98,6 +98,9 @@ export function ExperimentDetail({
   const [editingName, setEditingName] = useState(false)
   const [showUnsavedModal, setShowUnsavedModal] = useState(false)
   const [leaving, setLeaving] = useState(false)
+  // The save hook finishes before draft cleanup; lock navigation through both.
+  const [saving, setSaving] = useState(false)
+  const savingRef = useRef(false)
   const [displayName, setDisplayName] = useState(
     experiment.display_name || experiment.name
   )
@@ -121,7 +124,7 @@ export function ExperimentDetail({
         : initialVariants
     )
   }, [initialVariants])
-  const { save, saving } = useExperimentSave({
+  const { save } = useExperimentSave({
     experiment,
     domFieldName,
     onError
@@ -195,12 +198,14 @@ export function ExperimentDetail({
   }
 
   const handleSaveChanges = async () => {
-    if (saving || leaving || loading || !isDirty || !canAddVariants)
+    if (savingRef.current || leaving || loading || !isDirty || !canAddVariants)
       return false
     if (trafficError) {
       document.getElementById("traffic-percentage-input")?.focus()
       return false
     }
+    savingRef.current = true
+    setSaving(true)
     try {
       const formData = {
         display_name: displayName,
@@ -237,6 +242,9 @@ export function ExperimentDetail({
         onError(errorMessage)
       }
       return false
+    } finally {
+      savingRef.current = false
+      setSaving(false)
     }
   }
 

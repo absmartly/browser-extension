@@ -12,6 +12,7 @@ import "@testing-library/jest-dom"
 import { useExperimentHandlers } from "~src/hooks/useExperimentHandlers"
 import type { Experiment } from "~src/types/absmartly"
 import { unsafeExperimentId, unsafeVariantName } from "~src/types/branded"
+import { clearAllExperimentStorage } from "~src/utils/storage-cleanup"
 
 import { ExperimentDetail } from "../ExperimentDetail"
 
@@ -65,10 +66,25 @@ const experiment: Experiment = {
 
 const trafficInput = () =>
   document.getElementById("traffic-percentage-input") as HTMLInputElement
-const saveButton = () => screen.getByRole("button", { name: /Save Changes/ })
+const saveButton = () => document.getElementById("experiment-detail-save")!
+
+const deferred = () => {
+  let resolve!: () => void
+  let reject!: (error: Error) => void
+  const promise = new Promise<void>((yes, no) => {
+    resolve = yes
+    reject = no
+  })
+  return { promise, resolve, reject }
+}
 
 describe("ExperimentDetail with the real update handler (FT-2251)", () => {
   beforeEach(() => {
+    jest.clearAllMocks()
+    jest
+      .mocked(clearAllExperimentStorage)
+      .mockReset()
+      .mockResolvedValue(undefined)
     ;(global as any).chrome.runtime = {
       onMessage: { addListener: jest.fn(), removeListener: jest.fn() },
       sendMessage: jest.fn((message: any) =>
@@ -142,6 +158,100 @@ describe("ExperimentDetail with the real update handler (FT-2251)", () => {
     expect(updateExperiment).toHaveBeenCalledTimes(2)
     expect(updateExperiment.mock.calls[1][1]).toMatchObject({
       percentage_of_traffic: 42
+    })
+    expect(saveButton()).toBeDisabled()
+  })
+
+  it.each(["resolve", "reject"] as const)(
+    "keeps modal navigation busy through delayed persistence and cleanup (%s)",
+    async (cleanupResult) => {
+      const persistence = deferred()
+      const cleanup = deferred()
+      const updateExperiment = jest.fn().mockReturnValue(persistence.promise)
+      jest
+        .mocked(clearAllExperimentStorage)
+        .mockReturnValueOnce(cleanup.promise)
+      const { onBack } = renderWithHandlers(updateExperiment)
+      const modal = () => document.getElementById("unsaved-changes-modal")!
+      const cancel = () => document.getElementById("unsaved-changes-cancel")!
+      const discard = () => document.getElementById("unsaved-changes-discard")!
+      const modalSave = () => document.getElementById("unsaved-changes-save")!
+      const expectBusy = () => {
+        expect(modal()).toBeVisible()
+        expect(cancel()).toBeDisabled()
+        expect(discard()).toBeDisabled()
+        expect(modalSave()).toBeDisabled()
+        expect(modalSave()).toHaveTextContent("Saving...")
+        expect(
+          document.getElementById("experiment-detail-cancel")
+        ).toBeDisabled()
+        expect(saveButton()).toBeDisabled()
+        fireEvent.click(cancel())
+        fireEvent.click(discard())
+        fireEvent.keyDown(modal(), { key: "Escape" })
+        expect(modal()).toBeVisible()
+        expect(onBack).not.toHaveBeenCalled()
+      }
+
+      fireEvent.change(trafficInput(), { target: { value: "42" } })
+      fireEvent.click(document.getElementById("header-back-button")!)
+      await act(async () => {
+        fireEvent.click(modalSave())
+      })
+      expect(updateExperiment).toHaveBeenCalledTimes(1)
+      expect(clearAllExperimentStorage).not.toHaveBeenCalled()
+      expectBusy()
+
+      await act(async () => {
+        persistence.resolve()
+      })
+      expect(clearAllExperimentStorage).toHaveBeenCalledWith(experiment.id)
+      expectBusy()
+
+      await act(async () => {
+        if (cleanupResult === "resolve") cleanup.resolve()
+        else cleanup.reject(new Error("Test-owned cleanup failure"))
+      })
+      expect(onBack).toHaveBeenCalledTimes(1)
+      expect(document.getElementById("unsaved-changes-modal")).toBeNull()
+      expect(updateExperiment.mock.calls[0][1]).toMatchObject({
+        percentage_of_traffic: 42
+      })
+      expect(updateExperiment).toHaveBeenCalledTimes(1)
+    }
+  )
+
+  it("keeps regular Save busy through cleanup and preserves a newer edit", async () => {
+    const cleanup = deferred()
+    jest.mocked(clearAllExperimentStorage).mockReturnValueOnce(cleanup.promise)
+    const updateExperiment = jest.fn().mockResolvedValue({})
+    const { onBack } = renderWithHandlers(updateExperiment)
+    fireEvent.change(trafficInput(), { target: { value: "42" } })
+    await act(async () => {
+      fireEvent.click(saveButton())
+    })
+    expect(clearAllExperimentStorage).toHaveBeenCalledWith(experiment.id)
+    expect(document.getElementById("experiment-detail-cancel")).toBeDisabled()
+    expect(saveButton()).toBeDisabled()
+    expect(saveButton()).toHaveTextContent("Saving...")
+    fireEvent.change(trafficInput(), { target: { value: "55" } })
+
+    await act(async () => {
+      cleanup.resolve()
+    })
+    expect(onBack).not.toHaveBeenCalled()
+    expect(trafficInput()).toHaveValue(55)
+    expect(saveButton()).toBeEnabled()
+    expect(updateExperiment.mock.calls[0][1]).toMatchObject({
+      percentage_of_traffic: 42
+    })
+
+    await act(async () => {
+      fireEvent.click(saveButton())
+    })
+    expect(updateExperiment).toHaveBeenCalledTimes(2)
+    expect(updateExperiment.mock.calls[1][1]).toMatchObject({
+      percentage_of_traffic: 55
     })
     expect(saveButton()).toBeDisabled()
   })
