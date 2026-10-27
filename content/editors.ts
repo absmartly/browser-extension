@@ -2,10 +2,11 @@ import { html } from "@codemirror/lang-html"
 import { EditorState } from "@codemirror/state"
 import { oneDark } from "@codemirror/theme-one-dark"
 import { basicSetup, EditorView } from "codemirror"
+
+import { debugLog } from "~src/utils/debug"
 import { JavaScriptEditor, JSONEditor } from "~src/visual-editor"
 import { EventViewer } from "~src/visual-editor/ui/event-viewer"
 import { MarkdownEditor } from "~src/visual-editor/ui/markdown-editor"
-import { debugLog } from "~src/utils/debug"
 
 let codeEditorContainer: HTMLDivElement | null = null
 let codeEditorView: EditorView | null = null
@@ -249,7 +250,7 @@ export async function openJSONEditor(
 
   jsonEditorInstance = new JSONEditor()
 
-  const title = `Edit DOM Changes - ${data.variantName}`
+  const title = `Edit Variant Config - ${data.variantName}`
   const result = await jsonEditorInstance.show(title, data.value)
 
   if (wasVEActive && currentEditor) {

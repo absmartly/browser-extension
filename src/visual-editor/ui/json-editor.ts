@@ -51,6 +51,7 @@ export class JSONEditor {
 
       const titleEl = document.createElement("h3")
       titleEl.className = "json-editor-title"
+      titleEl.id = "json-editor-title"
       titleEl.textContent = title
 
       const statusEl = document.createElement("span")
@@ -72,20 +73,15 @@ export class JSONEditor {
 
       const formatBtn = document.createElement("button")
       formatBtn.className = "json-toolbar-button"
-      formatBtn.innerHTML = "⚡ Format"
+      formatBtn.textContent = "Format"
       formatBtn.id = "json-editor-format-button"
       formatBtn.title = "Format JSON"
 
       const tipsEl = document.createElement("div")
       tipsEl.className = "json-editor-tips"
-      tipsEl.innerHTML = `
-        <div style="font-size: 11px; color: #858585;">
-          <strong>Tips:</strong> 
-          Each change must have 'selector' and 'type' fields • 
-          Use Ctrl/Cmd+F to search • 
-          Code folding available in gutter
-        </div>
-      `
+      tipsEl.id = "json-editor-guidance"
+      tipsEl.textContent =
+        "Edit the full variant configuration as a JSON object."
 
       toolbar.appendChild(formatBtn)
       toolbar.appendChild(tipsEl)
@@ -97,11 +93,12 @@ export class JSONEditor {
       const cancelBtn = document.createElement("button")
       cancelBtn.className = "json-editor-button json-editor-button-cancel"
       cancelBtn.id = "json-editor-close-button"
-      cancelBtn.innerHTML = "<span>✕</span> Cancel"
+      cancelBtn.textContent = "Cancel"
 
       const saveBtn = document.createElement("button")
       saveBtn.className = "json-editor-button json-editor-button-save"
-      saveBtn.innerHTML = "<span>✓</span> Save Changes"
+      saveBtn.id = "json-editor-save-button"
+      saveBtn.textContent = "Save Changes"
 
       buttons.appendChild(cancelBtn)
       buttons.appendChild(saveBtn)
@@ -410,6 +407,8 @@ export class JSONEditor {
       .json-editor-tips {
         flex: 1;
         text-align: right;
+        font-size: 11px;
+        color: #858585;
       }
 
       .json-editor-codemirror-container {
