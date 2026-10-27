@@ -129,7 +129,7 @@ const URLFilterSection = React.memo(function URLFilterSection({
     }
   }
 
-  // Auto-save URL filter changes with debouncing (skip on first render)
+  // Keep parent dirty/save state current before the next user action.
   useEffect(() => {
     // Skip the autosave on first render to avoid false "unsaved changes"
     if (isFirstRenderRef.current) {
@@ -137,11 +137,7 @@ const URLFilterSection = React.memo(function URLFilterSection({
       return
     }
 
-    const timer = setTimeout(() => {
-      updateURLFilter()
-    }, 500)
-
-    return () => clearTimeout(timer)
+    updateURLFilter()
   }, [simplePatterns, excludePatterns, regexMode, matchType, mode])
 
   return (
@@ -196,6 +192,7 @@ const URLFilterSection = React.memo(function URLFilterSection({
                 Match against:
               </label>
               <select
+                id={`url-filter-match-type-variant-${variantIndex}`}
                 value={matchType}
                 onChange={(e) => {
                   setMatchType(
@@ -206,7 +203,6 @@ const URLFilterSection = React.memo(function URLFilterSection({
                       | "query"
                       | "hash"
                   )
-                  setTimeout(updateURLFilter, 0)
                 }}
                 disabled={!canEdit}
                 className="w-full pl-2 pr-10 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-xs bg-white"
@@ -244,7 +240,6 @@ const URLFilterSection = React.memo(function URLFilterSection({
                           newPatterns[i] = e.target.value
                           setSimplePatterns(newPatterns)
                         }}
-                        onBlur={updateURLFilter}
                         placeholder={
                           matchType === "path"
                             ? "/products/*"
@@ -269,7 +264,6 @@ const URLFilterSection = React.memo(function URLFilterSection({
                         setSimplePatterns(
                           newPatterns.length > 0 ? newPatterns : [""]
                         )
-                        setTimeout(updateURLFilter, 0)
                       }}
                       disabled={!canEdit}
                       className="p-1 text-red-600 hover:text-red-800">
@@ -299,7 +293,6 @@ const URLFilterSection = React.memo(function URLFilterSection({
                   checked={regexMode}
                   onChange={(e) => {
                     setRegexMode(e.target.checked)
-                    setTimeout(updateURLFilter, 0)
                   }}
                   disabled={!canEdit}
                   className="text-blue-600"
@@ -323,7 +316,6 @@ const URLFilterSection = React.memo(function URLFilterSection({
                             newPatterns[i] = e.target.value
                             setSimplePatterns(newPatterns)
                           }}
-                          onBlur={updateURLFilter}
                           placeholder={
                             regexMode
                               ? matchType === "path"
@@ -354,7 +346,6 @@ const URLFilterSection = React.memo(function URLFilterSection({
                           setSimplePatterns(
                             newPatterns.length > 0 ? newPatterns : [""]
                           )
-                          setTimeout(updateURLFilter, 0)
                         }}
                         disabled={!canEdit}
                         className="p-1 text-red-600 hover:text-red-800">
@@ -401,7 +392,6 @@ const URLFilterSection = React.memo(function URLFilterSection({
                           newPatterns[i] = e.target.value
                           setExcludePatterns(newPatterns)
                         }}
-                        onBlur={updateURLFilter}
                         placeholder={
                           regexMode
                             ? matchType === "path"
@@ -430,7 +420,6 @@ const URLFilterSection = React.memo(function URLFilterSection({
                           (_, idx) => idx !== i
                         )
                         setExcludePatterns(newPatterns)
-                        setTimeout(updateURLFilter, 0)
                       }}
                       disabled={!canEdit}
                       className="p-1 text-red-600 hover:text-red-800">

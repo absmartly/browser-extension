@@ -58,4 +58,30 @@ describe("VariantConfigJSONEditor (FT-2251)", () => {
     })
     expect(onClose).toHaveBeenCalled()
   })
+
+  it.each([
+    null,
+    "invalid",
+    { urlFilter: "/products/*" },
+    { changes: "invalid" }
+  ])("rejects invalid nested DOM changes: %p", (value) => {
+    const { onSave, onClose } = renderEditor()
+    listener({
+      type: "JSON_EDITOR_SAVE",
+      value: JSON.stringify({ color: "green", __dom_changes: value })
+    })
+    expect(onSave).not.toHaveBeenCalled()
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it.each([[], { changes: [], urlFilter: "/products/*" }])(
+    "preserves valid DOM changes and custom values: %p",
+    (value) => {
+      const { onSave, onClose } = renderEditor()
+      const config = { color: "green", __dom_changes: value }
+      listener({ type: "JSON_EDITOR_SAVE", value: JSON.stringify(config) })
+      expect(onSave).toHaveBeenCalledWith({ name: "Variant 1", config })
+      expect(onClose).toHaveBeenCalled()
+    }
+  )
 })

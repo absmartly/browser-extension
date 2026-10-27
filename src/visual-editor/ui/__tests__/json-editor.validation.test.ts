@@ -99,6 +99,43 @@ describe("JSONEditor save validation (FT-2251)", () => {
     expect(document.getElementById("absmartly-json-editor-host")).toBeNull()
   })
 
+  it.each([
+    { urlFilter: "/products/*" },
+    { changes: "invalid" },
+    "invalid",
+    null
+  ])(
+    "keeps invalid nested DOM changes open until corrected: %p",
+    async (value) => {
+      const result = editor.show(
+        "Edit Variant Config - Variant 1",
+        JSON.stringify({ color: "blue", __dom_changes: value })
+      )
+      await waitFor(() => expect((editor as any).editorView).toBeTruthy())
+      expect(status().textContent).toBe(
+        "✕ Variant DOM changes must be an array or an object with a changes array"
+      )
+      format()
+      expect(status().textContent).toBe(
+        "✕ Variant DOM changes must be an array or an object with a changes array"
+      )
+      document.getElementById("json-editor-save-button")!.click()
+      expect(
+        document.getElementById("absmartly-json-editor-host")
+      ).not.toBeNull()
+      expect(status().textContent).toBe(
+        "✕ Cannot save: variant DOM changes must be an array or an object with a changes array"
+      )
+
+      const corrected = JSON.stringify({
+        color: "green",
+        __dom_changes: { changes: [], urlFilter: "/products/*" }
+      })
+      await saveWith(corrected)
+      await expect(result).resolves.toBe(corrected)
+    }
+  )
+
   describe("status before save", () => {
     it.each(nonObjects)(
       "flags %s as not a variant config on open",

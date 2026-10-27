@@ -234,12 +234,16 @@ describe("ExperimentDetail with the real update handler (FT-2251)", () => {
     expect(document.getElementById("experiment-detail-cancel")).toBeDisabled()
     expect(saveButton()).toBeDisabled()
     expect(saveButton()).toHaveTextContent("Saving...")
+    expect(document.getElementById("experiment-variant-fields")).toBeDisabled()
     fireEvent.change(trafficInput(), { target: { value: "55" } })
 
     await act(async () => {
       cleanup.resolve()
     })
     expect(onBack).not.toHaveBeenCalled()
+    expect(
+      document.getElementById("experiment-variant-fields")
+    ).not.toBeDisabled()
     expect(trafficInput()).toHaveValue(55)
     expect(saveButton()).toBeEnabled()
     expect(updateExperiment.mock.calls[0][1]).toMatchObject({

@@ -5,7 +5,7 @@ import {
   PlusIcon,
   XMarkIcon
 } from "@heroicons/react/24/outline"
-import React, { useState } from "react"
+import React, { useEffect, useRef, useState } from "react"
 
 import type { ExperimentInjectionCode } from "~src/types/absmartly"
 import type { URLFilter } from "~src/types/dom-changes"
@@ -42,9 +42,12 @@ export function ExperimentCodeInjection({
   const [tempValue, setTempValue] = useState("")
 
   const [isUrlFilterExpanded, setIsUrlFilterExpanded] = useState(false)
+  const isFirstFilterRender = useRef(true)
   const [mode, setMode] = useState<"all" | "simple" | "advanced">(() => {
     if (!code.urlFilter) return "all"
     if (typeof code.urlFilter === "string" || Array.isArray(code.urlFilter))
+      return "simple"
+    if (!code.urlFilter.exclude?.length && code.urlFilter.mode !== "regex")
       return "simple"
     return "advanced"
   })
@@ -189,6 +192,14 @@ export function ExperimentCodeInjection({
     onChange(updatedCode)
   }
 
+  useEffect(() => {
+    if (isFirstFilterRender.current) {
+      isFirstFilterRender.current = false
+      return
+    }
+    updateURLFilter()
+  }, [simplePatterns, excludePatterns, regexMode, matchType, mode])
+
   const copyUrlFilterFromDomChanges = () => {
     if (!domChangesUrlFilter) return
 
@@ -202,16 +213,19 @@ export function ExperimentCodeInjection({
           ? [domChangesUrlFilter]
           : domChangesUrlFilter
       setSimplePatterns(patterns)
+      setExcludePatterns([])
+      setRegexMode(false)
+      setMatchType("path")
     } else {
       if (
-        domChangesUrlFilter.exclude &&
-        domChangesUrlFilter.exclude.length > 0
+        domChangesUrlFilter.exclude?.length ||
+        domChangesUrlFilter.mode === "regex"
       ) {
         setMode("advanced")
-        setExcludePatterns(domChangesUrlFilter.exclude)
       } else {
         setMode("simple")
       }
+      setExcludePatterns(domChangesUrlFilter.exclude || [])
       setSimplePatterns(domChangesUrlFilter.include || [])
       setRegexMode(domChangesUrlFilter.mode === "regex")
       setMatchType(domChangesUrlFilter.matchType || "path")
@@ -259,6 +273,7 @@ export function ExperimentCodeInjection({
 
           {domChangesUrlFilter && (
             <Button
+              id="code-injection-copy-url-filter"
               type="button"
               onClick={copyUrlFilterFromDomChanges}
               size="sm"
@@ -270,6 +285,7 @@ export function ExperimentCodeInjection({
 
           <div className="bg-blue-50 rounded-lg border border-blue-200">
             <button
+              id="code-injection-url-filter-toggle"
               type="button"
               onClick={() => setIsUrlFilterExpanded(!isUrlFilterExpanded)}
               className="w-full flex items-center justify-between px-3 py-2 hover:bg-blue-100 transition-colors rounded-lg">
@@ -284,6 +300,7 @@ export function ExperimentCodeInjection({
             {isUrlFilterExpanded && (
               <div className="px-4 pb-4 space-y-3 border-t border-blue-200 pt-3">
                 <select
+                  id="code-injection-url-filter-mode"
                   value={mode}
                   onChange={(e) => {
                     const newMode = e.target.value as
@@ -319,6 +336,7 @@ export function ExperimentCodeInjection({
                       Match against:
                     </label>
                     <select
+                      id="code-injection-url-match-type"
                       value={matchType}
                       onChange={(e) => {
                         setMatchType(
@@ -329,7 +347,6 @@ export function ExperimentCodeInjection({
                             | "query"
                             | "hash"
                         )
-                        setTimeout(updateURLFilter, 0)
                       }}
                       disabled={!canEdit}
                       className="w-full pl-2 pr-10 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-xs bg-white"
@@ -369,7 +386,6 @@ export function ExperimentCodeInjection({
                               newPatterns[i] = e.target.value
                               setSimplePatterns(newPatterns)
                             }}
-                            onBlur={updateURLFilter}
                             placeholder={
                               matchType === "path"
                                 ? "/products/*"
@@ -393,7 +409,6 @@ export function ExperimentCodeInjection({
                               setSimplePatterns(
                                 newPatterns.length > 0 ? newPatterns : [""]
                               )
-                              setTimeout(updateURLFilter, 0)
                             }}
                             disabled={!canEdit}
                             className="p-1 text-red-600 hover:text-red-800">
@@ -422,7 +437,6 @@ export function ExperimentCodeInjection({
                         checked={regexMode}
                         onChange={(e) => {
                           setRegexMode(e.target.checked)
-                          setTimeout(updateURLFilter, 0)
                         }}
                         disabled={!canEdit}
                         className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
@@ -449,7 +463,6 @@ export function ExperimentCodeInjection({
                                 newPatterns[i] = e.target.value
                                 setSimplePatterns(newPatterns)
                               }}
-                              onBlur={updateURLFilter}
                               placeholder={
                                 regexMode ? "^/products/\\d+$" : "/products/*"
                               }
@@ -465,7 +478,6 @@ export function ExperimentCodeInjection({
                                 setSimplePatterns(
                                   newPatterns.length > 0 ? newPatterns : [""]
                                 )
-                                setTimeout(updateURLFilter, 0)
                               }}
                               disabled={!canEdit}
                               className="p-1 text-red-600 hover:text-red-800">
@@ -504,7 +516,6 @@ export function ExperimentCodeInjection({
                                 newPatterns[i] = e.target.value
                                 setExcludePatterns(newPatterns)
                               }}
-                              onBlur={updateURLFilter}
                               placeholder={
                                 regexMode ? "^/admin/.*" : "/admin/*"
                               }
@@ -520,7 +531,6 @@ export function ExperimentCodeInjection({
                                 setExcludePatterns(
                                   newPatterns.length > 0 ? newPatterns : [""]
                                 )
-                                setTimeout(updateURLFilter, 0)
                               }}
                               disabled={!canEdit}
                               className="p-1 text-red-600 hover:text-red-800">

@@ -57,7 +57,15 @@ export function VariantList({
   onNavigateToAI,
   autoNavigateToAI
 }: VariantListProps) {
-  const [variants, setVariants] = useState<Variant[]>(initialVariants)
+  const [variants, setVariantsState] = useState<Variant[]>(initialVariants)
+  const variantKeys = useRef(initialVariants.map((_, index) => index))
+  const nextVariantKey = useRef(initialVariants.length)
+  const setVariants = useCallback((nextVariants: Variant[]) => {
+    variantKeys.current = nextVariants.map(
+      (_, index) => variantKeys.current[index] ?? nextVariantKey.current++
+    )
+    setVariantsState(nextVariants)
+  }, [])
   const [activeVEVariant, setActiveVEVariant] = useState<string | null>(null)
   const [jsonEditorOpen, setJsonEditorOpen] = useState(false)
   const [jsonEditorVariant, setJsonEditorVariant] = useState<number | null>(
@@ -179,6 +187,7 @@ export function VariantList({
 
   const removeVariant = (index: number) => {
     const newVariants = variants.filter((_, i) => i !== index)
+    variantKeys.current.splice(index, 1)
     updateVariants(newVariants)
   }
 
@@ -524,7 +533,7 @@ export function VariantList({
 
           return (
             <VariantCard
-              key={`${variant.name}-${index}`}
+              key={`${experimentId}-${variantKeys.current[index]}`}
               variant={variant}
               index={index}
               isExpanded={isExpanded}

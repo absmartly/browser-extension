@@ -10,10 +10,7 @@ import { oneDark } from "@codemirror/theme-one-dark"
 import { EditorView } from "@codemirror/view"
 import { basicSetup } from "codemirror"
 
-const NOT_AN_OBJECT_MESSAGE = "Variant config must be a JSON object"
-
-const isVariantConfigObject = (value: unknown): boolean =>
-  value !== null && typeof value === "object" && !Array.isArray(value)
+import { getVariantConfigError } from "~src/lib/variant-config-validation"
 
 export class JSONEditor {
   private editorHost: HTMLElement | null = null
@@ -119,17 +116,18 @@ export class JSONEditor {
         const content = view.state.doc.toString()
 
         try {
-          if (isVariantConfigObject(JSON.parse(content))) {
+          const configError = getVariantConfigError(JSON.parse(content))
+          if (!configError) {
             statusEl.textContent = "✓ Valid JSON"
             statusEl.style.color = "#4ade80"
           } else {
-            statusEl.textContent = `✕ ${NOT_AN_OBJECT_MESSAGE}`
+            statusEl.textContent = `✕ ${configError}`
             statusEl.style.color = "#f87171"
             diagnostics.push({
               from: 0,
               to: content.length,
               severity: "error",
-              message: NOT_AN_OBJECT_MESSAGE
+              message: configError
             })
           }
         } catch (e) {
@@ -176,11 +174,12 @@ export class JSONEditor {
 
         // Initial validation
         try {
-          if (isVariantConfigObject(JSON.parse(currentJSON))) {
+          const configError = getVariantConfigError(JSON.parse(currentJSON))
+          if (!configError) {
             statusEl.textContent = "✓ Valid JSON"
             statusEl.style.color = "#4ade80"
           } else {
-            statusEl.textContent = `✕ ${NOT_AN_OBJECT_MESSAGE}`
+            statusEl.textContent = `✕ ${configError}`
             statusEl.style.color = "#f87171"
           }
         } catch (e) {
@@ -204,11 +203,12 @@ export class JSONEditor {
                 insert: formatted
               }
             })
-            if (isVariantConfigObject(parsed)) {
+            const configError = getVariantConfigError(parsed)
+            if (!configError) {
               statusEl.textContent = "✓ Valid JSON"
               statusEl.style.color = "#4ade80"
             } else {
-              statusEl.textContent = `✕ ${NOT_AN_OBJECT_MESSAGE}`
+              statusEl.textContent = `✕ ${configError}`
               statusEl.style.color = "#f87171"
             }
           } catch (e) {
@@ -234,9 +234,9 @@ export class JSONEditor {
         // Validate before saving
         try {
           const parsed = JSON.parse(newJSON)
-          if (!isVariantConfigObject(parsed)) {
-            statusEl.textContent =
-              "✕ Cannot save: variant config must be a JSON object"
+          const configError = getVariantConfigError(parsed)
+          if (configError) {
+            statusEl.textContent = `✕ Cannot save: ${configError[0].toLowerCase()}${configError.slice(1)}`
             statusEl.style.color = "#f87171"
             return
           }

@@ -232,6 +232,40 @@ describe("VariantList", () => {
   })
 
   describe("Basic Rendering", () => {
+    it("keeps the focused variant input mounted while its name changes", () => {
+      render(<VariantList {...defaultProps} />)
+      const input = document.getElementById(
+        "variant-name-input-1"
+      ) as HTMLInputElement
+      input.focus()
+
+      for (const value of ["V", "Va", "Variant B"]) {
+        fireEvent.change(input, { target: { value } })
+        expect(document.getElementById("variant-name-input-1")).toBe(input)
+        expect(input).toHaveFocus()
+        expect(input).toHaveValue(value)
+      }
+    })
+
+    it("keeps the surviving card mounted when a preceding variant is removed", () => {
+      render(
+        <VariantList
+          {...defaultProps}
+          initialVariants={[
+            ...mockVariants,
+            { name: "Variant B", config: { cta_color: "green" } }
+          ]}
+        />
+      )
+      const input = document.getElementById("variant-name-input-2")!
+      fireEvent.click(document.getElementById("variant-delete-1")!)
+      expect(document.getElementById("variant-name-input-1")).toBe(input)
+      expect(input).toHaveValue("Variant B")
+      fireEvent.click(document.getElementById("add-variant-button")!)
+      expect(document.getElementById("variant-name-input-1")).toBe(input)
+      expect(document.getElementById("variant-name-input-2")).not.toBe(input)
+    })
+
     it("should render variant cards", () => {
       render(<VariantList {...defaultProps} />)
 

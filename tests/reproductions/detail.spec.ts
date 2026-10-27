@@ -56,19 +56,10 @@ test('packaged experiment detail tracks and validates traffic and keeps a Simple
   await sidebar.locator('#url-filtering-toggle-variant-1').click()
   await sidebar.locator('#url-filter-mode-variant-1').selectOption('simple')
   await sidebar.locator('#url-filter-pattern-variant-1-0').fill('/products/*')
-  // URL filter edits are debounced (500 ms) and can land after an early Save, so save again
-  // until the page stays clean across consecutive checks and the last request carries the filter.
-  const savedConfig = () => puts.length ? JSON.parse(puts.at(-1).variants[1].config) : null
-  let cleanChecks = 0
-  await expect.poll(async () => {
-    if (await save.isEnabled()) {
-      cleanChecks = 0
-      const before = puts.length
-      await save.click()
-      await expect.poll(() => puts.length).toBeGreaterThan(before)
-    } else if ((await save.innerText()) === 'Save Changes') cleanChecks++
-    return { stable: cleanChecks >= 2, config: savedConfig() }
-  }, { intervals: [700], timeout: 10000 }).toEqual({ stable: true, config: { __dom_changes: { changes: [], urlFilter: { include: ['/products/*'], mode: 'simple', matchType: 'path' } } } })
+  await save.click()
+  await expect.poll(() => puts.length).toBe(1)
+  await expect(save).toBeDisabled()
+  expect(JSON.parse(puts[0].variants[1].config)).toEqual({ __dom_changes: { changes: [], urlFilter: { include: ['/products/*'], mode: 'simple', matchType: 'path' } } })
   expect(puts.at(-1).percentage_of_traffic).toBe(55)
 
   await sidebar.locator('#header-back-button').click()
@@ -131,18 +122,22 @@ test('packaged experiment detail keeps a traffic edit unsaved when the update re
   await expect(save).toBeDisabled()
 })
 
-async function openNavigationDraft(page: Page, sidebar: FrameLocator, width: number) {
-  const draft = { ...experiment, id: 503, name: 'ft_2251_navigation', display_name: 'FT-2251 navigation', percentage_of_traffic: 100 }
-  const state = { fail: '' as '' | 'GET' | 'PUT', puts: [] as any[] }
+async function openNavigationDraft(page: Page, sidebar: FrameLocator, width: number, overrides: Partial<typeof experiment> = {}) {
+  const draft = { ...experiment, ...overrides, id: 503, name: 'ft_2251_navigation', display_name: 'FT-2251 navigation', percentage_of_traffic: 100 }
+  const state = { fail: '' as '' | 'GET' | 'PUT', puts: [] as any[], holdRefresh: false, refreshStarted: false, releaseRefresh: undefined as undefined | (() => void) }
   await page.locator('#absmartly-sidebar-iframe').evaluate((iframe, width) => {
     iframe.style.width = `${width}px`
   }, width)
-  await page.context().route(`${endpoint}/**`, route => {
+  await page.context().route(`${endpoint}/**`, async route => {
     const url = new URL(route.request().url())
     const method = route.request().method()
     const json = (body: unknown, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) })
     if (url.pathname === '/v1/experiments/503') {
       if (state.fail === method) return json({ errors: ['synthetic navigation save failure'] }, 400)
+      if (method === 'GET' && state.holdRefresh && state.puts.length > 0) {
+        state.refreshStarted = true
+        await new Promise<void>(resolve => { state.releaseRefresh = resolve })
+      }
       if (method === 'PUT') {
         const body = route.request().postDataJSON()
         const data = body.data || body
@@ -163,6 +158,111 @@ async function openNavigationDraft(page: Page, sidebar: FrameLocator, width: num
 }
 
 for (const width of [384, 320]) {
+  test(`detail keeps variant-name focus and persists character typing at ${width}px`, async ({ page, sidebar }) => {
+    test.setTimeout(10000)
+    const state = await openNavigationDraft(page, sidebar, width)
+    const input = sidebar.locator('#variant-name-input-1')
+    await input.click()
+    await input.press('ControlOrMeta+A')
+    await input.pressSequentially('Variant B', { delay: 40 })
+    await expect(input).toHaveValue('Variant B')
+    await expect(input).toBeFocused()
+    await sidebar.locator('#experiment-detail-save').click()
+    await expect.poll(() => state.puts.length).toBe(1)
+    expect(state.puts[0].variants[1].name).toBe('Variant B')
+    await expect(sidebar.locator('#experiment-detail-save')).toBeDisabled()
+    await sidebar.locator('[id^="toast-close-"]').first().click()
+    await sidebar.locator('#header-back-button').click()
+    await sidebar.locator('[data-experiment-name="ft_2251_navigation"]').click()
+    await expect(input).toHaveValue('Variant B')
+  })
+
+  test(`detail locks variant editing through the response refresh at ${width}px`, async ({ page, sidebar }) => {
+    test.setTimeout(10000)
+    const state = await openNavigationDraft(page, sidebar, width)
+    state.holdRefresh = true
+    try {
+      await sidebar.locator('#traffic-percentage-input').fill('42')
+      await sidebar.locator('#experiment-detail-save').click()
+      await expect.poll(() => state.refreshStarted).toBe(true)
+      await expect(sidebar.locator('#variant-name-input-1')).toBeDisabled()
+      await expect(sidebar.locator('#json-editor-button-variant-1')).toBeDisabled()
+      await expect(sidebar.locator('#add-variant-button')).toBeDisabled()
+      await expect(sidebar.locator('#experiment-variant-fields')).toHaveAttribute('inert', '')
+      await sidebar.locator('#traffic-percentage-input').fill('55')
+      state.holdRefresh = false
+      state.releaseRefresh?.()
+      await expect(sidebar.locator('#variant-name-input-1')).toBeEnabled()
+      await expect(sidebar.locator('#traffic-percentage-input')).toHaveValue('55')
+      await sidebar.locator('#variant-name-input-1').fill('After refresh')
+      await sidebar.locator('#experiment-detail-save').click()
+      await expect.poll(() => state.puts.length).toBe(2)
+      expect(state.puts[1]).toMatchObject({ percentage_of_traffic: 55 })
+      expect(state.puts[1].variants[1].name).toBe('After refresh')
+    } finally { state.releaseRefresh?.() }
+  })
+
+  test(`detail guards immediate Back after a URL match-type edit at ${width}px`, async ({ page, sidebar }) => {
+    test.setTimeout(10000)
+    const state = await openNavigationDraft(page, sidebar, width, {
+      variants: [
+        { variant: 0, name: 'Control', config: '{}' },
+        { variant: 1, name: 'Variant 1', config: JSON.stringify({ __dom_changes: { changes: [], urlFilter: { include: ['/products/*'], mode: 'simple', matchType: 'path' } } }) }
+      ]
+    })
+    await sidebar.locator('#url-filtering-toggle-variant-1').click()
+    await sidebar.locator('#url-filter-match-type-variant-1').selectOption('full-url')
+    await sidebar.locator('#header-back-button').click()
+    await expect(sidebar.locator('#unsaved-changes-modal')).toBeVisible()
+    await sidebar.locator('#unsaved-changes-save').click()
+    await expect(sidebar.locator('[data-experiment-name="ft_2251_navigation"]')).toBeVisible()
+    expect(state.puts).toHaveLength(1)
+    expect(JSON.parse(state.puts[0].variants[1].config).__dom_changes.urlFilter.matchType).toBe('full-url')
+  })
+
+  test(`detail keeps malformed nested JSON open until corrected at ${width}px`, async ({ page, sidebar }) => {
+    test.setTimeout(10000)
+    const state = await openNavigationDraft(page, sidebar, width)
+    await sidebar.locator('#json-editor-button-variant-1').click()
+    const editor = page.locator('#absmartly-json-editor-host .cm-content')
+    const replace = async (value: string) => {
+      await editor.click()
+      await editor.press('ControlOrMeta+A')
+      await editor.press('Delete')
+      await page.keyboard.insertText(value)
+    }
+    await replace(JSON.stringify({ color: 'green', __dom_changes: { urlFilter: '/products/*' } }))
+    await page.locator('#json-editor-save-button').click()
+    await expect(page.locator('#absmartly-json-editor-host')).toBeVisible()
+    await expect(page.locator('#json-editor-status')).toHaveText('✕ Cannot save: variant DOM changes must be an array or an object with a changes array')
+    await replace(JSON.stringify({ color: 'green', __dom_changes: { changes: [], urlFilter: '/products/*' } }))
+    await page.locator('#json-editor-save-button').click()
+    await expect(page.locator('#absmartly-json-editor-host')).toHaveCount(0)
+    await sidebar.locator('#experiment-detail-save').click()
+    await expect.poll(() => state.puts.length).toBe(1)
+    expect(JSON.parse(state.puts[0].variants[1].config)).toMatchObject({ color: 'green', __dom_changes: { changes: [], urlFilter: '/products/*' } })
+  })
+
+  test(`detail guards immediate Back after a code-injection URL edit at ${width}px`, async ({ page, sidebar }) => {
+    test.setTimeout(10000)
+    const state = await openNavigationDraft(page, sidebar, width, {
+      variants: [
+        { variant: 0, name: 'Control', config: JSON.stringify({ __inject_html: { headStart: '<meta name="fixture" content="test">', urlFilter: { include: ['/products/*'], mode: 'simple', matchType: 'path' } } }) },
+        { variant: 1, name: 'Variant 1', config: '{}' }
+      ]
+    })
+    await sidebar.locator('#custom-code-injection-button').click()
+    await sidebar.locator('#code-injection-url-filter-toggle').click()
+    await expect(sidebar.locator('#code-injection-url-filter-mode')).toHaveValue('simple')
+    await sidebar.locator('#code-injection-url-match-type').selectOption('full-url')
+    await sidebar.locator('#header-back-button').click()
+    await expect(sidebar.locator('#unsaved-changes-modal')).toBeVisible()
+    await sidebar.locator('#unsaved-changes-save').click()
+    await expect(sidebar.locator('[data-experiment-name="ft_2251_navigation"]')).toBeVisible()
+    expect(state.puts).toHaveLength(1)
+    expect(JSON.parse(state.puts[0].variants[0].config).__inject_html.urlFilter.matchType).toBe('full-url')
+  })
+
   test(`detail modal stays busy until storage cleanup finishes at ${width}px`, async ({ page, sidebar }) => {
     test.setTimeout(10000)
     const state = await openNavigationDraft(page, sidebar, width)

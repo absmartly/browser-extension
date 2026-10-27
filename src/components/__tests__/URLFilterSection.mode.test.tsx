@@ -21,6 +21,39 @@ const modeSelect = () =>
   document.getElementById("url-filter-mode-variant-1") as HTMLSelectElement
 
 describe("URLFilterSection initial mode (FT-2251)", () => {
+  it("publishes the next match type before another user action", () => {
+    const onConfigChange = jest.fn()
+    render(
+      <URLFilterSection
+        variantIndex={1}
+        config={{
+          changes: [],
+          urlFilter: {
+            include: ["/products/*"],
+            mode: "simple",
+            matchType: "path"
+          }
+        }}
+        onConfigChange={onConfigChange}
+        canEdit={true}
+      />
+    )
+    fireEvent.click(document.getElementById("url-filtering-toggle-variant-1")!)
+    fireEvent.change(
+      document.getElementById("url-filter-match-type-variant-1")!,
+      {
+        target: { value: "full-url" }
+      }
+    )
+    expect(onConfigChange).toHaveBeenLastCalledWith({
+      urlFilter: {
+        include: ["/products/*"],
+        mode: "simple",
+        matchType: "full-url"
+      }
+    })
+  })
+
   it("reopens a filter saved from Simple mode as Simple with its pattern", async () => {
     renderSection({
       include: ["/products/*"],

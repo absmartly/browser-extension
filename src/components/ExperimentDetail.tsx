@@ -479,33 +479,43 @@ export function ExperimentDetail({
           tags={tags}
         />
 
-        {currentVariants.length > 0 && (
-          <VariantList
-            initialVariants={currentVariants}
-            experimentId={experiment.id}
-            experimentName={experiment.name}
-            onVariantsChange={handleVariantsChange}
-            canEdit={true}
-            canAddRemove={canAddVariants}
-            domFieldName={domFieldName}
-            onNavigateToAI={onNavigateToAI}
-            autoNavigateToAI={autoNavigateToAI}
-          />
-        )}
+        <fieldset
+          id="experiment-variant-fields"
+          aria-label="Experiment variants"
+          aria-busy={saving}
+          disabled={saving || leaving}
+          {...{ inert: saving || leaving ? "" : undefined }}
+          className="min-w-0 space-y-4">
+          {currentVariants.length > 0 && (
+            <VariantList
+              initialVariants={currentVariants}
+              experimentId={experiment.id}
+              experimentName={experiment.name}
+              onVariantsChange={handleVariantsChange}
+              canEdit={true}
+              canAddRemove={canAddVariants}
+              domFieldName={domFieldName}
+              onNavigateToAI={onNavigateToAI}
+              autoNavigateToAI={autoNavigateToAI}
+            />
+          )}
 
-        {currentVariants.length > 0 && currentVariants[0] && (
-          <ExperimentCodeInjection
-            experimentId={experiment.id}
-            variantIndex={0}
-            initialCode={extractInjectionCode(currentVariants[0])}
-            domChangesUrlFilter={extractDomChangesUrlFilter(currentVariants[0])}
-            onChange={handleInjectionCodeChange}
-            canEdit={
-              experiment.state !== "running" &&
-              experiment.state !== "development"
-            }
-          />
-        )}
+          {currentVariants.length > 0 && currentVariants[0] && (
+            <ExperimentCodeInjection
+              experimentId={experiment.id}
+              variantIndex={0}
+              initialCode={extractInjectionCode(currentVariants[0])}
+              domChangesUrlFilter={extractDomChangesUrlFilter(
+                currentVariants[0]
+              )}
+              onChange={handleInjectionCodeChange}
+              canEdit={
+                experiment.state !== "running" &&
+                experiment.state !== "development"
+              }
+            />
+          )}
+        </fieldset>
 
         {(experiment.state === "running" ||
           experiment.state === "development") && (
