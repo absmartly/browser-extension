@@ -486,7 +486,7 @@ for (const width of [384, 320]) {
         await expect(host.locator('#json-editor-status')).toContainText('Cannot save:')
         expect(state.puts).toHaveLength(0)
       }
-      const valid = { changes: [{ selector: '#main-title', type: 'text', value: 'Updated heading' }], urlFilter: { include: ['/products/*'], mode: 'simple', matchType: 'path' } }
+      const valid = { changes: [{ selector: '#main-title', type: 'text', value: 'Updated heading', metadata: { source: 'imported' } }], urlFilter: { include: ['/products/*'], mode: 'simple', matchType: 'path' }, extra: { preserve: true } }
       await replace(valid, true)
       await host.locator('#json-editor-save-button').click()
       await expect(host).toHaveCount(0)
@@ -498,6 +498,8 @@ for (const width of [384, 320]) {
       await sidebar.locator('#json-editor-button-variant-1').click()
       await expect(host.locator('#json-editor-status')).toHaveText('✓ Valid JSON')
       await expect(editor).toContainText('Updated heading')
+      await expect(editor).toContainText('"source": "imported"')
+      await expect(editor).toContainText('"preserve": true')
     })
   }
 }

@@ -391,7 +391,7 @@ export function safeParseVariantConfig(
               .passthrough()
       const result = schema.safeParse(parsed)
       if (result.success) {
-        return { success: true, data: result.data }
+        return { success: true, data: parsed }
       } else {
         const firstError = result.error.issues[0]
         return {

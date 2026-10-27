@@ -55,6 +55,23 @@ describe("variant config DOM validation", () => {
     ).toBeUndefined()
   })
 
+  it.each(["__dom_changes", "custom_dom"])(
+    "preserves additional DOM metadata when reloading %s",
+    (field) => {
+      const config = {
+        color: "green",
+        [field]: {
+          changes: [{ ...change, metadata: { source: "imported" } }],
+          extra: { preserve: true }
+        }
+      }
+      expect(safeParseVariantConfig(JSON.stringify(config), field)).toEqual({
+        success: true,
+        data: config
+      })
+    }
+  )
+
   it("reloads the configured field while preserving unrelated default-name data", () => {
     const config = {
       __dom_changes: "ordinary value",
