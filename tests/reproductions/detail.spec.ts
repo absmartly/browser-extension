@@ -122,7 +122,7 @@ test('packaged experiment detail keeps a traffic edit unsaved when the update re
   await expect(save).toBeDisabled()
 })
 
-async function openNavigationDraft(page: Page, sidebar: FrameLocator, width: number, overrides: Partial<typeof experiment> = {}) {
+async function openNavigationDraft(page: Page, sidebar: FrameLocator, width: number, overrides: Partial<typeof experiment> = {}, enableAI = false) {
   const draft = { ...experiment, ...overrides, id: 503, name: 'ft_2251_navigation', display_name: 'FT-2251 navigation', percentage_of_traffic: 100 }
   const state = { fail: '' as '' | 'GET' | 'PUT', puts: [] as any[], holdRefresh: false, refreshStarted: false, releaseRefresh: undefined as undefined | (() => void) }
   await page.locator('#absmartly-sidebar-iframe').evaluate((iframe, width) => {
@@ -152,6 +152,7 @@ async function openNavigationDraft(page: Page, sidebar: FrameLocator, width: num
   await sidebar.locator('#absmartly-endpoint').fill(endpoint)
   await sidebar.locator('#auth-method-apikey').check()
   await sidebar.locator('#api-key-input').fill('synthetic-not-a-secret')
+  if (enableAI) await sidebar.locator('#vibe-studio-toggle').check()
   await sidebar.locator('#save-settings-button').click()
   await sidebar.locator('[data-experiment-name="ft_2251_navigation"]').click()
   return state
@@ -420,24 +421,18 @@ for (const width of [384, 320]) {
     const config = (pattern: string) => ({ __dom_changes: { changes: [], urlFilter: { include: [pattern], mode: 'simple', matchType: 'path' } } })
     const state = await openNavigationDraft(page, sidebar, width, {
       variants: [{ variant: 0, name: 'Control', config: '{}' }, { variant: 1, name: 'Variant 1', config: JSON.stringify(config('/old/*')) }]
-    })
-    const frameBody = sidebar.locator('body')
-    await frameBody.evaluate(() => {
-      const originalGet = chrome.storage.local.get.bind(chrome.storage.local)
-      chrome.storage.local.get = ((keys: any) => {
-        const names = typeof keys === 'string' ? [keys] : Array.isArray(keys) ? keys : Object.keys(keys || {})
-        if (names.includes('experiment-503-variants')) {
-          return Promise.resolve({ 'experiment-503-variants': JSON.stringify([
-            { name: 'Control', config: {} },
-            { name: 'Draft B', config: { __dom_changes: { changes: [], urlFilter: { include: ['/new/*'], mode: 'simple', matchType: 'path' } } } }
-          ]) })
-        }
-        return originalGet(keys)
-      }) as typeof chrome.storage.local.get
-    })
-    // Preserve the real detail navigation path, injecting only the stored draft.
+    }, true)
+    await sidebar.locator('#variant-name-input-1').fill('Draft B')
+    await sidebar.locator('#url-filtering-toggle-variant-1').click()
+    await sidebar.locator('#url-filter-pattern-variant-1-0').fill('/new/*')
+    await expect.poll(() => sidebar.locator('body').evaluate(async () => {
+      const stored = (await chrome.storage.local.get('experiment-503-variants'))['experiment-503-variants']
+      return typeof stored === 'string' ? JSON.parse(stored)?.[1]?.config?.__dom_changes?.urlFilter?.include?.[0] : undefined
+    })).toBe('/new/*')
+    // Returning from AI remounts detail while preserving its real unsaved draft.
+    await sidebar.locator('#generate-with-ai-button').click()
+    await expect(sidebar.locator('#ai-dom-generator-heading')).toBeVisible()
     await sidebar.locator('#header-back-button').click()
-    await sidebar.locator('[data-experiment-name="ft_2251_navigation"]').click()
     await expect(sidebar.locator('#variant-name-input-1')).toHaveValue('Draft B')
     await sidebar.locator('#url-filtering-toggle-variant-1').click()
     await expect(sidebar.locator('#url-filter-pattern-variant-1-0')).toHaveValue('/new/*')
