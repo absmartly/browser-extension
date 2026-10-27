@@ -630,6 +630,7 @@ export function VariantList({
             setJsonEditorVariant(null)
           }}
           variant={variants[jsonEditorVariant]}
+          domFieldName={domFieldName}
           onSave={(updatedVariant) => {
             if (jsonEditorVariant !== null) {
               const newVariants = [...variants]

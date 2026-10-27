@@ -99,6 +99,59 @@ describe("JSONEditor save validation (FT-2251)", () => {
     expect(document.getElementById("absmartly-json-editor-host")).toBeNull()
   })
 
+  it.each(["__dom_changes", "custom_dom"])(
+    "keeps invalid entries visible through initial, Format, lint and Save for %s",
+    async (field) => {
+      const onResult = jest.fn()
+      const result = editor.show(
+        "Edit Variant Config - Variant 1",
+        JSON.stringify({ [field]: [null] }),
+        field
+      )
+      result.then(onResult)
+      await waitFor(() => expect((editor as any).editorView).toBeTruthy())
+      expect(status().textContent).toContain("contain invalid data")
+      format()
+      expect(status().textContent).toContain("contain invalid data")
+      const view = replaceDoc(JSON.stringify({ [field]: { changes: [null] } }))
+      forceLinting(view)
+      await waitFor(() => expect(diagnosticCount(view.state)).toBe(1))
+      expect(status().textContent).toContain("contain invalid data")
+      document.getElementById("json-editor-save-button")!.click()
+      await Promise.resolve()
+      await Promise.resolve()
+      expect(status().textContent).toContain("Cannot save:")
+      expect(onResult).not.toHaveBeenCalled()
+      expect(
+        document.getElementById("absmartly-json-editor-host")
+      ).not.toBeNull()
+      const corrected = JSON.stringify({
+        color: "green",
+        [field]: {
+          changes: [{ selector: "#heading", type: "text", value: "Updated" }],
+          urlFilter: "/products/*"
+        }
+      })
+      await saveWith(corrected)
+      await expect(result).resolves.toBe(corrected)
+    }
+  )
+
+  it("rejects malformed custom-field structure before saving", async () => {
+    editor.show(
+      "Edit Variant Config - Variant 1",
+      '{"custom_dom":{"changes":"invalid"}}',
+      "custom_dom"
+    )
+    await waitFor(() => expect((editor as any).editorView).toBeTruthy())
+    expect(status().textContent).toContain(
+      "Variant DOM changes (custom_dom) must be an array"
+    )
+    document.getElementById("json-editor-save-button")!.click()
+    expect(status().textContent).toContain("Cannot save:")
+    expect(document.getElementById("absmartly-json-editor-host")).not.toBeNull()
+  })
+
   it.each([
     { urlFilter: "/products/*" },
     { changes: "invalid" },

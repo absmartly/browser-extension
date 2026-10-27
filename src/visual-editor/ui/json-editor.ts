@@ -16,7 +16,11 @@ export class JSONEditor {
   private editorHost: HTMLElement | null = null
   private editorView: EditorView | null = null
 
-  async show(title: string, currentJSON: string): Promise<string | null> {
+  async show(
+    title: string,
+    currentJSON: string,
+    domFieldName = "__dom_changes"
+  ): Promise<string | null> {
     return new Promise((resolve) => {
       // Create editor host in regular DOM
       this.editorHost = document.createElement("div")
@@ -116,7 +120,10 @@ export class JSONEditor {
         const content = view.state.doc.toString()
 
         try {
-          const configError = getVariantConfigError(JSON.parse(content))
+          const configError = getVariantConfigError(
+            JSON.parse(content),
+            domFieldName
+          )
           if (!configError) {
             statusEl.textContent = "✓ Valid JSON"
             statusEl.style.color = "#4ade80"
@@ -174,7 +181,10 @@ export class JSONEditor {
 
         // Initial validation
         try {
-          const configError = getVariantConfigError(JSON.parse(currentJSON))
+          const configError = getVariantConfigError(
+            JSON.parse(currentJSON),
+            domFieldName
+          )
           if (!configError) {
             statusEl.textContent = "✓ Valid JSON"
             statusEl.style.color = "#4ade80"
@@ -203,7 +213,7 @@ export class JSONEditor {
                 insert: formatted
               }
             })
-            const configError = getVariantConfigError(parsed)
+            const configError = getVariantConfigError(parsed, domFieldName)
             if (!configError) {
               statusEl.textContent = "✓ Valid JSON"
               statusEl.style.color = "#4ade80"
@@ -234,7 +244,7 @@ export class JSONEditor {
         // Validate before saving
         try {
           const parsed = JSON.parse(newJSON)
-          const configError = getVariantConfigError(parsed)
+          const configError = getVariantConfigError(parsed, domFieldName)
           if (configError) {
             statusEl.textContent = `✕ Cannot save: ${configError[0].toLowerCase()}${configError.slice(1)}`
             statusEl.style.color = "#f87171"

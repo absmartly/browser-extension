@@ -236,7 +236,7 @@ export function closeCodeEditor() {
 }
 
 export async function openJSONEditor(
-  data: { variantName: string; value: string },
+  data: { variantName: string; value: string; domFieldName?: string },
   isVisualEditorActive: boolean,
   currentEditor: any
 ) {
@@ -251,7 +251,11 @@ export async function openJSONEditor(
   jsonEditorInstance = new JSONEditor()
 
   const title = `Edit Variant Config - ${data.variantName}`
-  const result = await jsonEditorInstance.show(title, data.value)
+  const result = await jsonEditorInstance.show(
+    title,
+    data.value,
+    data.domFieldName
+  )
 
   if (wasVEActive && currentEditor) {
     debugLog("[JSON Editor] Re-enabling VE after JSON editor closed")

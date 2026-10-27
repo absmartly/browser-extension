@@ -122,7 +122,7 @@ test('packaged experiment detail keeps a traffic edit unsaved when the update re
   await expect(save).toBeDisabled()
 })
 
-async function openNavigationDraft(page: Page, sidebar: FrameLocator, width: number, overrides: Partial<typeof experiment> = {}, enableAI = false) {
+async function openNavigationDraft(page: Page, sidebar: FrameLocator, width: number, overrides: Partial<typeof experiment> = {}, enableAI = false, domFieldName?: string) {
   const draft = { ...experiment, ...overrides, id: 503, name: 'ft_2251_navigation', display_name: 'FT-2251 navigation', percentage_of_traffic: 100 }
   const state = { fail: '' as '' | 'GET' | 'PUT', puts: [] as any[], holdRefresh: false, refreshStarted: false, releaseRefresh: undefined as undefined | (() => void) }
   await page.locator('#absmartly-sidebar-iframe').evaluate((iframe, width) => {
@@ -153,6 +153,7 @@ async function openNavigationDraft(page: Page, sidebar: FrameLocator, width: num
   await sidebar.locator('#auth-method-apikey').check()
   await sidebar.locator('#api-key-input').fill('synthetic-not-a-secret')
   if (enableAI) await sidebar.locator('#vibe-studio-toggle').check()
+  if (domFieldName) await sidebar.locator('#dom-changes-field-name').fill(domFieldName)
   await sidebar.locator('#save-settings-button').click()
   await sidebar.locator('[data-experiment-name="ft_2251_navigation"]').click()
   return state
@@ -459,4 +460,44 @@ for (const width of [384, 320]) {
     expect(state.puts[0].variants.map((v: any) => v.name)).toEqual(['Control', 'B'])
     expect(JSON.parse(state.puts[0].variants[1].config).__dom_changes.changes).toEqual([{ selector: '#main-title', type: 'text', value: 'Updated B' }])
   })
+}
+
+for (const width of [384, 320]) {
+  for (const field of ['__dom_changes', 'custom_dom']) {
+    test(`detail rejects malformed DOM entries in ${field} and recovers at ${width}px`, async ({ page, sidebar }) => {
+      test.setTimeout(10000)
+      const state = await openNavigationDraft(page, sidebar, width, {}, false, field)
+      await sidebar.locator('#json-editor-button-variant-1').click()
+      const host = page.locator('#absmartly-json-editor-host')
+      const editor = host.locator('.cm-content')
+      const replace = async (value: any, includeOrdinaryValue = false) => {
+        await editor.click()
+        await editor.press('ControlOrMeta+A')
+        await editor.press('Delete')
+        await page.keyboard.insertText(JSON.stringify({ color: 'green', ...(includeOrdinaryValue && field === 'custom_dom' ? { __dom_changes: 'ordinary variable' } : {}), [field]: value }))
+      }
+      const invalid = field === 'custom_dom'
+        ? [{ changes: 'invalid' }, [null], { changes: [null] }]
+        : [[null], { changes: [null] }, { changes: 'invalid' }]
+      for (const value of invalid) {
+        await replace(value)
+        await host.locator('#json-editor-save-button').click()
+        await expect(host).toBeVisible()
+        await expect(host.locator('#json-editor-status')).toContainText('Cannot save:')
+        expect(state.puts).toHaveLength(0)
+      }
+      const valid = { changes: [{ selector: '#main-title', type: 'text', value: 'Updated heading' }], urlFilter: { include: ['/products/*'], mode: 'simple', matchType: 'path' } }
+      await replace(valid, true)
+      await host.locator('#json-editor-save-button').click()
+      await expect(host).toHaveCount(0)
+      await expect(sidebar.locator('#dom-change-checkbox-0')).toBeVisible()
+      await sidebar.locator('#experiment-detail-save').click()
+      await expect.poll(() => state.puts.length).toBe(1)
+      expect(JSON.parse(state.puts[0].variants[1].config)).toEqual({ color: 'green', ...(field === 'custom_dom' ? { __dom_changes: 'ordinary variable' } : {}), [field]: valid })
+      await expect(sidebar.locator('#experiment-detail-save')).toBeDisabled()
+      await sidebar.locator('#json-editor-button-variant-1').click()
+      await expect(host.locator('#json-editor-status')).toHaveText('✓ Valid JSON')
+      await expect(editor).toContainText('Updated heading')
+    })
+  }
 }

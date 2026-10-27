@@ -10,6 +10,7 @@ interface VariantConfigJSONEditorProps {
   onClose: () => void
   variant: Variant
   onSave: (variant: Variant) => void
+  domFieldName?: string
 }
 
 /**
@@ -19,7 +20,7 @@ interface VariantConfigJSONEditorProps {
  */
 export const VariantConfigJSONEditor: React.FC<
   VariantConfigJSONEditorProps
-> = ({ isOpen, onClose, variant, onSave }) => {
+> = ({ isOpen, onClose, variant, onSave, domFieldName = "__dom_changes" }) => {
   const onSaveRef = useRef(onSave)
   const onCloseRef = useRef(onClose)
 
@@ -42,7 +43,8 @@ export const VariantConfigJSONEditor: React.FC<
           type: "OPEN_JSON_EDITOR",
           data: {
             variantName: variant.name,
-            value: JSON.stringify(fullConfig, null, 2)
+            value: JSON.stringify(fullConfig, null, 2),
+            domFieldName
           }
         })
       } catch (error) {
@@ -56,7 +58,7 @@ export const VariantConfigJSONEditor: React.FC<
         try {
           const parsedConfig = JSON.parse(message.value)
 
-          const configError = getVariantConfigError(parsedConfig)
+          const configError = getVariantConfigError(parsedConfig, domFieldName)
           if (configError) {
             console.error(configError)
             return
@@ -93,7 +95,7 @@ export const VariantConfigJSONEditor: React.FC<
       }
       closeEditor()
     }
-  }, [isOpen, variant])
+  }, [isOpen, variant, domFieldName])
 
   return null
 }

@@ -20,6 +20,7 @@ export const DOMChangesStorageSection = React.memo(
 
         <div>
           <Input
+            id="dom-changes-field-name"
             label="Variable Name"
             type="text"
             value={domChangesFieldName}

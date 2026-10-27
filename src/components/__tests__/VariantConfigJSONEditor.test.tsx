@@ -1,6 +1,8 @@
 import { render } from "@testing-library/react"
 import React from "react"
 
+import { sendToContent } from "~src/lib/messaging"
+
 import { VariantConfigJSONEditor } from "../VariantConfigJSONEditor"
 
 jest.mock("~src/lib/messaging", () => ({
@@ -25,7 +27,7 @@ describe("VariantConfigJSONEditor (FT-2251)", () => {
     }
   })
 
-  const renderEditor = () => {
+  const renderEditor = (domFieldName?: string) => {
     const onSave = jest.fn()
     const onClose = jest.fn()
     render(
@@ -34,6 +36,7 @@ describe("VariantConfigJSONEditor (FT-2251)", () => {
         onClose={onClose}
         variant={variant as any}
         onSave={onSave}
+        domFieldName={domFieldName}
       />
     )
     return { onSave, onClose }
@@ -59,11 +62,45 @@ describe("VariantConfigJSONEditor (FT-2251)", () => {
     expect(onClose).toHaveBeenCalled()
   })
 
+  it("sends the configured DOM field to the content editor and preserves valid full config", () => {
+    const { onSave } = renderEditor("custom_dom")
+    expect(sendToContent).toHaveBeenCalledWith({
+      type: "OPEN_JSON_EDITOR",
+      data: {
+        variantName: variant.name,
+        value: JSON.stringify(variant.config, null, 2),
+        domFieldName: "custom_dom"
+      }
+    })
+    const config = {
+      color: "green",
+      __dom_changes: "ordinary variable",
+      custom_dom: [{ selector: "#heading", type: "text", value: "Updated" }]
+    }
+    listener({ type: "JSON_EDITOR_SAVE", value: JSON.stringify(config) })
+    expect(onSave).toHaveBeenCalledWith({ name: variant.name, config })
+  })
+
+  it.each([[null], { changes: [null] }, { changes: "invalid" }])(
+    "rejects malformed data in the configured DOM field: %p",
+    (value) => {
+      const { onSave, onClose } = renderEditor("custom_dom")
+      listener({
+        type: "JSON_EDITOR_SAVE",
+        value: JSON.stringify({ custom_dom: value })
+      })
+      expect(onSave).not.toHaveBeenCalled()
+      expect(onClose).not.toHaveBeenCalled()
+    }
+  )
+
   it.each([
     null,
     "invalid",
     { urlFilter: "/products/*" },
-    { changes: "invalid" }
+    { changes: "invalid" },
+    [null],
+    { changes: [null] }
   ])("rejects invalid nested DOM changes: %p", (value) => {
     const { onSave, onClose } = renderEditor()
     listener({
