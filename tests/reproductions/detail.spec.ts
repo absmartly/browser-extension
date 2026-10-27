@@ -244,6 +244,7 @@ for (const width of [384, 320]) {
       await expect(dialog).toHaveCount(0)
       await expect(sidebar.locator('#experiment-detail-save')).toBeEnabled()
       await expect(traffic).toHaveValue('42')
+      await sidebar.locator('#toast-container [id^="toast-close-"]').first().click()
       state.fail = ''
       await sidebar.locator('#header-back-button').click()
       await sidebar.locator('#unsaved-changes-save').click()
