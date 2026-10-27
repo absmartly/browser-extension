@@ -10,11 +10,17 @@ import { oneDark } from "@codemirror/theme-one-dark"
 import { EditorView } from "@codemirror/view"
 import { basicSetup } from "codemirror"
 
+import { getVariantConfigError } from "~src/lib/variant-config-validation"
+
 export class JSONEditor {
   private editorHost: HTMLElement | null = null
   private editorView: EditorView | null = null
 
-  async show(title: string, currentJSON: string): Promise<string | null> {
+  async show(
+    title: string,
+    currentJSON: string,
+    domFieldName = "__dom_changes"
+  ): Promise<string | null> {
     return new Promise((resolve) => {
       // Create editor host in regular DOM
       this.editorHost = document.createElement("div")
@@ -46,6 +52,7 @@ export class JSONEditor {
 
       const titleEl = document.createElement("h3")
       titleEl.className = "json-editor-title"
+      titleEl.id = "json-editor-title"
       titleEl.textContent = title
 
       const statusEl = document.createElement("span")
@@ -67,19 +74,15 @@ export class JSONEditor {
 
       const formatBtn = document.createElement("button")
       formatBtn.className = "json-toolbar-button"
-      formatBtn.innerHTML = "⚡ Format"
+      formatBtn.textContent = "Format"
+      formatBtn.id = "json-editor-format-button"
       formatBtn.title = "Format JSON"
 
       const tipsEl = document.createElement("div")
       tipsEl.className = "json-editor-tips"
-      tipsEl.innerHTML = `
-        <div style="font-size: 11px; color: #858585;">
-          <strong>Tips:</strong> 
-          Each change must have 'selector' and 'type' fields • 
-          Use Ctrl/Cmd+F to search • 
-          Code folding available in gutter
-        </div>
-      `
+      tipsEl.id = "json-editor-guidance"
+      tipsEl.textContent =
+        "Edit the full variant configuration as a JSON object."
 
       toolbar.appendChild(formatBtn)
       toolbar.appendChild(tipsEl)
@@ -91,11 +94,12 @@ export class JSONEditor {
       const cancelBtn = document.createElement("button")
       cancelBtn.className = "json-editor-button json-editor-button-cancel"
       cancelBtn.id = "json-editor-close-button"
-      cancelBtn.innerHTML = "<span>✕</span> Cancel"
+      cancelBtn.textContent = "Cancel"
 
       const saveBtn = document.createElement("button")
       saveBtn.className = "json-editor-button json-editor-button-save"
-      saveBtn.innerHTML = "<span>✓</span> Save Changes"
+      saveBtn.id = "json-editor-save-button"
+      saveBtn.textContent = "Save Changes"
 
       buttons.appendChild(cancelBtn)
       buttons.appendChild(saveBtn)
@@ -116,9 +120,23 @@ export class JSONEditor {
         const content = view.state.doc.toString()
 
         try {
-          JSON.parse(content)
-          statusEl.textContent = "✓ Valid JSON"
-          statusEl.style.color = "#4ade80"
+          const configError = getVariantConfigError(
+            JSON.parse(content),
+            domFieldName
+          )
+          if (!configError) {
+            statusEl.textContent = "✓ Valid JSON"
+            statusEl.style.color = "#4ade80"
+          } else {
+            statusEl.textContent = `✕ ${configError}`
+            statusEl.style.color = "#f87171"
+            diagnostics.push({
+              from: 0,
+              to: content.length,
+              severity: "error",
+              message: configError
+            })
+          }
         } catch (e) {
           const error = e as SyntaxError
           statusEl.textContent = `✕ ${error.message}`
@@ -163,9 +181,17 @@ export class JSONEditor {
 
         // Initial validation
         try {
-          JSON.parse(currentJSON)
-          statusEl.textContent = "✓ Valid JSON"
-          statusEl.style.color = "#4ade80"
+          const configError = getVariantConfigError(
+            JSON.parse(currentJSON),
+            domFieldName
+          )
+          if (!configError) {
+            statusEl.textContent = "✓ Valid JSON"
+            statusEl.style.color = "#4ade80"
+          } else {
+            statusEl.textContent = `✕ ${configError}`
+            statusEl.style.color = "#f87171"
+          }
         } catch (e) {
           statusEl.textContent = `✕ ${(e as Error).message}`
           statusEl.style.color = "#f87171"
@@ -187,8 +213,14 @@ export class JSONEditor {
                 insert: formatted
               }
             })
-            statusEl.textContent = "✓ Valid JSON"
-            statusEl.style.color = "#4ade80"
+            const configError = getVariantConfigError(parsed, domFieldName)
+            if (!configError) {
+              statusEl.textContent = "✓ Valid JSON"
+              statusEl.style.color = "#4ade80"
+            } else {
+              statusEl.textContent = `✕ ${configError}`
+              statusEl.style.color = "#f87171"
+            }
           } catch (e) {
             statusEl.textContent = `✕ ${(e as Error).message}`
             statusEl.style.color = "#f87171"
@@ -211,7 +243,13 @@ export class JSONEditor {
 
         // Validate before saving
         try {
-          JSON.parse(newJSON)
+          const parsed = JSON.parse(newJSON)
+          const configError = getVariantConfigError(parsed, domFieldName)
+          if (configError) {
+            statusEl.textContent = `✕ Cannot save: ${configError[0].toLowerCase()}${configError.slice(1)}`
+            statusEl.style.color = "#f87171"
+            return
+          }
           this.cleanup()
           resolve(newJSON)
         } catch (e) {
@@ -379,6 +417,8 @@ export class JSONEditor {
       .json-editor-tips {
         flex: 1;
         text-align: right;
+        font-size: 11px;
+        color: #858585;
       }
 
       .json-editor-codemirror-container {

@@ -376,15 +376,22 @@ export function parseVariantConfig(configStr: string): unknown {
 }
 
 export function safeParseVariantConfig(
-  configStr: string
+  configStr: string,
+  domFieldName = "__dom_changes"
 ): { success: true; data: unknown } | { success: false; error: string } {
   try {
     const parsed = JSON.parse(configStr)
 
-    if (parsed.__dom_changes) {
-      const result = VariantConfigSchema.safeParse(parsed)
+    if (parsed[domFieldName]) {
+      const schema =
+        domFieldName === "__dom_changes"
+          ? VariantConfigSchema
+          : z
+              .object({ [domFieldName]: DOMChangesDataSchema.optional() })
+              .passthrough()
+      const result = schema.safeParse(parsed)
       if (result.success) {
-        return { success: true, data: result.data }
+        return { success: true, data: parsed }
       } else {
         const firstError = result.error.issues[0]
         return {

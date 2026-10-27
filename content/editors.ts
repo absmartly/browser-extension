@@ -2,10 +2,11 @@ import { html } from "@codemirror/lang-html"
 import { EditorState } from "@codemirror/state"
 import { oneDark } from "@codemirror/theme-one-dark"
 import { basicSetup, EditorView } from "codemirror"
+
+import { debugLog } from "~src/utils/debug"
 import { JavaScriptEditor, JSONEditor } from "~src/visual-editor"
 import { EventViewer } from "~src/visual-editor/ui/event-viewer"
 import { MarkdownEditor } from "~src/visual-editor/ui/markdown-editor"
-import { debugLog } from "~src/utils/debug"
 
 let codeEditorContainer: HTMLDivElement | null = null
 let codeEditorView: EditorView | null = null
@@ -235,7 +236,7 @@ export function closeCodeEditor() {
 }
 
 export async function openJSONEditor(
-  data: { variantName: string; value: string },
+  data: { variantName: string; value: string; domFieldName?: string },
   isVisualEditorActive: boolean,
   currentEditor: any
 ) {
@@ -249,8 +250,12 @@ export async function openJSONEditor(
 
   jsonEditorInstance = new JSONEditor()
 
-  const title = `Edit DOM Changes - ${data.variantName}`
-  const result = await jsonEditorInstance.show(title, data.value)
+  const title = `Edit Variant Config - ${data.variantName}`
+  const result = await jsonEditorInstance.show(
+    title,
+    data.value,
+    data.domFieldName
+  )
 
   if (wasVEActive && currentEditor) {
     debugLog("[JSON Editor] Re-enabling VE after JSON editor closed")

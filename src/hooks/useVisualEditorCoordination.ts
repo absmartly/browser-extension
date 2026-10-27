@@ -258,7 +258,7 @@ export function useVisualEditorCoordination({
       window.removeEventListener("message", handleWindowMessage)
       chrome.storage.session.onChanged.removeListener(handleStorageChange)
     }
-  }, [variantName])
+  }, [variantName, onChange, onVEStop, changesRef])
 
   const handleLaunchVisualEditor = useCallback(async () => {
     try {

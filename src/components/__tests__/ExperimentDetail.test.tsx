@@ -261,20 +261,16 @@ describe("ExperimentDetail", () => {
 
   describe("Unsaved Changes Warning", () => {
     it("should not show warning when navigating back with no changes", async () => {
-      window.confirm = jest.fn(() => true)
-
       render(<ExperimentDetail {...defaultProps} />)
 
       const backButton = screen.getByRole("button", { name: /back/i })
       fireEvent.click(backButton)
 
-      expect(window.confirm).not.toHaveBeenCalled()
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
       expect(defaultProps.onBack).toHaveBeenCalled()
     })
 
     it("should show confirmation dialog when navigating back with unsaved changes", async () => {
-      window.confirm = jest.fn(() => true)
-
       const { container } = render(<ExperimentDetail {...defaultProps} />)
 
       const displayName = container.querySelector("h2")
@@ -288,14 +284,12 @@ describe("ExperimentDetail", () => {
       const backButton = screen.getByRole("button", { name: /back/i })
       fireEvent.click(backButton)
 
-      expect(window.confirm).toHaveBeenCalledWith(
-        "You have unsaved changes. Do you want to discard them?"
-      )
+      expect(
+        screen.getByRole("dialog", { name: "Save changes?" })
+      ).toBeVisible()
     })
 
     it("should clear storage when discarding changes", async () => {
-      window.confirm = jest.fn(() => true)
-
       const { container } = render(<ExperimentDetail {...defaultProps} />)
 
       const displayName = container.querySelector("h2")
@@ -308,6 +302,7 @@ describe("ExperimentDetail", () => {
 
       const backButton = screen.getByRole("button", { name: /back/i })
       fireEvent.click(backButton)
+      fireEvent.click(document.getElementById("unsaved-changes-discard")!)
 
       await waitFor(() => {
         expect(storageCleanup.clearAllExperimentStorage).toHaveBeenCalledWith(
@@ -317,8 +312,6 @@ describe("ExperimentDetail", () => {
     })
 
     it("should not navigate when user cancels discard", async () => {
-      window.confirm = jest.fn(() => false)
-
       const { container } = render(<ExperimentDetail {...defaultProps} />)
 
       const displayName = container.querySelector("h2")
@@ -331,8 +324,10 @@ describe("ExperimentDetail", () => {
 
       const backButton = screen.getByRole("button", { name: /back/i })
       fireEvent.click(backButton)
+      fireEvent.click(document.getElementById("unsaved-changes-cancel")!)
 
       expect(defaultProps.onBack).not.toHaveBeenCalled()
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
     })
   })
 
@@ -348,7 +343,11 @@ describe("ExperimentDetail", () => {
 
       global.chrome.runtime.sendMessage = mockSendMessage
 
-      render(<ExperimentDetail {...defaultProps} />)
+      const { container } = render(<ExperimentDetail {...defaultProps} />)
+      fireEvent.click(container.querySelector("h2")!)
+      fireEvent.change(screen.getByDisplayValue("Test Experiment"), {
+        target: { value: "Modified Name" }
+      })
 
       const saveButton = screen.getByRole("button", { name: /Save Changes/i })
       fireEvent.click(saveButton)
@@ -401,7 +400,11 @@ describe("ExperimentDetail", () => {
         .mockRejectedValue(new Error("Save failed"))
       global.chrome.runtime.sendMessage = mockSendMessage
 
-      render(<ExperimentDetail {...defaultProps} />)
+      const { container } = render(<ExperimentDetail {...defaultProps} />)
+      fireEvent.click(container.querySelector("h2")!)
+      fireEvent.change(screen.getByDisplayValue("Test Experiment"), {
+        target: { value: "Modified Name" }
+      })
 
       const saveButton = screen.getByRole("button", { name: /Save Changes/i })
       fireEvent.click(saveButton)
@@ -433,7 +436,7 @@ describe("ExperimentDetail", () => {
       expect(saveButton).toBeDisabled()
     })
 
-    it("should highlight save button when there are unsaved changes", async () => {
+    it("should enable the regular save button when there are unsaved changes", async () => {
       const { container } = render(<ExperimentDetail {...defaultProps} />)
 
       const displayName = container.querySelector("h2")
@@ -446,9 +449,11 @@ describe("ExperimentDetail", () => {
 
       await waitFor(() => {
         const saveButton = screen.getByRole("button", {
-          name: /• Save Changes/i
+          name: /^Save Changes$/i
         })
-        expect(saveButton).toHaveClass("ring-2", "ring-yellow-400")
+        expect(saveButton).toBeEnabled()
+        expect(saveButton).toHaveClass("bg-blue-600")
+        expect(saveButton).not.toHaveClass("ring-yellow-400")
       })
     })
   })
@@ -550,17 +555,33 @@ describe("ExperimentDetail", () => {
         storageCleanup.clearAllExperimentStorage as jest.Mock
       ).mockRejectedValue(new Error("Storage error"))
 
-      const mockSendMessage = jest.fn().mockResolvedValue({ success: true })
+      const mockSendMessage = jest
+        .fn()
+        .mockImplementation((message) =>
+          Promise.resolve(
+            message?.type === "API_REQUEST" && message?.method === "GET"
+              ? { success: true, data: { experiment: mockExperiment } }
+              : { success: true }
+          )
+        )
       global.chrome.runtime.sendMessage = mockSendMessage
 
-      render(<ExperimentDetail {...defaultProps} />)
+      const { container } = render(<ExperimentDetail {...defaultProps} />)
+      fireEvent.click(container.querySelector("h2")!)
+      fireEvent.change(screen.getByDisplayValue("Test Experiment"), {
+        target: { value: "Modified Name" }
+      })
 
       const saveButton = screen.getByRole("button", { name: /Save Changes/i })
       fireEvent.click(saveButton)
 
       await waitFor(() => {
-        expect(mockSendMessage).toHaveBeenCalled()
+        expect(storageCleanup.clearAllExperimentStorage).toHaveBeenCalledWith(
+          123
+        )
       })
+      expect(defaultProps.onError).not.toHaveBeenCalled()
+      expect(saveButton).toBeDisabled()
     })
 
     it("should handle missing variant config", () => {

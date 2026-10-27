@@ -8,6 +8,7 @@ interface UnsavedChangesModalProps {
   onDiscard: () => void
   onCancel: () => void
   saving?: boolean
+  saveDisabled?: boolean
 }
 
 const FOCUSABLE_SELECTOR =
@@ -18,7 +19,8 @@ export function UnsavedChangesModal({
   onSave,
   onDiscard,
   onCancel,
-  saving = false
+  saving = false,
+  saveDisabled = false
 }: UnsavedChangesModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null)
   const onCancelRef = useRef(onCancel)
@@ -157,7 +159,7 @@ export function UnsavedChangesModal({
             onClick={onSave}
             variant="primary"
             size="sm"
-            disabled={saving}>
+            disabled={saving || saveDisabled}>
             {saving ? "Saving..." : "Save"}
           </Button>
         </div>

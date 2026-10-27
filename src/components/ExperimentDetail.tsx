@@ -3,9 +3,12 @@ import {
   ExclamationTriangleIcon,
   XMarkIcon
 } from "@heroicons/react/24/outline"
-import React, { useEffect, useState } from "react"
+import React, { useEffect, useRef, useState } from "react"
 
-import { useExperimentSave } from "~src/hooks/useExperimentSave"
+import {
+  useExperimentSave,
+  type ExperimentUpdateHandler
+} from "~src/hooks/useExperimentSave"
 import { useExperimentVariants } from "~src/hooks/useExperimentVariants"
 import { sendToContent } from "~src/lib/messaging"
 import type { Experiment, ExperimentInjectionCode } from "~src/types/absmartly"
@@ -29,15 +32,29 @@ import { ExperimentMetadata } from "./ExperimentMetadata"
 import { Header } from "./Header"
 import { Badge } from "./ui/Badge"
 import { Button } from "./ui/Button"
+import { UnsavedChangesModal } from "./UnsavedChangesModal"
 import { VariantList } from "./VariantList"
 import type { Variant } from "./VariantList"
+
+// JSON object key order can change when saved config is parsed on refresh.
+// Compare persisted values while retaining the order of variants and arrays.
+const variantSnapshot = (variants: Variant[]) =>
+  JSON.stringify(variants, (_key, value) =>
+    value && typeof value === "object" && !Array.isArray(value)
+      ? Object.fromEntries(
+          Object.keys(value)
+            .sort()
+            .map((key) => [key, value[key]])
+        )
+      : value
+  )
 
 interface ExperimentDetailProps {
   experiment: Experiment
   onBack: () => void
   onStart: (id: number) => void
   onStop: (id: number) => void
-  onUpdate?: (id: number, updates: Partial<Experiment>) => void
+  onUpdate?: ExperimentUpdateHandler
   loading?: boolean
   applications?: any[]
   unitTypes?: any[]
@@ -92,39 +109,41 @@ export function ExperimentDetail({
   )
 
   const [editingName, setEditingName] = useState(false)
+  const [showUnsavedModal, setShowUnsavedModal] = useState(false)
+  const [leaving, setLeaving] = useState(false)
+  // The save hook finishes before draft cleanup; lock navigation through both.
+  const [saving, setSaving] = useState(false)
+  const savingRef = useRef(false)
   const [displayName, setDisplayName] = useState(
     experiment.display_name || experiment.name
   )
   const [domFieldName, setDomFieldName] = useState<string>("__dom_changes")
 
-  const {
-    initialVariants,
-    currentVariants,
-    hasUnsavedChanges,
-    setHasUnsavedChanges,
-    handleVariantsChange
-  } = useExperimentVariants({
-    experiment,
-    domFieldName
-  })
+  const { initialVariants, currentVariants, handleVariantsChange } =
+    useExperimentVariants({
+      experiment,
+      domFieldName
+    })
 
+  const [savedDisplayName, setSavedDisplayName] = useState(displayName)
+  const [savedVariants, setSavedVariants] = useState(initialVariants)
   useEffect(() => {
-    if (displayName !== (experiment.display_name || experiment.name)) {
-      setHasUnsavedChanges(true)
-    }
-  }, [
-    displayName,
-    experiment.display_name,
-    experiment.name,
-    setHasUnsavedChanges
-  ])
-  const { save, saving } = useExperimentSave({
+    setSavedDisplayName(experiment.display_name || experiment.name)
+  }, [experiment.display_name, experiment.name])
+  useEffect(() => {
+    setSavedVariants((previous) =>
+      variantSnapshot(previous) === variantSnapshot(initialVariants)
+        ? previous
+        : initialVariants
+    )
+  }, [initialVariants])
+  const { save } = useExperimentSave({
     experiment,
     domFieldName,
     onError
   })
   const [metadata, setMetadata] = useState({
-    percentage_of_traffic: experiment.percentage_of_traffic || 100,
+    percentage_of_traffic: experiment.percentage_of_traffic ?? 100,
     unit_type_id:
       experiment.unit_type?.unit_type_id || experiment.unit_type_id || null,
     application_ids:
@@ -136,6 +155,18 @@ export function ExperimentDetail({
         ?.map((t) => t.experiment_tag_id)
         .filter((id): id is number => id !== undefined) || []
   })
+  const [savedMetadata, setSavedMetadata] = useState(metadata)
+  const metadataChanged =
+    JSON.stringify(metadata) !== JSON.stringify(savedMetadata)
+  const isDirty =
+    metadataChanged ||
+    displayName !== savedDisplayName ||
+    variantSnapshot(currentVariants) !== variantSnapshot(savedVariants)
+  const traffic = metadata.percentage_of_traffic
+  const trafficError =
+    Number.isFinite(traffic) && traffic >= 0 && traffic <= 100
+      ? undefined
+      : "Traffic percentage must be between 0 and 100"
 
   debugLog("🔍 ExperimentDetail state - displayName:", displayName)
   debugLog(
@@ -160,14 +191,34 @@ export function ExperimentDetail({
     loadConfig()
   }, [])
 
-  const handleSaveDisplayName = () => {
-    if (onUpdate && displayName !== experiment.display_name) {
-      onUpdate(experiment.id, { display_name: displayName })
+  const handleSaveDisplayName = async () => {
+    try {
+      if (onUpdate && displayName !== savedDisplayName) {
+        const updated = await onUpdate(experiment.id, {
+          display_name: displayName
+        })
+        if (updated === false) return
+        setSavedDisplayName(displayName)
+      }
+      setEditingName(false)
+    } catch (error) {
+      onError?.(
+        error instanceof Error
+          ? error.message
+          : "Failed to save experiment name"
+      )
     }
-    setEditingName(false)
   }
 
   const handleSaveChanges = async () => {
+    if (savingRef.current || leaving || loading || !isDirty || !canAddVariants)
+      return false
+    if (trafficError) {
+      document.getElementById("traffic-percentage-input")?.focus()
+      return false
+    }
+    savingRef.current = true
+    setSaving(true)
     try {
       const formData = {
         display_name: displayName,
@@ -179,7 +230,8 @@ export function ExperimentDetail({
         tag_ids: metadata.tag_ids
       }
 
-      await save(formData, currentVariants, onUpdate)
+      const saved = await save(formData, currentVariants, onUpdate)
+      if (saved === false) return false
 
       try {
         await clearAllExperimentStorage(experiment.id)
@@ -191,7 +243,10 @@ export function ExperimentDetail({
         debugError("Failed to clear storage after save:", error)
       }
 
-      setHasUnsavedChanges(false)
+      setSavedDisplayName(displayName)
+      setSavedVariants(currentVariants)
+      setSavedMetadata(metadata)
+      return true
     } catch (error) {
       debugError("Failed to save experiment:", error)
       if (onError) {
@@ -199,6 +254,10 @@ export function ExperimentDetail({
           error instanceof Error ? error.message : "Failed to save experiment"
         onError(errorMessage)
       }
+      return false
+    } finally {
+      savingRef.current = false
+      setSaving(false)
     }
   }
 
@@ -250,7 +309,7 @@ export function ExperimentDetail({
     experiment.state !== "development" &&
     experiment.status !== "running"
 
-  const handleBack = () => {
+  const leaveDetail = () => {
     const cleanup = async () => {
       try {
         await sendToContent({
@@ -267,33 +326,43 @@ export function ExperimentDetail({
       }
     }
 
-    if (hasUnsavedChanges) {
-      if (
-        window.confirm("You have unsaved changes. Do you want to discard them?")
-      ) {
-        debugLog(
-          "🧹 User chose to discard changes for experiment",
-          experiment.id
-        )
-        clearAllExperimentStorage(experiment.id)
-          .then(() => {
-            debugLog(
-              "🧹 Cleared all DOM changes storage (session + local) when discarding for experiment",
-              experiment.id
-            )
-            cleanup()
-            onBack()
-          })
-          .catch((error) => {
-            debugError("Failed to clear storage when discarding:", error)
-            cleanup()
-            onBack()
-          })
-      }
-    } else {
-      cleanup()
-      onBack()
+    void cleanup()
+    onBack()
+  }
+
+  const handleBack = () => {
+    if (saving || leaving) return
+    if (isDirty) {
+      setShowUnsavedModal(true)
+      return
     }
+    leaveDetail()
+  }
+
+  const handleUnsavedSave = async () => {
+    if (trafficError) {
+      setShowUnsavedModal(false)
+      // Focus the invalid field after the dialog restores its opener's focus.
+      requestAnimationFrame(() => {
+        document.getElementById("traffic-percentage-input")?.focus()
+      })
+      return
+    }
+    if (await handleSaveChanges()) {
+      setShowUnsavedModal(false)
+      leaveDetail()
+    }
+  }
+
+  const handleUnsavedDiscard = async () => {
+    setShowUnsavedModal(false)
+    setLeaving(true)
+    try {
+      await clearAllExperimentStorage(experiment.id)
+    } catch (error) {
+      debugError("Failed to clear storage when discarding:", error)
+    }
+    leaveDetail()
   }
 
   const titleContent = (
@@ -376,6 +445,14 @@ export function ExperimentDetail({
 
   return (
     <div className="p-4">
+      <UnsavedChangesModal
+        isOpen={showUnsavedModal}
+        onSave={handleUnsavedSave}
+        onDiscard={handleUnsavedDiscard}
+        onCancel={() => setShowUnsavedModal(false)}
+        saving={saving}
+        saveDisabled={loading || !canAddVariants}
+      />
       <Header title={titleContent} onBack={handleBack} />
 
       <div className="mb-4 flex items-center justify-between gap-2">
@@ -403,6 +480,7 @@ export function ExperimentDetail({
       <div className="space-y-4">
         <ExperimentMetadata
           data={metadata}
+          trafficError={trafficError}
           onChange={(newMetadata) => {
             setMetadata(newMetadata)
           }}
@@ -414,33 +492,43 @@ export function ExperimentDetail({
           tags={tags}
         />
 
-        {currentVariants.length > 0 && (
-          <VariantList
-            initialVariants={currentVariants}
-            experimentId={experiment.id}
-            experimentName={experiment.name}
-            onVariantsChange={handleVariantsChange}
-            canEdit={true}
-            canAddRemove={canAddVariants}
-            domFieldName={domFieldName}
-            onNavigateToAI={onNavigateToAI}
-            autoNavigateToAI={autoNavigateToAI}
-          />
-        )}
+        <fieldset
+          id="experiment-variant-fields"
+          aria-label="Experiment variants"
+          aria-busy={saving}
+          disabled={saving || leaving}
+          {...{ inert: saving || leaving ? "" : undefined }}
+          className="min-w-0 space-y-4">
+          {currentVariants.length > 0 && (
+            <VariantList
+              initialVariants={currentVariants}
+              experimentId={experiment.id}
+              experimentName={experiment.name}
+              onVariantsChange={handleVariantsChange}
+              canEdit={true}
+              canAddRemove={canAddVariants}
+              domFieldName={domFieldName}
+              onNavigateToAI={onNavigateToAI}
+              autoNavigateToAI={autoNavigateToAI}
+            />
+          )}
 
-        {currentVariants.length > 0 && currentVariants[0] && (
-          <ExperimentCodeInjection
-            experimentId={experiment.id}
-            variantIndex={0}
-            initialCode={extractInjectionCode(currentVariants[0])}
-            domChangesUrlFilter={extractDomChangesUrlFilter(currentVariants[0])}
-            onChange={handleInjectionCodeChange}
-            canEdit={
-              experiment.state !== "running" &&
-              experiment.state !== "development"
-            }
-          />
-        )}
+          {currentVariants.length > 0 && currentVariants[0] && (
+            <ExperimentCodeInjection
+              experimentId={experiment.id}
+              variantIndex={0}
+              initialCode={extractInjectionCode(currentVariants[0])}
+              domChangesUrlFilter={extractDomChangesUrlFilter(
+                currentVariants[0]
+              )}
+              onChange={handleInjectionCodeChange}
+              canEdit={
+                experiment.state !== "running" &&
+                experiment.state !== "development"
+              }
+            />
+          )}
+        </fieldset>
 
         {(experiment.state === "running" ||
           experiment.state === "development") && (
@@ -464,31 +552,37 @@ export function ExperimentDetail({
 
         <div className="pt-4 flex gap-2">
           <Button
+            id="experiment-detail-cancel"
+            onClick={handleBack}
+            variant="secondary"
+            size="sm"
+            disabled={loading || saving || leaving}>
+            Cancel
+          </Button>
+          <Button
+            id="experiment-detail-save"
             onClick={handleSaveChanges}
-            variant="primary"
+            variant={isDirty ? "primary" : "secondary"}
             size="sm"
             disabled={
+              !isDirty ||
               loading ||
               saving ||
+              leaving ||
               experiment.state === "running" ||
               experiment.state === "development"
             }
-            className={hasUnsavedChanges ? "ring-2 ring-yellow-400" : ""}
             title={
               experiment.state === "running" ||
               experiment.state === "development"
                 ? "Stop the experiment to save changes"
                 : saving
                   ? "Saving..."
-                  : hasUnsavedChanges
+                  : isDirty
                     ? "Save your changes"
                     : "No changes to save"
             }>
-            {saving
-              ? "Saving..."
-              : hasUnsavedChanges
-                ? "• Save Changes"
-                : "Save Changes"}
+            {saving ? "Saving..." : "Save Changes"}
           </Button>
         </div>
       </div>

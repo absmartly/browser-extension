@@ -1,0 +1,295 @@
+import { act, cleanup, fireEvent, render } from "@testing-library/react"
+import React, { useState } from "react"
+
+import "@testing-library/jest-dom"
+
+import { sendToContent } from "~src/lib/messaging"
+import { localAreaStorage } from "~src/utils/storage"
+
+import { ExperimentCodeInjection } from "../ExperimentCodeInjection"
+import { VariantList } from "../VariantList"
+
+jest.mock("~src/lib/messaging", () => ({
+  sendToContent: jest.fn().mockResolvedValue(undefined)
+}))
+jest.mock("~src/utils/storage", () => ({
+  localAreaStorage: {
+    get: jest.fn().mockResolvedValue(null),
+    set: jest.fn().mockResolvedValue(undefined),
+    remove: jest.fn().mockResolvedValue(undefined)
+  },
+  sessionStorage: {
+    get: jest.fn().mockResolvedValue(null),
+    set: jest.fn().mockResolvedValue(undefined),
+    remove: jest.fn().mockResolvedValue(undefined)
+  }
+}))
+jest.mock("~src/utils/storage-cleanup", () => ({
+  clearVisualEditorSessionStorage: jest.fn().mockResolvedValue(undefined)
+}))
+
+let listeners: Set<any>
+let storageListeners: Set<any>
+let update: jest.Mock
+let currentVariants: any[]
+const el = (id: string) => document.getElementById(id)!
+const variant = (name: string, pattern: string) => ({
+  name,
+  config: {
+    color: "blue",
+    __dom_changes: {
+      changes: [],
+      urlFilter: { include: [pattern], mode: "simple", matchType: "path" }
+    }
+  }
+})
+const server = [{ name: "Control", config: {} }, variant("Variant 1", "/old/*")]
+const restored = [server[0], variant("Draft B", "/new/*")]
+
+function Parent({
+  initial = server,
+  withInjection = false
+}: {
+  initial?: any[]
+  withInjection?: boolean
+}) {
+  const [variants, setVariants] = useState(initial)
+  currentVariants = variants
+  return (
+    <>
+      <VariantList
+        experimentId={501}
+        experimentName="synthetic"
+        domFieldName="__dom_changes"
+        initialVariants={variants}
+        onVariantsChange={(next) => {
+          update(next)
+          setVariants(next)
+        }}
+      />
+      {withInjection && (
+        <ExperimentCodeInjection
+          experimentId={501}
+          variantIndex={0}
+          canEdit={true}
+          initialCode={variants[0].config.__inject_html}
+          onChange={(code) =>
+            setVariants((current) => [
+              {
+                ...current[0],
+                config: { ...current[0].config, __inject_html: code }
+              },
+              ...current.slice(1)
+            ])
+          }
+        />
+      )}
+    </>
+  )
+}
+
+beforeEach(() => {
+  jest.clearAllMocks()
+  jest.mocked(localAreaStorage.get).mockResolvedValue(null)
+  update = jest.fn()
+  listeners = new Set()
+  storageListeners = new Set()
+  ;(global as any).chrome = {
+    tabs: {
+      query: jest
+        .fn()
+        .mockResolvedValue([
+          { id: 1, url: "https://example.invalid/products/1" }
+        ])
+    },
+    runtime: {
+      onMessage: {
+        addListener: (f: any) => listeners.add(f),
+        removeListener: (f: any) => listeners.delete(f)
+      },
+      sendMessage: jest.fn().mockResolvedValue({})
+    },
+    storage: {
+      session: {
+        onChanged: {
+          addListener: (f: any) => storageListeners.add(f),
+          removeListener: (f: any) => storageListeners.delete(f)
+        }
+      }
+    }
+  }
+})
+afterEach(() => {
+  cleanup()
+  document.body.innerHTML = ""
+})
+
+it("restores a renamed draft and saves its current URL pattern after a match-type edit", async () => {
+  let release!: (value: any) => void
+  const pending = new Promise((resolve) => {
+    release = resolve
+  })
+  jest
+    .mocked(localAreaStorage.get)
+    .mockImplementation((key: any) =>
+      key === "experiment-501-variants" ? pending : Promise.resolve(null)
+    )
+  render(<Parent />)
+  await act(async () => {
+    release(restored)
+  })
+  expect(el("variant-name-input-1")).toHaveValue("Draft B")
+  fireEvent.click(el("url-filtering-toggle-variant-1"))
+  expect(el("url-filter-pattern-variant-1-0")).toHaveValue("/new/*")
+  fireEvent.change(el("url-filter-match-type-variant-1"), {
+    target: { value: "full-url" }
+  })
+  expect(update.mock.calls.at(-1)[0][1].config.__dom_changes.urlFilter).toEqual(
+    { include: ["/new/*"], mode: "simple", matchType: "full-url" }
+  )
+})
+
+it("refreshes child inputs when an external replacement changes a variant config", async () => {
+  const props = {
+    experimentId: 501,
+    experimentName: "synthetic",
+    domFieldName: "__dom_changes",
+    onVariantsChange: update
+  }
+  const view = render(<VariantList {...props} initialVariants={server} />)
+  await act(async () => {})
+  view.rerender(<VariantList {...props} initialVariants={restored} />)
+  await act(async () => {})
+  fireEvent.click(el("url-filtering-toggle-variant-1"))
+  expect(el("url-filter-pattern-variant-1-0")).toHaveValue("/new/*")
+})
+
+it("preserves an unfinished sibling DOM change through a Control injection update", async () => {
+  render(<Parent withInjection />)
+  await act(async () => {})
+  fireEvent.click(el("add-dom-change-button"))
+  fireEvent.change(el("dom-change-type-1-new"), {
+    target: { value: "text" }
+  })
+  fireEvent.change(el("dom-change-selector-1-new"), {
+    target: { value: "#unsaved-heading" }
+  })
+  fireEvent.change(el("dom-change-text-1-new"), {
+    target: { value: "Updated heading" }
+  })
+  fireEvent.click(el("custom-code-injection-button"))
+  fireEvent.click(el("code-injection-url-filter-toggle"))
+  fireEvent.change(el("code-injection-url-filter-mode"), {
+    target: { value: "simple" }
+  })
+  await act(async () => {})
+  expect(el("dom-change-selector-1-new")).toHaveValue("#unsaved-heading")
+  expect(el("dom-change-text-1-new")).toHaveValue("Updated heading")
+  fireEvent.click(el("dom-change-save-1-new"))
+  expect(update.mock.calls.at(-1)[0][1].config.__dom_changes.changes).toEqual([
+    expect.objectContaining({
+      selector: "#unsaved-heading",
+      value: "Updated heading"
+    })
+  ])
+})
+
+it.each([
+  "VISUAL_EDITOR_CHANGES",
+  "VISUAL_EDITOR_CHANGES_COMPLETE",
+  "storage",
+  "window"
+])(
+  "retains a Control injection edit when an unchanged sibling receives %s",
+  async (type) => {
+    render(<Parent withInjection />)
+    await act(async () => {})
+    fireEvent.click(el("custom-code-injection-button"))
+    fireEvent.click(el("code-injection-url-filter-toggle"))
+    fireEvent.change(el("code-injection-url-filter-mode"), {
+      target: { value: "simple" }
+    })
+    fireEvent.change(
+      document.querySelector('input[placeholder="/products/*"]')!,
+      {
+        target: { value: "/injection/*" }
+      }
+    )
+    await act(async () => {})
+    const controlBefore = structuredClone(currentVariants[0])
+    expect(controlBefore.config.__inject_html.urlFilter.include).toEqual([
+      "/injection/*"
+    ])
+    await act(async () => {
+      fireEvent.click(el("visual-editor-button"))
+    })
+    expect(sendToContent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "START_VISUAL_EDITOR",
+        variantName: "Variant 1"
+      })
+    )
+    const change = { selector: "#heading", type: "text", value: "VE update" }
+    const message = { type, variantName: "Variant 1", changes: [change] }
+    await act(async () => {
+      if (type === "storage") {
+        for (const fn of [...storageListeners]) {
+          fn({ visualEditorChanges: { newValue: message } })
+        }
+      } else if (type === "window") {
+        window.dispatchEvent(
+          new MessageEvent("message", {
+            source: window,
+            origin: window.location.origin,
+            data: {
+              ...message,
+              type: "VISUAL_EDITOR_CHANGES",
+              source: "absmartly-visual-editor"
+            }
+          })
+        )
+      } else {
+        for (const fn of [...listeners]) fn(message, {}, () => {})
+      }
+    })
+    const saved = update.mock.calls.at(-1)[0]
+    expect(saved[1].config.__dom_changes.changes).toEqual([change])
+    expect(saved[0]).toEqual(controlBefore)
+  }
+)
+
+it.each(["VISUAL_EDITOR_CHANGES", "VISUAL_EDITOR_CHANGES_COMPLETE", "storage"])(
+  "does not restore a deleted variant when surviving B receives %s",
+  async (type) => {
+    render(
+      <Parent
+        initial={[server[0], variant("A", "/a/*"), variant("B", "/b/*")]}
+      />
+    )
+    await act(async () => {})
+    fireEvent.click(el("variant-delete-1"))
+    expect(update.mock.calls.at(-1)[0].map((v: any) => v.name)).toEqual([
+      "Control",
+      "B"
+    ])
+    const change = { selector: "#heading", type: "text", value: "Updated B" }
+    await act(async () => {
+      if (type === "storage") {
+        for (const fn of [...storageListeners])
+          fn({
+            visualEditorChanges: {
+              newValue: { variantName: "B", changes: [change] }
+            }
+          })
+      } else {
+        for (const fn of [...listeners])
+          fn({ type, variantName: "B", changes: [change] }, {}, () => {})
+      }
+    })
+    const saved = update.mock.calls.at(-1)[0]
+    expect(saved.map((v: any) => v.name)).toEqual(["Control", "B"])
+    expect(saved[1].config.color).toBe("blue")
+    expect(saved[1].config.__dom_changes.changes).toEqual([change])
+    expect(saved[1].config.__dom_changes.urlFilter.include).toEqual(["/b/*"])
+  }
+)

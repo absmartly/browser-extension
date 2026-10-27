@@ -182,6 +182,7 @@ export const VariantCard = React.memo(function VariantCard({
         </Button>
         {canEdit && canAddRemove && allVariantsCount > 2 && (
           <button
+            id={`variant-delete-${index}`}
             type="button"
             onClick={onRemove}
             className="p-1 text-red-600 hover:text-red-800"

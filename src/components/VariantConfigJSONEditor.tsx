@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from "react"
 
 import { sendToContent } from "~src/lib/messaging"
+import { getVariantConfigError } from "~src/lib/variant-config-validation"
 
 import type { Variant } from "./VariantList"
 
@@ -9,6 +10,7 @@ interface VariantConfigJSONEditorProps {
   onClose: () => void
   variant: Variant
   onSave: (variant: Variant) => void
+  domFieldName?: string
 }
 
 /**
@@ -18,7 +20,7 @@ interface VariantConfigJSONEditorProps {
  */
 export const VariantConfigJSONEditor: React.FC<
   VariantConfigJSONEditorProps
-> = ({ isOpen, onClose, variant, onSave }) => {
+> = ({ isOpen, onClose, variant, onSave, domFieldName = "__dom_changes" }) => {
   const onSaveRef = useRef(onSave)
   const onCloseRef = useRef(onClose)
 
@@ -41,7 +43,8 @@ export const VariantConfigJSONEditor: React.FC<
           type: "OPEN_JSON_EDITOR",
           data: {
             variantName: variant.name,
-            value: JSON.stringify(fullConfig, null, 2)
+            value: JSON.stringify(fullConfig, null, 2),
+            domFieldName
           }
         })
       } catch (error) {
@@ -55,27 +58,10 @@ export const VariantConfigJSONEditor: React.FC<
         try {
           const parsedConfig = JSON.parse(message.value)
 
-          // Validate: must be an object
-          if (typeof parsedConfig !== "object" || parsedConfig === null) {
-            console.error("Variant config must be an object")
+          const configError = getVariantConfigError(parsedConfig, domFieldName)
+          if (configError) {
+            console.error(configError)
             return
-          }
-
-          // Validate DOM changes format if present
-          if (parsedConfig.__dom_changes) {
-            const domChanges = parsedConfig.__dom_changes
-            if (!Array.isArray(domChanges)) {
-              if (
-                typeof domChanges !== "object" ||
-                !domChanges.changes ||
-                !Array.isArray(domChanges.changes)
-              ) {
-                console.error(
-                  "__dom_changes must be either an array or an object with a changes array"
-                )
-                return
-              }
-            }
           }
 
           // Create updated variant - keep full config as-is
@@ -109,7 +95,7 @@ export const VariantConfigJSONEditor: React.FC<
       }
       closeEditor()
     }
-  }, [isOpen, variant])
+  }, [isOpen, variant, domFieldName])
 
   return null
 }

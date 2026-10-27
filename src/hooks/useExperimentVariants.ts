@@ -35,7 +35,7 @@ export function useExperimentVariants({
         let config: VariantConfig = {}
 
         const configStr = v.config || "{}"
-        const parseResult = safeParseVariantConfig(configStr)
+        const parseResult = safeParseVariantConfig(configStr, domFieldName)
 
         if (parseResult.success) {
           config = parseResult.data as VariantConfig
