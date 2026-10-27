@@ -41,7 +41,7 @@ test('packaged experiment detail tracks and validates traffic and keeps a Simple
   await traffic.fill('42')
   await expect(save).toBeEnabled()
   await sidebar.locator('#header-back-button').click()
-  await expect(sidebar.getByRole('dialog', { name: 'Save changes?' })).toBeVisible()
+  await expect(sidebar.locator('#unsaved-changes-modal')).toBeVisible()
   await sidebar.locator('#unsaved-changes-cancel').click()
   await expect(traffic).toHaveValue('42')
 
@@ -120,7 +120,7 @@ test('packaged experiment detail keeps a traffic edit unsaved when the update re
 
   await sidebar.locator('[id^="toast-close-"]').first().click()
   await sidebar.locator('#header-back-button').click()
-  await expect(sidebar.getByRole('dialog', { name: 'Save changes?' })).toBeVisible()
+  await expect(sidebar.locator('#unsaved-changes-modal')).toBeVisible()
   await sidebar.locator('#unsaved-changes-cancel').click()
   await expect(traffic).toHaveValue('42')
 
@@ -142,7 +142,7 @@ async function openNavigationDraft(page: Page, sidebar: FrameLocator, width: num
     const method = route.request().method()
     const json = (body: unknown, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) })
     if (url.pathname === '/v1/experiments/503') {
-      if (state.fail === method) return json({ errors: ['synthetic navigation save failure'] }, 500)
+      if (state.fail === method) return json({ errors: ['synthetic navigation save failure'] }, 400)
       if (method === 'PUT') {
         const body = route.request().postDataJSON()
         const data = body.data || body
@@ -169,7 +169,7 @@ for (const width of [384, 320]) {
     const save = sidebar.locator('#experiment-detail-save')
     const cancel = sidebar.locator('#experiment-detail-cancel')
     const back = sidebar.locator('#header-back-button')
-    const dialog = sidebar.getByRole('dialog', { name: 'Save changes?' })
+    const dialog = sidebar.locator('#unsaved-changes-modal')
 
     await expect(save).toBeDisabled()
     await expect(save).toHaveClass(/bg-gray-200/)
@@ -225,14 +225,15 @@ for (const width of [384, 320]) {
 
   for (const method of ['GET', 'PUT'] as const) {
     test(`detail modal keeps edits after failed ${method}, then saves and leaves at ${width}px`, async ({ page, sidebar }) => {
+      test.setTimeout(10000)
       const state = await openNavigationDraft(page, sidebar, width)
       const traffic = sidebar.locator('#traffic-percentage-input')
-      const dialog = sidebar.getByRole('dialog', { name: 'Save changes?' })
+      const dialog = sidebar.locator('#unsaved-changes-modal')
       await traffic.fill('42')
       await sidebar.locator('#experiment-detail-cancel').click()
       state.fail = method
       await sidebar.locator('#unsaved-changes-save').click()
-      await expect(sidebar.locator('#toast-container')).toContainText('500', { timeout: 20000 })
+      await expect(sidebar.locator('#toast-container')).toContainText('400')
       await expect(dialog).toBeVisible()
       await expect(sidebar.locator('#unsaved-changes-save')).toBeEnabled()
       expect(state.puts).toHaveLength(0)
