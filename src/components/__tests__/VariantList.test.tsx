@@ -247,7 +247,7 @@ describe("VariantList", () => {
       }
     })
 
-    it("keeps the surviving card mounted when a preceding variant is removed", () => {
+    it("keeps the surviving variant when a preceding row is removed and another is added", () => {
       render(
         <VariantList
           {...defaultProps}
@@ -257,13 +257,12 @@ describe("VariantList", () => {
           ]}
         />
       )
-      const input = document.getElementById("variant-name-input-2")!
       fireEvent.click(document.getElementById("variant-delete-1")!)
-      expect(document.getElementById("variant-name-input-1")).toBe(input)
-      expect(input).toHaveValue("Variant B")
+      const survivor = document.getElementById("variant-name-input-1")!
+      expect(survivor).toHaveValue("Variant B")
       fireEvent.click(document.getElementById("add-variant-button")!)
-      expect(document.getElementById("variant-name-input-1")).toBe(input)
-      expect(document.getElementById("variant-name-input-2")).not.toBe(input)
+      expect(document.getElementById("variant-name-input-1")).toBe(survivor)
+      expect(document.getElementById("variant-name-input-2")).not.toBe(survivor)
     })
 
     it("should render variant cards", () => {

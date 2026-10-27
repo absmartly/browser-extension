@@ -413,3 +413,55 @@ for (const width of [384, 320]) {
     })
   }
 }
+
+for (const width of [384, 320]) {
+  test(`detail restores renamed draft URL controls before another edit at ${width}px`, async ({ page, sidebar }) => {
+    test.setTimeout(10000)
+    const config = (pattern: string) => ({ __dom_changes: { changes: [], urlFilter: { include: [pattern], mode: 'simple', matchType: 'path' } } })
+    const state = await openNavigationDraft(page, sidebar, width, {
+      variants: [{ variant: 0, name: 'Control', config: '{}' }, { variant: 1, name: 'Variant 1', config: JSON.stringify(config('/old/*')) }]
+    })
+    const frameBody = sidebar.locator('body')
+    await frameBody.evaluate(() => {
+      const originalGet = chrome.storage.local.get.bind(chrome.storage.local)
+      chrome.storage.local.get = ((keys: any) => {
+        const names = typeof keys === 'string' ? [keys] : Array.isArray(keys) ? keys : Object.keys(keys || {})
+        if (names.includes('experiment-503-variants')) {
+          return Promise.resolve({ 'experiment-503-variants': JSON.stringify([
+            { name: 'Control', config: {} },
+            { name: 'Draft B', config: { __dom_changes: { changes: [], urlFilter: { include: ['/new/*'], mode: 'simple', matchType: 'path' } } } }
+          ]) })
+        }
+        return originalGet(keys)
+      }) as typeof chrome.storage.local.get
+    })
+    // Preserve the real detail navigation path, injecting only the stored draft.
+    await sidebar.locator('#header-back-button').click()
+    await sidebar.locator('[data-experiment-name="ft_2251_navigation"]').click()
+    await expect(sidebar.locator('#variant-name-input-1')).toHaveValue('Draft B')
+    await sidebar.locator('#url-filtering-toggle-variant-1').click()
+    await expect(sidebar.locator('#url-filter-pattern-variant-1-0')).toHaveValue('/new/*')
+    await sidebar.locator('#url-filter-match-type-variant-1').selectOption('full-url')
+    await sidebar.locator('#experiment-detail-save').click()
+    await expect.poll(() => state.puts.length).toBe(1)
+    expect(JSON.parse(state.puts[0].variants[1].config).__dom_changes.urlFilter).toEqual({ include: ['/new/*'], mode: 'simple', matchType: 'full-url' })
+  })
+
+  test(`detail keeps a deleted variant removed after a surviving VE update at ${width}px`, async ({ page, sidebar }) => {
+    test.setTimeout(10000)
+    const state = await openNavigationDraft(page, sidebar, width, {
+      variants: [{ variant: 0, name: 'Control', config: '{}' }, { variant: 1, name: 'A', config: '{}' }, { variant: 2, name: 'B', config: '{}' }]
+    })
+    await sidebar.locator('#variant-delete-1').click()
+    await expect(sidebar.locator('#variant-name-input-1')).toHaveValue('B')
+    await expect(sidebar.locator('#variant-name-input-2')).toHaveCount(0)
+    await sidebar.locator('body').evaluate(() => window.postMessage({ source: 'absmartly-visual-editor', type: 'VISUAL_EDITOR_CHANGES', variantName: 'B', changes: [{ selector: '#main-title', type: 'text', value: 'Updated B' }] }, window.location.origin))
+    await expect(sidebar.locator('#dom-change-checkbox-0')).toBeVisible()
+    await expect(sidebar.locator('#variant-name-input-1')).toHaveValue('B')
+    await expect(sidebar.locator('#variant-name-input-2')).toHaveCount(0)
+    await sidebar.locator('#experiment-detail-save').click()
+    await expect.poll(() => state.puts.length).toBe(1)
+    expect(state.puts[0].variants.map((v: any) => v.name)).toEqual(['Control', 'B'])
+    expect(JSON.parse(state.puts[0].variants[1].config).__dom_changes.changes).toEqual([{ selector: '#main-title', type: 'text', value: 'Updated B' }])
+  })
+}

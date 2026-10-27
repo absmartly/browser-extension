@@ -58,12 +58,22 @@ export function VariantList({
   autoNavigateToAI
 }: VariantListProps) {
   const [variants, setVariantsState] = useState<Variant[]>(initialVariants)
+  const variantsRef = useRef(initialVariants)
   const variantKeys = useRef(initialVariants.map((_, index) => index))
   const nextVariantKey = useRef(initialVariants.length)
   const setVariants = useCallback((nextVariants: Variant[]) => {
+    variantsRef.current = nextVariants
     variantKeys.current = nextVariants.map(
       (_, index) => variantKeys.current[index] ?? nextVariantKey.current++
     )
+    setVariantsState(nextVariants)
+  }, [])
+  // Local typing retains focus. Replacing the draft resets child editor state
+  // so controls and listeners cannot retain values from the previous draft.
+  const replaceVariants = useCallback((nextVariants: Variant[]) => {
+    if (nextVariants === variantsRef.current) return
+    variantsRef.current = nextVariants
+    variantKeys.current = nextVariants.map(() => nextVariantKey.current++)
     setVariantsState(nextVariants)
   }, [])
   const [activeVEVariant, setActiveVEVariant] = useState<string | null>(null)
@@ -119,7 +129,7 @@ export function VariantList({
               JSON.stringify(savedVariants) !== JSON.stringify(initialVariants)
 
             if (hasActualChanges) {
-              setVariants(savedVariants)
+              replaceVariants(savedVariants)
               justUpdatedRef.current = true
               onVariantsChange(savedVariants, true)
             }
@@ -137,7 +147,7 @@ export function VariantList({
       try {
         const savedVariants = await storage.get(storageKey)
         if (savedVariants && Array.isArray(savedVariants)) {
-          setVariants(savedVariants)
+          replaceVariants(savedVariants)
           justUpdatedRef.current = true
           onVariantsChange(savedVariants, true)
         }
@@ -154,7 +164,7 @@ export function VariantList({
       return
     }
 
-    setVariants(initialVariants)
+    replaceVariants(initialVariants)
   }, [initialVariants, experimentId])
 
   const saveToStorage = (updatedVariants: Variant[]) => {
@@ -185,6 +195,7 @@ export function VariantList({
     updateVariants(newVariants)
   }
 
+  // Card keys also include the index to renew index-bound editor subscriptions.
   const removeVariant = (index: number) => {
     const newVariants = variants.filter((_, i) => i !== index)
     variantKeys.current.splice(index, 1)
@@ -533,7 +544,7 @@ export function VariantList({
 
           return (
             <VariantCard
-              key={`${experimentId}-${variantKeys.current[index]}`}
+              key={`${experimentId}-${variantKeys.current[index]}-${index}`}
               variant={variant}
               index={index}
               isExpanded={isExpanded}
@@ -623,6 +634,7 @@ export function VariantList({
             if (jsonEditorVariant !== null) {
               const newVariants = [...variants]
               newVariants[jsonEditorVariant] = updatedVariant
+              variantKeys.current[jsonEditorVariant] = nextVariantKey.current++
               updateVariants(newVariants)
             }
             setJsonEditorOpen(false)
