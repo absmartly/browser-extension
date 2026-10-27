@@ -36,6 +36,19 @@ import { UnsavedChangesModal } from "./UnsavedChangesModal"
 import { VariantList } from "./VariantList"
 import type { Variant } from "./VariantList"
 
+// JSON object key order can change when saved config is parsed on refresh.
+// Compare persisted values while retaining the order of variants and arrays.
+const variantSnapshot = (variants: Variant[]) =>
+  JSON.stringify(variants, (_key, value) =>
+    value && typeof value === "object" && !Array.isArray(value)
+      ? Object.fromEntries(
+          Object.keys(value)
+            .sort()
+            .map((key) => [key, value[key]])
+        )
+      : value
+  )
+
 interface ExperimentDetailProps {
   experiment: Experiment
   onBack: () => void
@@ -119,7 +132,7 @@ export function ExperimentDetail({
   }, [experiment.display_name, experiment.name])
   useEffect(() => {
     setSavedVariants((previous) =>
-      JSON.stringify(previous) === JSON.stringify(initialVariants)
+      variantSnapshot(previous) === variantSnapshot(initialVariants)
         ? previous
         : initialVariants
     )
@@ -148,7 +161,7 @@ export function ExperimentDetail({
   const isDirty =
     metadataChanged ||
     displayName !== savedDisplayName ||
-    JSON.stringify(currentVariants) !== JSON.stringify(savedVariants)
+    variantSnapshot(currentVariants) !== variantSnapshot(savedVariants)
   const traffic = metadata.percentage_of_traffic
   const trafficError =
     Number.isFinite(traffic) && traffic >= 0 && traffic <= 100

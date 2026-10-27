@@ -241,6 +241,14 @@ for (const width of [384, 320]) {
     await sidebar.locator('#experiment-detail-save').click()
     await expect.poll(() => state.puts.length).toBe(1)
     expect(JSON.parse(state.puts[0].variants[1].config)).toMatchObject({ color: 'green', __dom_changes: { changes: [], urlFilter: '/products/*' } })
+    await expect(sidebar.locator('#experiment-detail-save')).toBeDisabled()
+    await sidebar.locator('[id^="toast-close-"]').first().click()
+    await sidebar.locator('#header-back-button').click()
+    await expect(sidebar.locator('[data-experiment-name="ft_2251_navigation"]')).toBeVisible()
+    await sidebar.locator('[data-experiment-name="ft_2251_navigation"]').click()
+    await sidebar.locator('#json-editor-button-variant-1').click()
+    await expect(editor).toContainText('green')
+    await expect(page.locator('#json-editor-status')).toHaveText('✓ Valid JSON')
   })
 
   test(`detail guards immediate Back after a code-injection URL edit at ${width}px`, async ({ page, sidebar }) => {
