@@ -2,6 +2,8 @@
  * SDK Interceptor Unit Tests
  */
 
+import { runInNewContext } from "node:vm"
+
 import { SDKInterceptor } from "../../sdk/sdk-interceptor"
 import { Logger } from "../../utils/logger"
 
@@ -100,6 +102,89 @@ describe("SDKInterceptor", () => {
         "test_event",
         eventData
       )
+    })
+
+    it("keeps the message of SDK error events (Error objects)", () => {
+      const mockOriginalLogger = jest.fn()
+      const mockContext: any = {
+        eventLogger: jest.fn(() => mockOriginalLogger),
+        _eventLogger: mockOriginalLogger
+      }
+
+      interceptor.interceptEventLogger(mockContext)
+
+      const error = new Error("fixture collector failure")
+      mockContext._eventLogger(mockContext, "error", error)
+
+      const forwarded = mockCallback.mock.calls[0][1]
+      expect(forwarded).toMatchObject({
+        name: "Error",
+        message: "fixture collector failure"
+      })
+      expect(typeof forwarded.stack).toBe("string")
+      expect(() => structuredClone(forwarded)).not.toThrow()
+      expect(mockOriginalLogger).toHaveBeenCalledWith(
+        mockContext,
+        "error",
+        error
+      )
+    })
+
+    it.each([false, true])(
+      "keeps a cross-realm Error's details (nested: %s)",
+      (nested) => {
+        const mockContext: any = {
+          eventLogger: jest.fn(() => null),
+          _eventLogger: jest.fn()
+        }
+        interceptor.interceptEventLogger(mockContext)
+        const foreignError = runInNewContext(
+          'new Error("iframe publisher failure")'
+        )
+        foreignError.status = 503
+        expect(foreignError).not.toBeInstanceOf(Error)
+
+        mockContext._eventLogger(
+          mockContext,
+          "error",
+          nested ? { cause: foreignError } : foreignError
+        )
+
+        const forwarded = nested
+          ? mockCallback.mock.calls[0][1].cause
+          : mockCallback.mock.calls[0][1]
+        expect(forwarded).toMatchObject({
+          name: "Error",
+          message: "iframe publisher failure",
+          status: 503
+        })
+        expect(forwarded.stack).toBe(foreignError.stack)
+        expect(() => structuredClone(forwarded)).not.toThrow()
+      }
+    )
+
+    it("keeps enumerable fields of Error subclasses and nested errors", () => {
+      const mockContext: any = {
+        eventLogger: jest.fn(() => null),
+        _eventLogger: jest.fn()
+      }
+      interceptor.interceptEventLogger(mockContext)
+
+      class TimeoutError extends Error {
+        constructor(message: string) {
+          super(message)
+          this.name = "TimeoutError"
+        }
+      }
+      const error: any = new TimeoutError("Timeout")
+      error.status = 504
+      mockContext._eventLogger(mockContext, "error", { cause: error })
+
+      expect(mockCallback.mock.calls[0][1].cause).toMatchObject({
+        name: "TimeoutError",
+        message: "Timeout",
+        status: 504
+      })
     })
 
     it("should handle null event data", () => {
