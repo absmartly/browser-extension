@@ -129,6 +129,7 @@ export default function EventsDebugPage({ onBack }: EventsDebugPageProps) {
   }
 
   const confirmClearEvents = async () => {
+    if (clearPhaseRef.current !== "idle") return
     clearPhaseRef.current = "clearing"
     heldDuringReloadRef.current = []
     setEvents([])

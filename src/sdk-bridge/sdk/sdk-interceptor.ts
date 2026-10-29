@@ -14,7 +14,10 @@ export interface InterceptorCallbacks {
 
 // Error message/stack are non-enumerable, so plain JSON cloning yields {}.
 const serializeErrors = (_key: string, value: any) => {
-  if (value instanceof Error) {
+  if (
+    value instanceof Error ||
+    Object.prototype.toString.call(value) === "[object Error]"
+  ) {
     return {
       ...value,
       name: value.name,

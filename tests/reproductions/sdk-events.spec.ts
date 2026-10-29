@@ -12,7 +12,7 @@ const pageHtml = `<!doctype html><html><head><meta charset="utf-8"><title>SDK ev
   const sdk = new absmartly.SDK({
     client: { getContext: () => { throw new Error('offline') }, publish: () => { throw new Error('offline') }, request: () => { throw new Error('offline') } },
     provider: { getContextData: () => Promise.resolve({ experiments: [] }) },
-    publisher: { publish: () => window.failPublish ? Promise.reject(new Error('fixture publish failure')) : Promise.resolve() },
+    publisher: { publish: () => window.failPublish ? Promise.reject(window.failPublishError || new Error('fixture publish failure')) : Promise.resolve() },
   })
   const data = { experiments: [{ id: 1, name: 'ft2253_exp', unitType: 'fixture_user', iteration: 1, seedHi: 1, seedLo: 2, split: [0.5, 0.5], trafficSeedHi: 3, trafficSeedLo: 4, trafficSplit: [0, 1], fullOnVariant: 0, audience: '', audienceStrict: false, applications: [], variants: [{ name: 'A', config: '{}' }, { name: 'B', config: '{}' }] }] }
   const context = sdk.createContextWith({ units: { fixture_user: 'ft2253' } }, data, { publishDelay: -1, refreshPeriod: 0 })
@@ -104,6 +104,30 @@ test('SDK error events keep the error message', async ({ page, origin, mount }) 
   await expect(error).toContainText('fixture publish failure')
   await error.click()
   await expect(viewerHost(page).locator('.cm-content')).toContainText('fixture publish failure')
+})
+
+test('SDK publisher errors from a same-origin iframe retain their details', async ({ page, origin, mount }) => {
+  const sidebar = await openSdkEvents(page, origin, mount)
+  await sidebar.locator('#nav-events').click()
+  const isLocalError = await page.evaluate(async () => {
+    const iframe = document.createElement('iframe')
+    document.body.appendChild(iframe)
+    const error = new (iframe.contentWindow as any).Error('iframe publisher failure')
+    ;(window as any).failPublishError = error
+    ;(window as any).failPublish = true
+    const context = (window as any).ABsmartlyContext
+    context.track('before_iframe_publish_failure')
+    await context.publish().catch(() => undefined)
+    return error instanceof Error
+  })
+  expect(isLocalError).toBe(false)
+  const error = rows(sidebar).and(sidebar.locator('[data-event-name="error"]'))
+  await expect(error).toHaveCount(1)
+  await expect(error).toContainText('iframe publisher failure')
+  await error.click()
+  await expect(viewerHost(page).locator('.cm-content')).toContainText('"name": "Error"')
+  await expect(viewerHost(page).locator('.cm-content')).toContainText('"message": "iframe publisher failure"')
+  await expect(viewerHost(page).locator('.cm-content')).toContainText('"stack":')
 })
 
 test('Tab and Shift+Tab stay inside Event Details and Escape returns focus to the sidebar', async ({ page, origin, mount }) => {

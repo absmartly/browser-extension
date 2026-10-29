@@ -344,6 +344,57 @@ describe("EventsDebugPage", () => {
       })
     }
 
+    it("keeps post-clear events when confirmation is clicked twice before clearing finishes", async () => {
+      const finishClears: Array<(value: unknown) => void> = []
+      const finishReloads: Array<(value: unknown) => void> = []
+      const previous = mockSendMessage.getMockImplementation()
+      let initialFetch = true
+      mockSendMessage.mockImplementation((message: any) => {
+        if (message.type === "CLEAR_BUFFERED_EVENTS") {
+          return new Promise((resolve) => finishClears.push(resolve))
+        }
+        if (message.type === "GET_BUFFERED_EVENTS") {
+          if (initialFetch) {
+            initialFetch = false
+            return Promise.resolve({ success: true, events: [] })
+          }
+          return new Promise((resolve) => finishReloads.push(resolve))
+        }
+        return undefined
+      })
+
+      try {
+        render(<EventsDebugPage onBack={() => {}} />)
+        await waitFor(() => {
+          expect(screen.getByText("0 events captured")).toBeInTheDocument()
+        })
+        await openClearDialog()
+        const confirm = screen.getByText("Clear All")
+        fireEvent.click(confirm)
+        fireEvent.click(confirm)
+
+        await act(async () => {
+          finishClears.forEach((finish) => finish({ success: true }))
+        })
+        await act(async () => {
+          finishReloads[0]({ success: true, events: [] })
+        })
+        dispatchWithId("post-clear")
+        await act(async () => {
+          // A second reload, if started, must not overwrite a newer broadcast.
+          finishReloads
+            .slice(1)
+            .forEach((finish) => finish({ success: true, events: [] }))
+        })
+
+        expect(screen.getByText("1 event captured")).toBeInTheDocument()
+        expect(screen.getByText('{"id":"post-clear"}')).toBeInTheDocument()
+        expect(finishClears).toHaveLength(1)
+      } finally {
+        mockSendMessage.mockImplementation(previous)
+      }
+    })
+
     it("does not show events whose broadcasts arrive before the clear completes, and matches the buffer afterwards", async () => {
       let finishClear: (value: unknown) => void = () => {}
       let buffered: any[] = []

@@ -2,6 +2,8 @@
  * SDK Interceptor Unit Tests
  */
 
+import { runInNewContext } from "node:vm"
+
 import { SDKInterceptor } from "../../sdk/sdk-interceptor"
 import { Logger } from "../../utils/logger"
 
@@ -127,6 +129,39 @@ describe("SDKInterceptor", () => {
         error
       )
     })
+
+    it.each([false, true])(
+      "keeps a cross-realm Error's details (nested: %s)",
+      (nested) => {
+        const mockContext: any = {
+          eventLogger: jest.fn(() => null),
+          _eventLogger: jest.fn()
+        }
+        interceptor.interceptEventLogger(mockContext)
+        const foreignError = runInNewContext(
+          'new Error("iframe publisher failure")'
+        )
+        foreignError.status = 503
+        expect(foreignError).not.toBeInstanceOf(Error)
+
+        mockContext._eventLogger(
+          mockContext,
+          "error",
+          nested ? { cause: foreignError } : foreignError
+        )
+
+        const forwarded = nested
+          ? mockCallback.mock.calls[0][1].cause
+          : mockCallback.mock.calls[0][1]
+        expect(forwarded).toMatchObject({
+          name: "Error",
+          message: "iframe publisher failure",
+          status: 503
+        })
+        expect(forwarded.stack).toBe(foreignError.stack)
+        expect(() => structuredClone(forwarded)).not.toThrow()
+      }
+    )
 
     it("keeps enumerable fields of Error subclasses and nested errors", () => {
       const mockContext: any = {
