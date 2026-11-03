@@ -133,12 +133,17 @@ export const DOMChangeOptions: React.FC<DOMChangeOptionsProps> = ({
 
       {showObserverRoot && waitForElement && onObserverRootChange && (
         <div className="ml-6">
-          <div className="mb-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-            `waitForElement` only delays when the change is applied. `Observer
-            Root` is used as the immediate exposure trigger anchor, and if it is
-            empty exposure falls back to `body`, so all variants track
-            immediately.
-          </div>
+          {/* Only relevant for immediate exposure: with trigger-on-view the
+              SDK plugin waits for the element itself to be visible and never
+              uses Observer Root as an exposure anchor. */}
+          {!triggerOnView && (
+            <div className="mb-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              `waitForElement` only delays when the change is applied. `Observer
+              Root` is used as the immediate exposure trigger anchor, and if it
+              is empty exposure falls back to `body`, so all variants track
+              immediately.
+            </div>
+          )}
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Observer Root (optional)
           </label>
