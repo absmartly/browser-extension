@@ -24,6 +24,26 @@ describe("DOMChangeOptions", () => {
     )
   })
 
+  it("hides the observerRoot tracking warning when triggerOnView is enabled", () => {
+    render(
+      <DOMChangeOptions
+        waitForElement
+        triggerOnView
+        observerRoot=""
+        onWaitForElementChange={jest.fn()}
+        onTriggerOnViewChange={jest.fn()}
+        onObserverRootChange={jest.fn()}
+      />
+    )
+
+    expect(
+      screen.queryByText(
+        /`waitForElement` only delays when the change is applied/i
+      )
+    ).not.toBeInTheDocument()
+    expect(screen.getByText(/Observer Root \(optional\)/i)).toBeInTheDocument()
+  })
+
   it("hides the observerRoot tracking warning when waitForElement is disabled", () => {
     render(
       <DOMChangeOptions
