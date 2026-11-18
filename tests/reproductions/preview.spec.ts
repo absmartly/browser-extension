@@ -107,3 +107,18 @@ test('overlapping ancestor and descendant previews restore one original descenda
   await expect(page.locator('#structural-parent > p')).toHaveCount(1)
   expect(await sameNode(page, 'structural-child')).toBe(true)
 })
+
+test('created preview nodes are removed for every insertion position', async ({ page, origin }) => {
+  await openPreviewPage(page, origin)
+  const send = await previewSender(page, 'preview-create-positions')
+  await send('apply', ['before', 'after', 'firstChild', 'lastChild'].map(position => ({
+    selector: `create-${position}`, type: 'create', targetSelector: '#create-anchor', position,
+    element: `<p class="preview-created" data-position="${position}">${position}</p>`,
+  })))
+  await expect(page.locator('.preview-created')).toHaveCount(4)
+  await expect(page.locator('#create-anchor > .preview-created')).toHaveCount(2)
+
+  await send('remove')
+  await expect(page.locator('.preview-created')).toHaveCount(0)
+  expect(await sameNode(page, 'create-anchor-child')).toBe(true)
+})

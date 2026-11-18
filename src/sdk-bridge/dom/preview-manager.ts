@@ -36,9 +36,8 @@ export class PreviewManager {
   private domManipulator: DOMManipulator
   private styleManagers: Map<string, StyleSheetManager> = new Map()
   // Elements created by 'create' changes, keyed by experiment. The SDK's
-  // createElement doesn't expose the new node, so we diff parent children
-  // before/after to find them, then track here so removePreviewChanges can
-  // remove them on revert.
+  // createElement doesn't expose the new nodes, so mutation records around
+  // the call identify them for removal.
   private createdElementsMap: Map<string, Set<Element>> = new Map()
 
   constructor() {
@@ -116,28 +115,12 @@ export class PreviewManager {
       return false
     }
 
-    // For 'create' the change.selector is just a label — the real anchor is
-    // change.targetSelector. Snapshot the target's current children so we can
-    // diff after the SDK applies and identify the newly-inserted node(s).
-    let createTarget: Element | null = null
-    let createPreChildren: Set<Element> | null = null
     if (change.type === "create") {
-      const targetSel = (change as any).targetSelector
-      if (targetSel) {
-        try {
-          createTarget = document.querySelector(targetSel)
-          if (createTarget) {
-            const parent = createTarget.parentElement || createTarget
-            createPreChildren = new Set(Array.from(parent.children))
-          }
-        } catch {
-          /* invalid selector — SDK will surface its own error */
-        }
-      }
+      return this.applyCreateChange(change, experimentName)
     }
 
     // Capture original state BEFORE applying (for undo functionality)
-    if (change.type !== "styleRules" && change.type !== "create") {
+    if (change.type !== "styleRules") {
       try {
         const elements = document.querySelectorAll(change.selector)
         const filtered = Array.from(elements).filter(
@@ -172,34 +155,8 @@ export class PreviewManager {
     // It handles: styleRules, waitForElement, PendingChangeManager, all change types
     const success = this.domManipulator.applyChange(change, experimentName)
 
-    // For 'create': diff parent children to find the new node(s), tag them,
-    // and track in createdElementsMap so removePreviewChanges can detach them.
-    if (
-      success &&
-      change.type === "create" &&
-      createTarget &&
-      createPreChildren
-    ) {
-      const parent = createTarget.parentElement || createTarget
-      const after = Array.from(parent.children)
-      const newOnes = after.filter((el) => !createPreChildren!.has(el))
-      if (newOnes.length > 0) {
-        let bucket = this.createdElementsMap.get(experimentName)
-        if (!bucket) {
-          bucket = new Set()
-          this.createdElementsMap.set(experimentName, bucket)
-        }
-        for (const el of newOnes) {
-          bucket.add(el)
-          el.setAttribute("data-absmartly-experiment", experimentName)
-          el.setAttribute("data-absmartly-modified", "true")
-        }
-      }
-    }
-
-    // Mark applied elements AFTER for undo tracking (for non-styleRules,
-    // non-create — create marks the new element, not the reference).
-    if (success && change.type !== "styleRules" && change.type !== "create") {
+    // Mark applied elements AFTER for undo tracking.
+    if (success && change.type !== "styleRules") {
       try {
         const elements = document.querySelectorAll(change.selector)
         const filtered = Array.from(elements).filter(
@@ -216,6 +173,52 @@ export class PreviewManager {
     }
 
     return success
+  }
+
+  private applyCreateChange(
+    change: DOMChange,
+    experimentName: string
+  ): boolean {
+    let target: Element | null = null
+    try {
+      const targetSelector =
+        "targetSelector" in change ? change.targetSelector : undefined
+      target = targetSelector ? document.querySelector(targetSelector) : null
+    } catch {
+      // Invalid selector: the SDK reports its own failure.
+    }
+    const root = target?.parentNode || target
+    if (!root) return this.domManipulator.applyChange(change, experimentName)
+
+    // Observe the anchor's parent subtree so before/after and
+    // firstChild/lastChild insertions are all attributed to this change.
+    const observer = new MutationObserver(() => {})
+    observer.observe(root, { childList: true, subtree: true })
+    let success = false
+    let records: MutationRecord[] = []
+    try {
+      success = this.domManipulator.applyChange(change, experimentName)
+    } finally {
+      records = observer.takeRecords()
+      observer.disconnect()
+    }
+    if (!success) return false
+
+    let bucket = this.createdElementsMap.get(experimentName)
+    if (!bucket) {
+      bucket = new Set()
+      this.createdElementsMap.set(experimentName, bucket)
+    }
+    for (const record of records) {
+      for (const node of Array.from(record.addedNodes)) {
+        if (node instanceof Element && node.isConnected) {
+          bucket.add(node)
+          node.setAttribute("data-absmartly-experiment", experimentName)
+          node.setAttribute("data-absmartly-modified", "true")
+        }
+      }
+    }
+    return true
   }
 
   /**
