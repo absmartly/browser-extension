@@ -12,6 +12,8 @@ export class EventHandlers {
   private stateManager: StateManager
   private isEditing = false
   private hoverTooltip: HTMLElement | null = null
+  private hoverTarget: Element | null = null
+  private hoverFrame: number | null = null
   private hoverEnabled = true
 
   constructor(stateManager: StateManager) {
@@ -20,11 +22,7 @@ export class EventHandlers {
 
   setHoverEnabled(enabled: boolean): void {
     this.hoverEnabled = enabled
-    // Remove tooltip if disabling
-    if (!enabled && this.hoverTooltip) {
-      this.hoverTooltip.remove()
-      this.hoverTooltip = null
-    }
+    if (!enabled) this.cancelHoverTooltip()
   }
 
   handleMouseOver = (e: MouseEvent): void => {
@@ -54,10 +52,20 @@ export class EventHandlers {
     target.classList.add("absmartly-hover")
     // Don't update state on hover - it's just a visual effect!
 
-    // Show tooltip with element selector
-    if (this.hoverTooltip) {
-      this.hoverTooltip.remove()
+    // The tooltip is display-only and selector generation queries the whole
+    // document, so it runs once per frame for the element still hovered.
+    this.removeHoverTooltip()
+    this.hoverTarget = target
+    if (this.hoverFrame === null) {
+      this.hoverFrame = requestAnimationFrame(() => {
+        this.hoverFrame = null
+        if (this.hoverTarget) this.showHoverTooltip(this.hoverTarget)
+      })
     }
+  }
+
+  private showHoverTooltip(target: Element): void {
+    if (!target.isConnected) return
 
     const selector = generateRobustSelector(target, {
       preferDataAttributes: false,
@@ -66,6 +74,7 @@ export class EventHandlers {
       maxParentLevels: 3
     })
 
+    this.removeHoverTooltip()
     this.hoverTooltip = document.createElement("div")
     this.hoverTooltip.id = "absmartly-hover-tooltip"
     this.hoverTooltip.style.cssText = `
@@ -98,16 +107,27 @@ export class EventHandlers {
     document.body.appendChild(this.hoverTooltip)
   }
 
-  handleMouseOut = (e: MouseEvent): void => {
-    if (this.isEditing) return
-    ;(e.target as Element).classList.remove("absmartly-hover")
-    // Don't update state on hover - it's just a visual effect!
-
-    // Remove tooltip
+  private removeHoverTooltip(): void {
     if (this.hoverTooltip) {
       this.hoverTooltip.remove()
       this.hoverTooltip = null
     }
+  }
+
+  private cancelHoverTooltip(): void {
+    this.hoverTarget = null
+    if (this.hoverFrame !== null) {
+      cancelAnimationFrame(this.hoverFrame)
+      this.hoverFrame = null
+    }
+    this.removeHoverTooltip()
+  }
+
+  handleMouseOut = (e: MouseEvent): void => {
+    if (this.isEditing) return
+    ;(e.target as Element).classList.remove("absmartly-hover")
+    // Don't update state on hover - it's just a visual effect!
+    this.cancelHoverTooltip()
   }
 
   handleClick = (e: MouseEvent): void => {
@@ -226,12 +246,7 @@ export class EventHandlers {
     document.removeEventListener("mouseover", this.handleMouseOver, true)
     document.removeEventListener("mouseout", this.handleMouseOut, true)
     document.removeEventListener("click", this.handleClick, true)
-
-    // Clean up tooltip
-    if (this.hoverTooltip) {
-      this.hoverTooltip.remove()
-      this.hoverTooltip = null
-    }
+    this.cancelHoverTooltip()
   }
 }
 
