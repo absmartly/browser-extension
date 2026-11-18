@@ -47,10 +47,28 @@ interface SpecificElementApplier {
 // experiment's observers and drops its pending work without touching other
 // previews. Late matches are routed through applyOwned so they are captured
 // for restoration and rejected once the session is no longer current.
+// Depends on two SDK internals pinned by the ~1.3.2 range; if an upgrade
+// renames either, late SPA matches are no longer captured or restorable.
+let reportedMissingInternals = false
+
 class PreviewDOMManipulator extends DOMManipulatorLite {
   constructor(plugin: Record<string, any>, applyOwned: OwnedApplication) {
     super(true, plugin)
     const applier = this as unknown as SpecificElementApplier
+    const missing = [
+      typeof applier.applyChangeToSpecificElement !== "function" &&
+        "DOMManipulatorLite.prototype.applyChangeToSpecificElement",
+      !("pendingManager" in this) && "DOMManipulatorLite#pendingManager"
+    ].filter(Boolean)
+    if (missing.length > 0 && !reportedMissingInternals) {
+      reportedMissingInternals = true
+      // Always reported, not behind Logger's debug flag.
+      console.error(
+        "[ABsmartly Extension] @absmartly/sdk-plugins no longer exposes",
+        missing.join(", "),
+        "- late SPA preview changes cannot be captured or restored"
+      )
+    }
     this.pendingManager = new PendingChangeManager(
       (change, experimentName, element) => {
         if (!element) return this.applyChange(change, experimentName)
