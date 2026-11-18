@@ -600,13 +600,11 @@ describe("EditorCoordinator", () => {
       const keydownHandler = addEventListenerSpy.mock.calls[0][1]
       const event = new KeyboardEvent("keydown", { key: "Delete" })
       const preventDefaultSpy = jest.spyOn(event, "preventDefault")
-      const removeSpy = jest.spyOn(mockSelectedElement, "remove")
 
       keydownHandler(event)
 
       expect(preventDefaultSpy).toHaveBeenCalled()
-      expect(removeSpy).toHaveBeenCalled()
-      expect(mockUndoRedoManager.addChange).toHaveBeenCalled()
+      expect(mockCallbacks.deleteElement).toHaveBeenCalledTimes(1)
     })
 
     it("should not handle Delete key when in editing mode", () => {
@@ -624,6 +622,7 @@ describe("EditorCoordinator", () => {
 
       expect(preventDefaultSpy).not.toHaveBeenCalled()
       expect(mockUndoRedoManager.addChange).not.toHaveBeenCalled()
+      expect(mockCallbacks.deleteElement).not.toHaveBeenCalled()
     })
 
     it("should not handle shortcuts when no element is selected", () => {

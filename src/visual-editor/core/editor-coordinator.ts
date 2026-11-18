@@ -246,23 +246,14 @@ export class EditorCoordinator {
         return
       }
 
-      // Delete: Delete key
+      // Delete: Delete key. Same path as the context-menu Delete: the selector
+      // is generated while the element is still attached, and the removal is
+      // applied by the SDK replay so undo restores it.
       if (e.key === "Delete") {
         const selectedElement = this.stateManager.getState().selectedElement
         if (selectedElement && !this.eventHandlers.isEditingMode) {
           e.preventDefault()
-          selectedElement.remove()
-          const selector = this.callbacks.getSelector(
-            selectedElement as HTMLElement
-          )
-          const oldValue = selectedElement.outerHTML
-          this.undoRedoManager.addChange(
-            {
-              selector,
-              type: "delete"
-            },
-            oldValue
-          )
+          this.callbacks.deleteElement()
         }
       }
     }
