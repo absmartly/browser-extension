@@ -408,12 +408,14 @@ export class BackgroundAPIClient {
   async getFavorites(): Promise<number[]> {
     try {
       // favorites list not yet in CLI core, use generic request
-      const data = (await this.makeRequest("GET", "/favorites")) as Record<
-        string,
-        unknown
-      >
-      const experiments = data?.experiments
-      return Array.isArray(experiments) ? (experiments as number[]) : []
+      const data = (await this.makeRequest("GET", "/favorites")) as {
+        user_favorite_experiments?: unknown
+      } | null
+      const rows = data?.user_favorite_experiments
+      if (!Array.isArray(rows)) return []
+      return rows
+        .map((row) => (row as { experiment_id?: unknown })?.experiment_id)
+        .filter((id): id is number => Number.isInteger(id))
     } catch (error) {
       debugError("Failed to fetch favorites:", error)
       throw error
