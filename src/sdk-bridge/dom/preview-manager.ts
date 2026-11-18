@@ -14,7 +14,11 @@ import type { DOMChange } from "~src/types/dom-changes"
 
 import { sanitizeHTML } from "../utils/html-sanitizer"
 import { Logger } from "../utils/logger"
-import { ElementStateManager, type ElementState } from "./element-state"
+import {
+  ElementStateManager,
+  type ChildRestore,
+  type ElementState
+} from "./element-state"
 
 interface PreviewState {
   experimentName: string
@@ -59,13 +63,13 @@ class PreviewDOMManipulator extends DOMManipulatorLite {
   }
 }
 
-// JavaScript can mutate arbitrary descendants, so it owns child membership too.
-function changeOwnsChildren(change: DOMChange): boolean {
-  return (
-    change.type === "text" ||
-    change.type === "html" ||
-    change.type === "javascript"
-  )
+// text/html replace children, leaving the originals detached and intact.
+// JavaScript can mutate the original descendants in place, so only a
+// serialized copy taken before it ran is a faithful restore source.
+function childRestoreFor(change: DOMChange): ChildRestore {
+  if (change.type === "javascript") return "serialized"
+  if (change.type === "text" || change.type === "html") return "live"
+  return "none"
 }
 
 export class PreviewManager {
@@ -263,18 +267,22 @@ export class PreviewManager {
     change: DOMChange,
     experimentName: string
   ): void {
-    const ownsChildren = changeOwnsChildren(change)
+    const childRestore = childRestoreFor(change)
     const existing = this.previewStateMap.get(element)
     if (existing?.experimentName === experimentName) {
-      // The first snapshot already holds the original children.
-      if (ownsChildren) existing.originalState.restoreChildren = true
+      // The first snapshot already holds the original children and markup.
+      // Once a text/html change detached the originals, later changes cannot
+      // reach them, so only a "none" snapshot needs upgrading.
+      if (existing.originalState.childRestore === "none") {
+        existing.originalState.childRestore = childRestore
+      }
       return
     }
     this.previewStateMap.set(element, {
       experimentName,
       originalState: ElementStateManager.captureElementState(
         element,
-        ownsChildren
+        childRestore
       ),
       selector: change.selector,
       changeType: change.type

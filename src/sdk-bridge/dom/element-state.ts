@@ -9,16 +9,22 @@
 import { sanitizeHTML } from "../utils/html-sanitizer"
 import { Logger } from "../utils/logger"
 
+// How descendants are restored:
+// - "none": leave descendants untouched (style/attribute/class/move/delete).
+// - "live": put the captured original child nodes back (text/html replace
+//   children, so the originals are detached and unmodified).
+// - "serialized": re-parse the captured innerHTML (javascript can mutate the
+//   original descendants in place, so the live nodes are not a reliable copy).
+export type ChildRestore = "none" | "live" | "serialized"
+
 export interface ElementState {
   textContent: string
   innerHTML: string
   attributes: Record<string, string>
   styles: Record<string, string>
   classList: string[]
-  // Live original children. Restored only when the preview owns the content;
-  // style/attribute/class restoration leaves descendants untouched.
   childNodes?: Node[]
-  restoreChildren?: boolean
+  childRestore?: ChildRestore
   // Position in the DOM at capture time. Used to reattach an element if a
   // change like 'delete' or 'move' detaches it before the state is restored.
   // Held as live Node references — fine because a captured state is short-lived
@@ -35,7 +41,7 @@ export class ElementStateManager {
    */
   static captureElementState(
     element: Element,
-    restoreChildren = true
+    childRestore: ChildRestore = "live"
   ): ElementState {
     const htmlElement = element as HTMLElement
 
@@ -45,7 +51,7 @@ export class ElementStateManager {
       attributes: {},
       styles: {},
       classList: Array.from(element.classList),
-      restoreChildren,
+      childRestore,
       childNodes: Array.from(element.childNodes),
       parent: element.parentNode,
       nextSibling: element.nextSibling
@@ -113,10 +119,12 @@ export class ElementStateManager {
           "[ElementStateManager] Skipping innerHTML restoration for structural element:",
           element.tagName
         )
+      } else if (originalState.childRestore === "serialized") {
+        element.innerHTML = sanitizeHTML(originalState.innerHTML)
       } else if (originalState.childNodes) {
-        // Only content-changing previews own child membership. Reuse host nodes,
-        // including their listeners and form state, rather than parsing HTML.
-        if (originalState.restoreChildren) {
+        // Reuse host nodes, including their listeners and form state, rather
+        // than parsing HTML.
+        if (originalState.childRestore === "live") {
           element.replaceChildren(...originalState.childNodes)
         }
       } else {

@@ -261,31 +261,92 @@ describe("PreviewManager", () => {
       expect(byId("now").style.color).toBe("blue")
     })
 
-    it.each([
-      ["html", { type: "html", value: "<em>Preview</em>" }],
-      [
-        "javascript",
-        { type: "javascript", value: "element.innerHTML = '<em>JS</em>'" }
-      ]
-    ])(
-      "restores original children of a late %s mount",
-      async (_label, partial) => {
-        manager.applyPreviewChange(
-          { selector: "#late", ...partial } as DOMChange,
-          "exp"
-        )
-        mount('<div id="late"><span id="orig">O</span></div>')
-        const original = byId("orig")
-        await settle()
-        expect(byId("orig")).toBeNull()
-        expect(byId("late").querySelector("em")).not.toBeNull()
+    it("restores original children of a late html mount by identity", async () => {
+      manager.applyPreviewChange(
+        { selector: "#late", type: "html", value: "<em>Preview</em>" },
+        "exp"
+      )
+      mount('<div id="late"><span id="orig">O</span></div>')
+      const original = byId("orig")
+      await settle()
+      expect(byId("orig")).toBeNull()
+      expect(byId("late").querySelector("em")).not.toBeNull()
 
-        manager.removePreviewChanges("exp")
+      manager.removePreviewChanges("exp")
 
-        expect(byId("late").childNodes).toHaveLength(1)
-        expect(byId("late").firstChild).toBe(original)
-      }
+      expect(byId("late").childNodes).toHaveLength(1)
+      expect(byId("late").firstChild).toBe(original)
+    })
+
+    it("restores the original markup of a late javascript mount", async () => {
+      manager.applyPreviewChange(
+        {
+          selector: "#late",
+          type: "javascript",
+          value: "element.querySelector('span').textContent = 'JS'"
+        },
+        "exp"
+      )
+      mount('<div id="late"><span id="orig">O</span></div>')
+      await settle()
+      expect(byId("orig").textContent).toBe("JS")
+
+      manager.removePreviewChanges("exp")
+
+      expect(byId("late").innerHTML).toBe('<span id="orig">O</span>')
+    })
+  })
+
+  it("undoes javascript changes to existing descendants", () => {
+    document.body.innerHTML =
+      '<div id="p"><span id="s">orig</span><a id="l" href="/x">l</a></div>'
+
+    manager.applyPreviewChange(
+      {
+        selector: "#p",
+        type: "javascript",
+        value: [
+          "const s = element.querySelector('span')",
+          "s.textContent = 'JS'",
+          "s.style.color = 'red'",
+          "element.querySelector('a').setAttribute('href', '/js')"
+        ].join("\n")
+      },
+      "exp"
     )
+    expect(byId("s").textContent).toBe("JS")
+    expect(byId("s").style.color).toBe("red")
+    expect(byId("l").getAttribute("href")).toBe("/js")
+
+    manager.removePreviewChanges("exp")
+
+    expect(byId("s").textContent).toBe("orig")
+    expect(byId("s").hasAttribute("style")).toBe(false)
+    expect(byId("l").getAttribute("href")).toBe("/x")
+    expect(byId("p").innerHTML).toBe(
+      '<span id="s">orig</span><a id="l" href="/x">l</a>'
+    )
+  })
+
+  it("undoes javascript descendant changes made after a style change on the same element", () => {
+    document.body.innerHTML = '<div id="p"><span id="s">orig</span></div>'
+
+    manager.applyPreviewChange(
+      { selector: "#p", type: "style", value: { color: "blue" } },
+      "exp"
+    )
+    manager.applyPreviewChange(
+      {
+        selector: "#p",
+        type: "javascript",
+        value: "element.querySelector('span').textContent = 'JS'"
+      },
+      "exp"
+    )
+    manager.removePreviewChanges("exp")
+
+    expect(byId("s").textContent).toBe("orig")
+    expect(byId("p").style.color).toBe("")
   })
 
   it("restores visual-editor marked elements from their serialized original", () => {

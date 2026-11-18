@@ -130,7 +130,7 @@ describe("ElementStateManager", () => {
       const button = element.querySelector("button")!
       const click = jest.fn()
       button.addEventListener("click", click)
-      const state = ElementStateManager.captureElementState(element, false)
+      const state = ElementStateManager.captureElementState(element, "none")
       element.style.backgroundColor = "orange"
       const lateChild = document.createElement("p")
       element.append(lateChild)
