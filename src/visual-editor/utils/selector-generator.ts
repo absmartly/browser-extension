@@ -74,10 +74,14 @@ function attributeSelector(name: string, value: string): string {
 }
 
 // A generated selector is only usable if it resolves to the selected element
-// and nothing else; DOM changes apply to every match.
+// and nothing else; DOM changes apply to every match. Matching is scoped to
+// the element's own tree, so elements inside a shadow root are resolvable.
 function matchesOnly(selector: string, element: Element): boolean {
+  const root = element.getRootNode()
+  const scope =
+    root instanceof Document || root instanceof ShadowRoot ? root : document
   try {
-    const matches = document.querySelectorAll(selector)
+    const matches = scope.querySelectorAll(selector)
     return matches.length === 1 && matches[0] === element
   } catch {
     return false
@@ -575,7 +579,11 @@ function getSelectorPart(element: Element, isTarget: boolean): string {
 
 function positionalPart(element: Element): string {
   const tagName = element.tagName.toLowerCase()
-  const parent = element.parentElement
+  // Top-level children of a shadow root have no parentElement but do have
+  // siblings that the shadow-scoped query can match.
+  const parent =
+    element.parentElement ??
+    (element.parentNode instanceof ShadowRoot ? element.parentNode : null)
   if (!parent) return tagName
   const siblings = Array.from(parent.children).filter(
     (child) => child.tagName === element.tagName

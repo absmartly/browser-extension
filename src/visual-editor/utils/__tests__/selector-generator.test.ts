@@ -94,6 +94,42 @@ describe("generateRobustSelector", () => {
     expect(generateRobustSelector(target)).toBe('[data-testid="checkout"]')
   })
 
+  describe("elements inside an open shadow root", () => {
+    function shadowHost(html: string) {
+      const host = document.createElement("div")
+      document.body.append(host)
+      const shadow = host.attachShadow({ mode: "open" })
+      shadow.innerHTML = html
+      return shadow
+    }
+
+    it("keeps a stable ID that is unique within the shadow root", () => {
+      document.body.innerHTML = "<button>Page</button>"
+      const shadow = shadowHost('<div><button id="inner">In</button></div>')
+      const target = shadow.getElementById("inner")!
+
+      const selector = generateRobustSelector(target)
+
+      expect(selector).toBe("#inner")
+      expectSelectsOnly(selector, target, shadow)
+    })
+
+    it("returns a path unique within the shadow root for repeated siblings", () => {
+      document.body.innerHTML = "<button>Page</button>"
+      const shadow = shadowHost(
+        "<div><button>A</button></div><div><button>B</button></div>"
+      )
+      const target = shadow.querySelectorAll("button")[1]
+
+      const selector = generateRobustSelector(target, {
+        preferDataAttributes: false,
+        includeParentContext: true
+      })
+
+      expectSelectsOnly(selector, target, shadow)
+    })
+  })
+
   describe("positional fallback on deep auto-generated markup", () => {
     const hoverOptions = {
       preferDataAttributes: false,
