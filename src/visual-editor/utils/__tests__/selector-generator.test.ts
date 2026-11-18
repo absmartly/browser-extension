@@ -1,4 +1,4 @@
-import { generateRobustSelector } from "../selector-generator"
+import { generateRobustSelector, improveSelector } from "../selector-generator"
 
 function expectSelectsOnly(
   selector: string,
@@ -92,6 +92,67 @@ describe("generateRobustSelector", () => {
     const target = document.querySelector("button")!
 
     expect(generateRobustSelector(target)).toBe('[data-testid="checkout"]')
+  })
+
+  describe("with the visual editor option set", () => {
+    const veOptions = {
+      preferDataAttributes: false,
+      includeParentContext: true
+    }
+
+    it("returns a unique selector for duplicated Tailwind variant classes", () => {
+      document.body.innerHTML = `
+        <div class="flex md:flex-row w-1/2 hover:bg-x">One</div>
+        <div class="flex md:flex-row w-1/2 hover:bg-x">Two</div>`
+      const target = document.querySelectorAll("div")[1]
+
+      expectSelectsOnly(generateRobustSelector(target, veOptions), target)
+    })
+
+    it("returns a unique selector for an element whose ID starts with a digit", () => {
+      document.body.innerHTML = `<span id="1abc">A</span><span>B</span>`
+      const target = document.getElementById("1abc")!
+
+      expectSelectsOnly(generateRobustSelector(target, veOptions), target)
+    })
+
+    it("escapes a data-component-name value containing a double quote", () => {
+      document.body.innerHTML = `
+        <section><a data-component-name='Hero "CTA"'>Go</a><a>Other</a></section>`
+      const target = document.querySelector("a")!
+
+      expectSelectsOnly(generateRobustSelector(target, veOptions), target)
+    })
+
+    it("anchors on a parent whose ID needs escaping", () => {
+      document.body.innerHTML = `
+        <div id="cart:v2"><button class="btn">Pay</button></div>
+        <div id="cart"><button class="btn">Pay</button></div>`
+      const target = document.querySelector("#cart\\:v2 button")!
+
+      const selector = generateRobustSelector(target, veOptions)
+
+      expect(selector).toBe("#cart\\:v2 button.btn")
+      expectSelectsOnly(selector, target)
+    })
+  })
+
+  describe("improveSelector", () => {
+    it("returns an ambiguous selector unchanged", () => {
+      document.body.innerHTML = `<p class="note">A</p><p class="note">B</p>`
+
+      expect(improveSelector("p.note")).toBe("p.note")
+    })
+
+    it("replaces a unique selector with a robust one for the same element", () => {
+      document.body.innerHTML = `<main><p id="lead">A</p><p>B</p></main>`
+      const target = document.getElementById("lead")!
+
+      const improved = improveSelector("main > p:nth-of-type(1)")
+
+      expect(improved).toBe("#lead")
+      expectSelectsOnly(improved, target)
+    })
   })
 
   describe("elements inside an open shadow root", () => {
