@@ -1,0 +1,91 @@
+import { generateRobustSelector } from "../selector-generator"
+
+function expectSelectsOnly(selector: string, element: Element) {
+  const matches = document.querySelectorAll(selector)
+  expect(Array.from(matches)).toEqual([element])
+}
+
+describe("generateRobustSelector", () => {
+  afterEach(() => {
+    document.body.innerHTML = ""
+  })
+
+  it("escapes IDs containing selector syntax", () => {
+    document.body.innerHTML = `<div id="checkout:total.v2">Total</div><div id="checkout">Other</div>`
+    const target = document.getElementById("checkout:total.v2")!
+
+    const selector = generateRobustSelector(target)
+
+    expect(selector).toBe("#checkout\\:total\\.v2")
+    expectSelectsOnly(selector, target)
+  })
+
+  it("does not return a duplicated ID that also matches another element", () => {
+    document.body.innerHTML = `
+      <section class="card"><button id="buy">First</button></section>
+      <aside class="panel"><button id="buy">Second</button></aside>`
+    const target = document.querySelectorAll("#buy")[1]
+
+    const selector = generateRobustSelector(target)
+
+    expect(selector).not.toBe("#buy")
+    expectSelectsOnly(selector, target)
+  })
+
+  it("does not return a duplicated ID whose first match is another element", () => {
+    document.body.innerHTML = `
+      <div><span id="label">One</span></div>
+      <div><span id="label">Two</span></div>`
+    const target = document.querySelectorAll("#label")[1]
+
+    expectSelectsOnly(generateRobustSelector(target), target)
+  })
+
+  it("escapes class tokens so the generated selector parses and matches", () => {
+    document.body.innerHTML = `
+      <button class="btn md:px-4">Target</button>
+      <button class="btn">Other</button>`
+    const target = document.querySelector("button")!
+
+    const selector = generateRobustSelector(target)
+
+    expect(selector).toBe("button.btn.md\\:px-4")
+    expectSelectsOnly(selector, target)
+  })
+
+  it("escapes name attribute values in contextual selectors", () => {
+    document.body.innerHTML = `
+      <form><input name='coupon"code'><input name="other"></form>`
+    const target = document.querySelector("input")!
+
+    const selector = generateRobustSelector(target)
+
+    expectSelectsOnly(selector, target)
+  })
+
+  it("falls back to a position-based selector that is unique for repeated structures", () => {
+    document.body.innerHTML = `
+      <main><div><div><span>One</span></div></div></main>
+      <main><div><div><span>Two</span></div></div></main>`
+    const target = document.querySelectorAll("span")[1]
+
+    const selector = generateRobustSelector(target)
+
+    expect(selector).toContain(":nth-of-type(2)")
+    expectSelectsOnly(selector, target)
+  })
+
+  it("keeps a unique stable ID as the preferred selector", () => {
+    document.body.innerHTML = `<button id="hero-cta" class="btn">Go</button><button class="btn">No</button>`
+    const target = document.getElementById("hero-cta")!
+
+    expect(generateRobustSelector(target)).toBe("#hero-cta")
+  })
+
+  it("keeps a unique data-testid as the preferred non-ID selector", () => {
+    document.body.innerHTML = `<button data-testid="checkout">Go</button><button>No</button>`
+    const target = document.querySelector("button")!
+
+    expect(generateRobustSelector(target)).toBe('[data-testid="checkout"]')
+  })
+})
