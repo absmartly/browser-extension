@@ -122,3 +122,39 @@ test('created preview nodes are removed for every insertion position', async ({ 
   await expect(page.locator('.preview-created')).toHaveCount(0)
   expect(await sameNode(page, 'create-anchor-child')).toBe(true)
 })
+
+test('SPA preview applies late mounts while active and cancels pending work on replacement and removal', async ({ page, origin }) => {
+  await openPreviewPage(page, origin)
+  const send = await previewSender(page, 'preview-spa-pending')
+  const sentinel = { selector: '#preview-sentinel', type: 'style', value: { color: 'rgb(1, 2, 3)' } }
+  const pending = (selector: string) => ({ selector, type: 'style', value: { backgroundColor: 'orange' } })
+  const mount = (id: string) => page.evaluate(id => {
+    const element = document.createElement('div')
+    element.id = id
+    element.textContent = id
+    document.getElementById('late-root')!.append(element)
+  }, id)
+
+  await send('apply', [sentinel, pending('#late-active'), pending('#late-replaced')])
+  await expect(page.locator('#preview-sentinel')).toHaveCSS('color', 'rgb(1, 2, 3)')
+  await mount('late-active')
+  await expect(page.locator('#late-active')).toHaveCSS('background-color', 'rgb(255, 165, 0)')
+
+  await send('update', [{ ...sentinel, value: { color: 'rgb(4, 5, 6)' } }])
+  await expect(page.locator('#preview-sentinel')).toHaveCSS('color', 'rgb(4, 5, 6)')
+  await expect(page.locator('#late-active')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
+  await mount('late-replaced')
+
+  await send('apply', [sentinel, pending('#late-removed')])
+  await expect(page.locator('#preview-sentinel')).toHaveCSS('color', 'rgb(1, 2, 3)')
+  await send('remove')
+  await expect(page.locator('#preview-sentinel')).not.toHaveAttribute('data-absmartly-modified', 'true')
+  await mount('late-removed')
+  await nextFrames(page)
+
+  await expect(page.locator('#late-active')).toHaveCount(1)
+  for (const id of ['late-replaced', 'late-removed']) {
+    await expect(page.locator(`#${id}`)).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
+    await expect(page.locator(`#${id}`)).not.toHaveAttribute('data-absmartly-modified', 'true')
+  }
+})

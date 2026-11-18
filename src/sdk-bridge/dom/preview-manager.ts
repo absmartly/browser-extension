@@ -6,7 +6,8 @@
  * @module PreviewManager
  */
 
-import { DOMManipulatorLite as DOMManipulator } from "@absmartly/sdk-plugins/core/dom-manipulator"
+import { DOMManipulatorLite } from "@absmartly/sdk-plugins/core/dom-manipulator"
+import { PendingChangeManager } from "@absmartly/sdk-plugins/core/pending-change-manager"
 import { StyleSheetManager } from "@absmartly/sdk-plugins/core/style-sheet-manager"
 
 import type { DOMChange } from "~src/types/dom-changes"
@@ -22,6 +23,42 @@ interface PreviewState {
   changeType: string
 }
 
+type OwnedApplication = (
+  element: Element,
+  change: DOMChange,
+  apply: () => boolean
+) => boolean
+
+// The SDK declares its per-element pending callback private; this is the
+// method its own PendingChangeManager callback invokes.
+interface SpecificElementApplier {
+  applyChangeToSpecificElement(
+    change: DOMChange,
+    experimentName: string,
+    element: Element
+  ): boolean
+}
+
+// One SDK manipulator per preview session: destroying it disconnects that
+// experiment's observers and drops its pending work without touching other
+// previews. Late matches are routed through applyOwned so they are captured
+// for restoration and rejected once the session is no longer current.
+class PreviewDOMManipulator extends DOMManipulatorLite {
+  constructor(plugin: Record<string, any>, applyOwned: OwnedApplication) {
+    super(true, plugin)
+    const applier = this as unknown as SpecificElementApplier
+    this.pendingManager = new PendingChangeManager(
+      (change, experimentName, element) => {
+        if (!element) return this.applyChange(change, experimentName)
+        return applyOwned(element, change, () =>
+          applier.applyChangeToSpecificElement(change, experimentName, element)
+        )
+      },
+      true
+    )
+  }
+}
+
 // JavaScript can mutate arbitrary descendants, so it owns child membership too.
 function changeOwnsChildren(change: DOMChange): boolean {
   return (
@@ -33,7 +70,7 @@ function changeOwnsChildren(change: DOMChange): boolean {
 
 export class PreviewManager {
   private previewStateMap: Map<Element, PreviewState>
-  private domManipulator: DOMManipulator
+  private sessions: Map<string, PreviewDOMManipulator> = new Map()
   private styleManagers: Map<string, StyleSheetManager> = new Map()
   // Elements created by 'create' changes, keyed by experiment. The SDK's
   // createElement doesn't expose the new nodes, so mutation records around
@@ -42,26 +79,44 @@ export class PreviewManager {
 
   constructor() {
     this.previewStateMap = new Map()
+  }
 
-    // Create mock plugin for DOMManipulator
-    const mockPlugin: any = {
+  private getSession(experimentName: string): PreviewDOMManipulator {
+    const existing = this.sessions.get(experimentName)
+    if (existing) return existing
+
+    const plugin = {
       config: { spa: true },
       reapplyingElements: new Set(),
-      getStyleManager: (experimentName: string) => {
-        if (!this.styleManagers.has(experimentName)) {
+      getStyleManager: (name: string) => {
+        if (!this.styleManagers.has(name)) {
           this.styleManagers.set(
-            experimentName,
-            new StyleSheetManager(`absmartly-styles-${experimentName}`, true)
+            name,
+            new StyleSheetManager(`absmartly-styles-${name}`, true)
           )
         }
-        return this.styleManagers.get(experimentName)
+        return this.styleManagers.get(name)
       },
       buildStateRules: this.buildStateRules.bind(this),
       watchElement: () => {}
     }
-
-    // Delegate all DOM manipulation to SDK plugin
-    this.domManipulator = new DOMManipulator(true, mockPlugin)
+    const session: PreviewDOMManipulator = new PreviewDOMManipulator(
+      plugin,
+      (element, change, apply) => {
+        if (
+          this.sessions.get(experimentName) !== session ||
+          this.isExtensionElement(element)
+        ) {
+          return false
+        }
+        this.captureOriginalState(element, change, experimentName)
+        const success = apply()
+        if (success) this.markElement(element, experimentName)
+        return success
+      }
+    )
+    this.sessions.set(experimentName, session)
+    return session
   }
 
   private buildStateRules(
@@ -115,60 +170,31 @@ export class PreviewManager {
       return false
     }
 
+    const session = this.getSession(experimentName)
     if (change.type === "create") {
-      return this.applyCreateChange(change, experimentName)
+      return this.applyCreateChange(change, experimentName, session)
     }
 
     // Capture original state BEFORE applying (for undo functionality)
     if (change.type !== "styleRules") {
-      try {
-        const elements = document.querySelectorAll(change.selector)
-        const filtered = Array.from(elements).filter(
-          (el) => !this.isExtensionElement(el)
-        )
-
-        const ownsChildren = changeOwnsChildren(change)
-        for (const element of filtered) {
-          const existing = this.previewStateMap.get(element)
-          if (existing?.experimentName === experimentName) {
-            // The first snapshot already holds the original children.
-            if (ownsChildren) existing.originalState.restoreChildren = true
-          } else {
-            const originalState = ElementStateManager.captureElementState(
-              element,
-              ownsChildren
-            )
-            this.previewStateMap.set(element, {
-              experimentName,
-              originalState,
-              selector: change.selector,
-              changeType: change.type
-            })
-          }
-        }
-      } catch (err) {
-        // Selector might be invalid or elements don't exist yet - that's okay
+      for (const element of this.findPreviewTargets(change.selector)) {
+        this.captureOriginalState(element, change, experimentName)
       }
     }
 
     // Delegate to SDK plugin's DOMManipulator
     // It handles: styleRules, waitForElement, PendingChangeManager, all change types
-    const success = this.domManipulator.applyChange(change, experimentName)
+    const success = session.applyChange(change, experimentName)
 
-    // Mark applied elements AFTER for undo tracking.
+    // Mark applied elements AFTER for undo tracking. Late SPA matches are
+    // captured and marked by the session's pending callback instead.
     if (success && change.type !== "styleRules") {
-      try {
-        const elements = document.querySelectorAll(change.selector)
-        const filtered = Array.from(elements).filter(
-          (el) => !this.isExtensionElement(el)
-        )
-
-        for (const element of filtered) {
-          element.setAttribute("data-absmartly-experiment", experimentName)
-          element.setAttribute("data-absmartly-modified", "true")
+      for (const element of this.findPreviewTargets(change.selector)) {
+        if (
+          this.previewStateMap.get(element)?.experimentName === experimentName
+        ) {
+          this.markElement(element, experimentName)
         }
-      } catch (err) {
-        // Ignore - elements might appear later via waitForElement
       }
     }
 
@@ -177,7 +203,8 @@ export class PreviewManager {
 
   private applyCreateChange(
     change: DOMChange,
-    experimentName: string
+    experimentName: string,
+    session: PreviewDOMManipulator
   ): boolean {
     let target: Element | null = null
     try {
@@ -188,7 +215,7 @@ export class PreviewManager {
       // Invalid selector: the SDK reports its own failure.
     }
     const root = target?.parentNode || target
-    if (!root) return this.domManipulator.applyChange(change, experimentName)
+    if (!root) return session.applyChange(change, experimentName)
 
     // Observe the anchor's parent subtree so before/after and
     // firstChild/lastChild insertions are all attributed to this change.
@@ -197,7 +224,7 @@ export class PreviewManager {
     let success = false
     let records: MutationRecord[] = []
     try {
-      success = this.domManipulator.applyChange(change, experimentName)
+      success = session.applyChange(change, experimentName)
     } finally {
       records = observer.takeRecords()
       observer.disconnect()
@@ -213,12 +240,50 @@ export class PreviewManager {
       for (const node of Array.from(record.addedNodes)) {
         if (node instanceof Element && node.isConnected) {
           bucket.add(node)
-          node.setAttribute("data-absmartly-experiment", experimentName)
-          node.setAttribute("data-absmartly-modified", "true")
+          this.markElement(node, experimentName)
         }
       }
     }
     return true
+  }
+
+  private findPreviewTargets(selector: string): Element[] {
+    try {
+      return Array.from(document.querySelectorAll(selector)).filter(
+        (element) => !this.isExtensionElement(element)
+      )
+    } catch {
+      // Invalid selector: the SDK reports its own failure.
+      return []
+    }
+  }
+
+  private captureOriginalState(
+    element: Element,
+    change: DOMChange,
+    experimentName: string
+  ): void {
+    const ownsChildren = changeOwnsChildren(change)
+    const existing = this.previewStateMap.get(element)
+    if (existing?.experimentName === experimentName) {
+      // The first snapshot already holds the original children.
+      if (ownsChildren) existing.originalState.restoreChildren = true
+      return
+    }
+    this.previewStateMap.set(element, {
+      experimentName,
+      originalState: ElementStateManager.captureElementState(
+        element,
+        ownsChildren
+      ),
+      selector: change.selector,
+      changeType: change.type
+    })
+  }
+
+  private markElement(element: Element, experimentName: string): void {
+    element.setAttribute("data-absmartly-experiment", experimentName)
+    element.setAttribute("data-absmartly-modified", "true")
   }
 
   /**
@@ -226,6 +291,13 @@ export class PreviewManager {
    */
   removePreviewChanges(experimentName: string): boolean {
     Logger.log("Removing preview changes for experiment:", experimentName)
+
+    // Cancel pending SPA work before restoring, so no late mount re-applies.
+    const session = this.sessions.get(experimentName)
+    if (session) {
+      this.sessions.delete(experimentName)
+      session.destroy()
+    }
 
     let restoredCount = 0
 
@@ -349,7 +421,11 @@ export class PreviewManager {
    * Clear all preview changes
    */
   clearAll(): void {
-    const experimentNames = new Set<string>()
+    const experimentNames = new Set<string>([
+      ...this.sessions.keys(),
+      ...this.createdElementsMap.keys(),
+      ...this.styleManagers.keys()
+    ])
     for (const data of this.previewStateMap.values()) {
       experimentNames.add(data.experimentName)
     }
