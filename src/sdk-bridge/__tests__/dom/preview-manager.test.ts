@@ -208,6 +208,22 @@ describe("PreviewManager", () => {
     expect(byId("h").style.color).toBe("")
   })
 
+  it("leaves no class attribute on an element that had none", () => {
+    document.body.innerHTML = '<p id="p">P</p><p id="q" class="">Q</p>'
+
+    for (const selector of ["#p", "#q"]) {
+      manager.applyPreviewChange(
+        { selector, type: "class", add: ["hl"], remove: [] } as DOMChange,
+        "exp"
+      )
+    }
+    expect(byId("p").className).toBe("hl")
+    manager.removePreviewChanges("exp")
+
+    expect(byId("p").hasAttribute("class")).toBe(false)
+    expect(byId("q").getAttribute("class")).toBe("")
+  })
+
   it("restores a move preview to the original position", () => {
     document.body.innerHTML =
       '<div id="from"><span id="m">M</span><span id="z">Z</span></div><div id="to"></div>'

@@ -172,9 +172,17 @@ export class ElementStateManager {
         })
       }
 
-      // Restore class list (always safe to restore)
+      // Restore class list; an element captured without a class attribute
+      // gets none back rather than an empty one.
       if (originalState.classList) {
-        element.className = originalState.classList.join(" ")
+        if (
+          originalState.classList.length === 0 &&
+          !("class" in (originalState.attributes ?? {}))
+        ) {
+          element.removeAttribute("class")
+        } else {
+          element.className = originalState.classList.join(" ")
+        }
       }
 
       // Remove tracking attributes
