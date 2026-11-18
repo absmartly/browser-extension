@@ -15,6 +15,10 @@ export interface ElementState {
   attributes: Record<string, string>
   styles: Record<string, string>
   classList: string[]
+  // Live original children. Restored only when the preview owns the content;
+  // style/attribute/class restoration leaves descendants untouched.
+  childNodes?: Node[]
+  restoreChildren?: boolean
   // Position in the DOM at capture time. Used to reattach an element if a
   // change like 'delete' or 'move' detaches it before the state is restored.
   // Held as live Node references — fine because a captured state is short-lived
@@ -29,7 +33,10 @@ export class ElementStateManager {
   /**
    * Capture the current state of an element
    */
-  static captureElementState(element: Element): ElementState {
+  static captureElementState(
+    element: Element,
+    restoreChildren = true
+  ): ElementState {
     const htmlElement = element as HTMLElement
 
     const state: ElementState = {
@@ -38,6 +45,8 @@ export class ElementStateManager {
       attributes: {},
       styles: {},
       classList: Array.from(element.classList),
+      restoreChildren,
+      childNodes: Array.from(element.childNodes),
       parent: element.parentNode,
       nextSibling: element.nextSibling
     }
@@ -104,8 +113,14 @@ export class ElementStateManager {
           "[ElementStateManager] Skipping innerHTML restoration for structural element:",
           element.tagName
         )
+      } else if (originalState.childNodes) {
+        // Only content-changing previews own child membership. Reuse host nodes,
+        // including their listeners and form state, rather than parsing HTML.
+        if (originalState.restoreChildren) {
+          element.replaceChildren(...originalState.childNodes)
+        }
       } else {
-        // Restore innerHTML first (this clears textContent)
+        // Serialized legacy states have no live nodes to restore.
         if (originalState.innerHTML !== undefined) {
           element.innerHTML = sanitizeHTML(originalState.innerHTML)
         }

@@ -22,6 +22,15 @@ interface PreviewState {
   changeType: string
 }
 
+// JavaScript can mutate arbitrary descendants, so it owns child membership too.
+function changeOwnsChildren(change: DOMChange): boolean {
+  return (
+    change.type === "text" ||
+    change.type === "html" ||
+    change.type === "javascript"
+  )
+}
+
 export class PreviewManager {
   private previewStateMap: Map<Element, PreviewState>
   private domManipulator: DOMManipulator
@@ -135,13 +144,17 @@ export class PreviewManager {
           (el) => !this.isExtensionElement(el)
         )
 
+        const ownsChildren = changeOwnsChildren(change)
         for (const element of filtered) {
-          if (
-            !this.previewStateMap.has(element) ||
-            this.previewStateMap.get(element)!.experimentName !== experimentName
-          ) {
-            const originalState =
-              ElementStateManager.captureElementState(element)
+          const existing = this.previewStateMap.get(element)
+          if (existing?.experimentName === experimentName) {
+            // The first snapshot already holds the original children.
+            if (ownsChildren) existing.originalState.restoreChildren = true
+          } else {
+            const originalState = ElementStateManager.captureElementState(
+              element,
+              ownsChildren
+            )
             this.previewStateMap.set(element, {
               experimentName,
               originalState,

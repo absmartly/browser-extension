@@ -123,6 +123,47 @@ describe("ElementStateManager", () => {
   })
 
   describe("restoreElementState", () => {
+    it("preserves host descendants and listeners for attribute-only restoration", () => {
+      const element = document.createElement("div")
+      element.innerHTML = "<button>Click</button><input><span>Original</span>"
+      const nodes = Array.from(element.childNodes)
+      const button = element.querySelector("button")!
+      const click = jest.fn()
+      button.addEventListener("click", click)
+      const state = ElementStateManager.captureElementState(element, false)
+      element.style.backgroundColor = "orange"
+      const lateChild = document.createElement("p")
+      element.append(lateChild)
+
+      ElementStateManager.restoreElementState(element, state)
+
+      expect(Array.from(element.childNodes)).toEqual([...nodes, lateChild])
+      button.click()
+      expect(click).toHaveBeenCalledTimes(1)
+      expect(element.style.backgroundColor).toBe("")
+    })
+
+    it("restores overlapping structural snapshots using the same host nodes", () => {
+      const ancestor = document.createElement("div")
+      ancestor.innerHTML = "<section><button>Original</button></section>"
+      document.body.append(ancestor)
+      const descendant = ancestor.firstElementChild!
+      const button = descendant.firstElementChild!
+      const ancestorState = ElementStateManager.captureElementState(ancestor)
+      const descendantState =
+        ElementStateManager.captureElementState(descendant)
+      descendant.textContent = "Preview"
+      ancestor.textContent = "Replacement"
+
+      ElementStateManager.restoreElementState(ancestor, ancestorState)
+      ElementStateManager.restoreElementState(descendant, descendantState)
+
+      expect(ancestor.firstElementChild).toBe(descendant)
+      expect(descendant.firstElementChild).toBe(button)
+      expect(ancestor.querySelectorAll("section")).toHaveLength(1)
+      ancestor.remove()
+    })
+
     it("should restore text content via innerHTML", () => {
       const element = document.createElement("div")
       element.textContent = "Current"
