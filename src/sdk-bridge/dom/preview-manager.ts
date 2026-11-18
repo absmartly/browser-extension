@@ -309,21 +309,6 @@ export class PreviewManager {
 
     let restoredCount = 0
 
-    // Remove elements created by 'create' changes for this experiment.
-    // We do this first so subsequent revert passes don't observe stale nodes.
-    const created = this.createdElementsMap.get(experimentName)
-    if (created) {
-      for (const el of created) {
-        try {
-          el.remove()
-          restoredCount++
-        } catch {
-          /* element may already be detached */
-        }
-      }
-      this.createdElementsMap.delete(experimentName)
-    }
-
     // Undo snapshots newest-first. A snapshot taken inside content introduced
     // by an earlier ancestor change is unwound before that ancestor restores
     // its original children, so the descendant is not reinserted.
@@ -334,6 +319,17 @@ export class PreviewManager {
       ElementStateManager.restoreElementState(element, data.originalState)
       this.previewStateMap.delete(element)
       restoredCount++
+    }
+
+    // Remove created nodes after the snapshots: a snapshot of a created node
+    // (a later change targeted it) or of its parent reinserts it on restore.
+    const created = this.createdElementsMap.get(experimentName)
+    if (created) {
+      for (const el of created) {
+        el.remove()
+        restoredCount++
+      }
+      this.createdElementsMap.delete(experimentName)
     }
 
     // Also remove markers from any elements with this experiment (e.g., from visual editor)

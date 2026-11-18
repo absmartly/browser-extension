@@ -135,6 +135,59 @@ describe("PreviewManager", () => {
     }
   )
 
+  it.each(["before", "after", "firstChild", "lastChild"] as const)(
+    "keeps a node created at %s removed when a later change styled it",
+    (position) => {
+      document.body.innerHTML =
+        '<section id="s"><div id="t"><span id="a">A</span></div></section>'
+
+      manager.applyPreviewChange(
+        {
+          selector: "",
+          type: "create",
+          element: '<i id="new">N</i>',
+          targetSelector: "#t",
+          position
+        },
+        "exp"
+      )
+      manager.applyPreviewChange(
+        { selector: "#new", type: "style", value: { color: "red" } },
+        "exp"
+      )
+      expect(byId("new").style.color).toBe("red")
+
+      manager.removePreviewChanges("exp")
+
+      expect(byId("new")).toBeNull()
+      expect(byId("s").innerHTML).toBe(
+        '<div id="t"><span id="a">A</span></div>'
+      )
+    }
+  )
+
+  it("does not accumulate created nodes over apply/remove cycles", () => {
+    document.body.innerHTML = '<div id="t"><span id="a">A</span></div>'
+    const changes: DOMChange[] = [
+      {
+        selector: "",
+        type: "create",
+        element: '<i class="new">N</i>',
+        targetSelector: "#t",
+        position: "lastChild"
+      },
+      { selector: "i.new", type: "style", value: { color: "red" } }
+    ]
+
+    for (let cycle = 0; cycle < 3; cycle++) {
+      for (const change of changes) manager.applyPreviewChange(change, "exp")
+      expect(document.querySelectorAll("i.new")).toHaveLength(1)
+      manager.removePreviewChanges("exp")
+      expect(document.querySelectorAll("i.new")).toHaveLength(0)
+    }
+    expect(byId("t").innerHTML).toBe('<span id="a">A</span>')
+  })
+
   it("restores original children by identity after a style then html change on one element", () => {
     document.body.innerHTML = '<div id="h"><b id="k">Keep</b></div>'
     const child = byId("k")
