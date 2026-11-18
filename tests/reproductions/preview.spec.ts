@@ -111,15 +111,21 @@ test('overlapping ancestor and descendant previews restore one original descenda
 test('created preview nodes are removed for every insertion position', async ({ page, origin }) => {
   await openPreviewPage(page, origin)
   const send = await previewSender(page, 'preview-create-positions')
-  await send('apply', ['before', 'after', 'firstChild', 'lastChild'].map(position => ({
-    selector: `create-${position}`, type: 'create', targetSelector: '#create-anchor', position,
-    element: `<p class="preview-created" data-position="${position}">${position}</p>`,
+  const positions = ['before', 'after', 'firstChild', 'lastChild']
+  await send('apply', positions.map(position => ({
+    selector: `#preview-created-${position}`, type: 'create', targetSelector: '#create-anchor', position,
+    element: `<p id="preview-created-${position}">${position}</p>`,
   })))
-  await expect(page.locator('.preview-created')).toHaveCount(4)
-  await expect(page.locator('#create-anchor > .preview-created')).toHaveCount(2)
+  for (const position of positions) {
+    await expect(page.locator(`#preview-created-${position}`)).toHaveCount(1)
+  }
+  await expect(page.locator('#create-anchor > #preview-created-firstChild')).toHaveCount(1)
+  await expect(page.locator('#create-anchor > #preview-created-lastChild')).toHaveCount(1)
 
   await send('remove')
-  await expect(page.locator('.preview-created')).toHaveCount(0)
+  for (const position of positions) {
+    await expect(page.locator(`#preview-created-${position}`)).toHaveCount(0)
+  }
   expect(await sameNode(page, 'create-anchor-child')).toBe(true)
 })
 
