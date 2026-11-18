@@ -92,3 +92,18 @@ test('style preview removal keeps page-owned descendants, listeners and form sta
   await page.locator('#host-button').click()
   expect(await page.evaluate(() => (window as typeof window & { previewClicks: number }).previewClicks)).toBe(1)
 })
+
+test('overlapping ancestor and descendant previews restore one original descendant', async ({ page, origin }) => {
+  await openPreviewPage(page, origin)
+  const send = await previewSender(page, 'preview-overlap')
+  await send('apply', [
+    { selector: '#structural-parent', type: 'html', value: '<p id="structural-child">Preview child</p>' },
+    { selector: '#structural-child', type: 'text', value: 'Preview descendant text' },
+  ])
+  await expect(page.locator('#structural-child')).toHaveText('Preview descendant text')
+
+  await send('remove')
+  await expect(page.locator('#structural-child')).toHaveText('Original child')
+  await expect(page.locator('#structural-parent > p')).toHaveCount(1)
+  expect(await sameNode(page, 'structural-child')).toBe(true)
+})

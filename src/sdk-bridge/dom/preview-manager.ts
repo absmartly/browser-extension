@@ -225,7 +225,6 @@ export class PreviewManager {
     Logger.log("Removing preview changes for experiment:", experimentName)
 
     let restoredCount = 0
-    const elementsToRemove: Element[] = []
 
     // Remove elements created by 'create' changes for this experiment.
     // We do this first so subsequent revert passes don't observe stale nodes.
@@ -242,17 +241,16 @@ export class PreviewManager {
       this.createdElementsMap.delete(experimentName)
     }
 
-    // First, restore elements we tracked in previewStateMap
-    for (const [element, data] of this.previewStateMap) {
-      if (data.experimentName === experimentName) {
-        ElementStateManager.restoreElementState(element, data.originalState)
-        elementsToRemove.push(element)
-        restoredCount++
-      }
-    }
-
-    for (const element of elementsToRemove) {
+    // Undo snapshots newest-first. A snapshot taken inside content introduced
+    // by an earlier ancestor change is unwound before that ancestor restores
+    // its original children, so the descendant is not reinserted.
+    const tracked = Array.from(this.previewStateMap).filter(
+      ([, data]) => data.experimentName === experimentName
+    )
+    for (const [element, data] of tracked.reverse()) {
+      ElementStateManager.restoreElementState(element, data.originalState)
       this.previewStateMap.delete(element)
+      restoredCount++
     }
 
     // Also remove markers from any elements with this experiment (e.g., from visual editor)
