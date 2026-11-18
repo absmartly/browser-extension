@@ -1,8 +1,13 @@
 import { generateRobustSelector } from "../selector-generator"
 
-function expectSelectsOnly(selector: string, element: Element) {
-  const matches = document.querySelectorAll(selector)
-  expect(Array.from(matches)).toEqual([element])
+function expectSelectsOnly(
+  selector: string,
+  element: Element,
+  root: ParentNode = document
+) {
+  const matches = root.querySelectorAll(selector)
+  expect(matches).toHaveLength(1)
+  expect(matches[0]).toBe(element)
 }
 
 describe("generateRobustSelector", () => {

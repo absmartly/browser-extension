@@ -137,8 +137,10 @@ describe("ElementStateManager", () => {
 
       ElementStateManager.restoreElementState(element, state)
 
-      expect(Array.from(element.childNodes)).toEqual([...nodes, lateChild])
-      button.click()
+      expect(element.childNodes).toHaveLength(nodes.length + 1)
+      nodes.forEach((node, i) => expect(element.childNodes[i]).toBe(node))
+      expect(element.lastChild).toBe(lateChild)
+      ;(element.querySelector("button") as HTMLButtonElement).click()
       expect(click).toHaveBeenCalledTimes(1)
       expect(element.style.backgroundColor).toBe("")
     })
