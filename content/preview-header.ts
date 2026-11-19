@@ -161,14 +161,17 @@ export function createPreviewHeader(
     })
 
     // The page bridge undoes the experiment's journal; the sidebar may be
-    // closed and unable to relay PREVIEW_STATE_CHANGED as a removal.
+    // closed and unable to relay PREVIEW_STATE_CHANGED as a removal. An
+    // opaque origin serializes as "null", which postMessage rejects as a
+    // targetOrigin with a SyntaxError.
+    const origin = window.location.origin
     window.postMessage(
       {
         source: "absmartly-extension",
         type: "REMOVE_PREVIEW",
         payload: { experimentName }
       },
-      window.location.origin
+      origin === "null" || window.location.protocol === "file:" ? "*" : origin
     )
 
     chrome.runtime.sendMessage({
