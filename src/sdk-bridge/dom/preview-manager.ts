@@ -24,6 +24,45 @@ import {
   type JournalEntry
 } from "./mutation-journal"
 
+// A live form property (value, checked, selectedness) that javascript can
+// change without writing an attribute, so no MutationRecord sees it.
+interface FormPropertyWrite {
+  element: Element
+  property: "value" | "checked" | "selected"
+  before: string | boolean
+  after: string | boolean
+}
+
+type FormControl = HTMLInputElement | HTMLTextAreaElement | HTMLOptionElement
+
+function formControlsIn(roots: Element[]): FormControl[] {
+  const controls = new Set<FormControl>()
+  const consider = (element: Element) => {
+    if (
+      element instanceof HTMLInputElement ||
+      element instanceof HTMLTextAreaElement ||
+      element instanceof HTMLOptionElement
+    )
+      controls.add(element)
+  }
+  for (const root of roots) {
+    consider(root)
+    root.querySelectorAll("input, textarea, option").forEach(consider)
+  }
+  return Array.from(controls)
+}
+
+function formProperties(control: FormControl) {
+  if (control instanceof HTMLOptionElement)
+    return { selected: control.selected }
+  if (
+    control instanceof HTMLInputElement &&
+    (control.type === "checkbox" || control.type === "radio")
+  )
+    return { checked: control.checked }
+  return { value: control.value }
+}
+
 // Everything one experiment's preview did to the page, in application order.
 interface PreviewJournal {
   entries: JournalEntry[]
@@ -31,6 +70,7 @@ interface PreviewJournal {
   marked: Set<Element>
   // Every element a change was applied to, including ones it detached.
   targets: Set<Element>
+  formWrites: FormPropertyWrite[]
 }
 
 type OwnedApplication = (
@@ -130,7 +170,8 @@ export class PreviewManager {
         entries: [],
         attributeOrder: new Map(),
         marked: new Set(),
-        targets: new Set()
+        targets: new Set(),
+        formWrites: []
       }
       this.journals.set(experimentName, journal)
     }
@@ -150,6 +191,7 @@ export class PreviewManager {
   ): boolean {
     const journal = this.getJournal(experimentName)
     recordAttributeOrder(journal.attributeOrder, targets)
+    let formBefore: Array<[FormControl, Record<string, string | boolean>]> = []
     if (change.type === "javascript") {
       for (const target of targets) {
         recordAttributeOrder(
@@ -157,6 +199,10 @@ export class PreviewManager {
           target.querySelectorAll("*")
         )
       }
+      formBefore = formControlsIn(targets).map((control) => [
+        control,
+        formProperties(control)
+      ])
     }
     // A change matching nested targets detaches an inner target (text or
     // html on the outer one) before applying to it; observing each target
@@ -169,6 +215,7 @@ export class PreviewManager {
       (partial) => this.append(journal, partial)
     )
     this.append(journal, entries)
+    this.recordFormWrites(journal, formBefore)
     if (result) {
       for (const element of targets) {
         if (element.isConnected) {
@@ -178,6 +225,34 @@ export class PreviewManager {
       }
     }
     return result
+  }
+
+  private recordFormWrites(
+    journal: PreviewJournal,
+    before: Array<[FormControl, Record<string, string | boolean>]>
+  ): void {
+    for (const [control, properties] of before) {
+      const after = formProperties(control) as Record<string, string | boolean>
+      for (const [property, value] of Object.entries(properties)) {
+        if (after[property] !== value)
+          journal.formWrites.push({
+            element: control,
+            property: property as FormPropertyWrite["property"],
+            before: value,
+            after: after[property]
+          })
+      }
+    }
+  }
+
+  // Newest first, and only where the property still holds the preview's
+  // value: a value the user or page has since entered is theirs.
+  private undoFormWrites(writes: FormPropertyWrite[]): void {
+    for (let i = writes.length - 1; i >= 0; i--) {
+      const { element, property, before, after } = writes[i]
+      const control = element as unknown as Record<string, string | boolean>
+      if (control[property] === after) control[property] = before
+    }
   }
 
   private getSession(experimentName: string): PreviewDOMManipulator {
@@ -339,6 +414,7 @@ export class PreviewManager {
         this.spliceIntoLaterOwner(skipped)
       )
       restoreAttributeOrder(journal.attributeOrder)
+      this.undoFormWrites(journal.formWrites)
       restoredCount += journal.entries.length
       this.clearEditorMarkers(journal.targets)
     }

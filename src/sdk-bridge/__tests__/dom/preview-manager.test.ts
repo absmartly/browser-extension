@@ -612,6 +612,39 @@ describe("PreviewManager", () => {
     })
   })
 
+  it("restores live form state a javascript preview set without attributes", () => {
+    document.body.innerHTML = `<form id="f">
+      <input id="t" value="orig"><input id="c" type="checkbox">
+      <select id="s"><option>a</option><option>b</option></select>
+      <textarea id="ta">orig</textarea><input id="kept" value="orig">
+    </form>`
+    const field = <T>(id: string) => byId(id) as T
+    manager.applyPreviewChange(
+      {
+        selector: "#f",
+        type: "javascript",
+        value: [
+          "element.querySelector('#t').value = 'js'",
+          "element.querySelector('#c').checked = true",
+          "element.querySelector('#s').selectedIndex = 1",
+          "element.querySelector('#ta').value = 'js'",
+          "element.querySelector('#kept').value = 'js'"
+        ].join(";")
+      },
+      "exp"
+    )
+    expect(field<HTMLInputElement>("t").value).toBe("js")
+    // The user types into one field while the preview is applied.
+    field<HTMLInputElement>("kept").value = "user"
+    manager.removePreviewChanges("exp")
+
+    expect(field<HTMLInputElement>("t").value).toBe("orig")
+    expect(field<HTMLInputElement>("c").checked).toBe(false)
+    expect(field<HTMLSelectElement>("s").selectedIndex).toBe(0)
+    expect(field<HTMLTextAreaElement>("ta").value).toBe("orig")
+    expect(field<HTMLInputElement>("kept").value).toBe("user")
+  })
+
   it("restores the page when two experiments overlap and are removed in either order", () => {
     const original = '<div id="p"><span id="c">orig</span></div>'
     for (const order of [
