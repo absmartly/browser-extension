@@ -79,9 +79,10 @@ describe("undoing a child-list replacement whose old child now contains the pare
       p.setAttribute("title", "preview")
       p.innerHTML = "<i>preview</i>"
     })
-    // Page code moves the container into its former child.
+    // Page code moves the container into its former child; the preview's
+    // <i> stays in place, so the inverse reaches the reinsert of `c`.
     c.appendChild(p)
-    p.innerHTML = "<u>page</u>"
+    expect(p.firstElementChild.outerHTML).toBe("<i>preview</i>")
 
     expect(() => undoMutations(entries)).not.toThrow()
     expect(p.parentElement).toBe(c)

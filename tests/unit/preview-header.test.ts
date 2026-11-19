@@ -1,6 +1,13 @@
 import { createPreviewHeader } from "~content/preview-header"
 
 describe("preview header Exit Preview button", () => {
+  const runtime = (global as any).chrome.runtime
+
+  afterEach(() => {
+    ;(global as any).chrome.runtime = runtime
+    jest.restoreAllMocks()
+  })
+
   it("strips preview markers without writing the selection sidecar back", () => {
     document.body.innerHTML =
       '<div id="wrap" data-absmartly-experiment="exp" data-absmartly-modified="true"><span id="child">Current</span></div>'
@@ -18,12 +25,13 @@ describe("preview header Exit Preview button", () => {
     // The header mounts a closed shadow root.
     const attachShadow = Element.prototype.attachShadow
     let root: ShadowRoot
-    jest
-      .spyOn(Element.prototype, "attachShadow")
-      .mockImplementation(function (this: Element, init) {
-        root = attachShadow.call(this, init)
-        return root
-      })
+    jest.spyOn(Element.prototype, "attachShadow").mockImplementation(function (
+      this: Element,
+      init
+    ) {
+      root = attachShadow.call(this, init)
+      return root
+    })
     createPreviewHeader("exp", "v1", false, false)
 
     root.querySelector("button").click()

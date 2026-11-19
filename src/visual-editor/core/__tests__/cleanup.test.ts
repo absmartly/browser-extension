@@ -40,10 +40,12 @@ describe("Cleanup on visual-editor exit with unsaved changes", () => {
     new Cleanup(stateManager).cleanupVisualEditor(true)
     preview.removePreviewChanges(VISUAL_EDITOR_EXPERIMENT_NAME)
 
-    expect(document.getElementById("child")).toBe(child)
-    expect(wrap.outerHTML).toBe(
-      '<div id="wrap" class=""><span id="child">Original</span></div>'
-    )
+    expect(wrap.firstChild).toBe(child)
+    expect(wrap.childNodes).toHaveLength(1)
+    expect(child.outerHTML).toBe('<span id="child">Original</span>')
+    expect(
+      wrap.getAttributeNames().filter((name) => name.startsWith("data-"))
+    ).toEqual([])
   })
 })
 
