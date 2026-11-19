@@ -26,9 +26,28 @@ export class HtmlEditor {
 
   // Writes each edit to `element` live. Resolves the edited HTML on Apply,
   // or null on cancel or cleanup(); the caller restores `element`'s children.
+  // Rejects, with the editor UI removed, if building the editor throws.
   async show(element: Element, currentHtml: string): Promise<string | null> {
     this.cleanup()
+    try {
+      return await this.open(element, currentHtml)
+    } catch (error) {
+      // Settles the stored resolver and removes whatever was mounted.
+      this.cleanup()
+      throw error
+    }
+  }
+
+  private open(element: Element, currentHtml: string): Promise<string | null> {
     return new Promise((resolvePromise) => {
+      // Defined before the resolver is stored: settling, which cleanup()
+      // can do from then on, removes this listener.
+      const escapeHandler = (e: KeyboardEvent) => {
+        if (e.key === "Escape" && this.editorHost) {
+          resolve(null)
+          this.cleanup()
+        }
+      }
       const resolve = (html: string | null) => {
         if (this.settle !== resolve) return
         this.settle = null
@@ -72,7 +91,11 @@ export class HtmlEditor {
 
       const tagInfo = document.createElement("span")
       tagInfo.className = "editor-tag-info"
-      tagInfo.textContent = `<${element.tagName.toLowerCase()}${element.className ? `.${element.className.split(" ").join(".")}` : ""}>`
+      // getAttribute: an SVG element's className is an SVGAnimatedString.
+      const classes = (element.getAttribute("class") ?? "")
+        .split(/\s+/)
+        .filter(Boolean)
+      tagInfo.textContent = `<${element.tagName.toLowerCase()}${classes.map((c) => `.${c}`).join("")}>`
 
       header.appendChild(title)
       header.appendChild(tagInfo)
@@ -221,12 +244,6 @@ export class HtmlEditor {
       })
 
       // Handle ESC key
-      const escapeHandler = (e: KeyboardEvent) => {
-        if (e.key === "Escape" && this.editorHost) {
-          resolve(null)
-          this.cleanup()
-        }
-      }
       document.addEventListener("keydown", escapeHandler)
 
       // Prevent backdrop clicks from closing (only click outside container)
