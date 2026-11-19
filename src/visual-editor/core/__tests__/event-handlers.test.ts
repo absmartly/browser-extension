@@ -65,4 +65,31 @@ describe("EventHandlers hover tooltip", () => {
     expect(generate).not.toHaveBeenCalled()
     expect(tooltip()).toBeNull()
   })
+
+  it("drops a pending tooltip when the listeners are detached before the frame", async () => {
+    hover(document.getElementById("first"))
+    handlers.detachEventListeners()
+
+    await nextFrame()
+
+    expect(generate).not.toHaveBeenCalled()
+    expect(tooltip()).toBeNull()
+  })
+
+  it("shows no tooltip and does not throw when the hovered element is removed before the frame", async () => {
+    document.body.innerHTML = "<div><button>1</button></div>"
+    const button = document.querySelector("button")
+    const errors: unknown[] = []
+    const onError = (event: ErrorEvent) => errors.push(event.error)
+    window.addEventListener("error", onError)
+    hover(button)
+    button.remove()
+
+    await nextFrame()
+    window.removeEventListener("error", onError)
+
+    expect(errors).toEqual([])
+    expect(generate).not.toHaveBeenCalled()
+    expect(tooltip()).toBeNull()
+  })
 })

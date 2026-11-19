@@ -35,7 +35,7 @@ describe("PreviewManager SDK internals check", () => {
       args.some(
         (arg: unknown) =>
           typeof arg === "string" &&
-          arg.includes("applyChangeToSpecificElement")
+          arg.includes("@absmartly/sdk-plugins no longer exposes")
       )
     )
 
@@ -70,6 +70,36 @@ describe("PreviewManager SDK internals check", () => {
     )
 
     expect(internalsErrors()).toHaveLength(1)
+    expect(internalsErrors()[0]).toContain(
+      "DOMManipulatorLite.prototype.applyChangeToSpecificElement"
+    )
+    manager.clearAll()
+  })
+
+  it("reports a manipulator whose constructor no longer creates a pending manager", () => {
+    const PreviewManager = loadIsolated((sdk) => {
+      const Real = sdk.DOMManipulatorLite
+      class WithoutPendingManager extends Real {
+        constructor(...args: ConstructorParameters<typeof Real>) {
+          super(...args)
+          delete (this as any).pendingManager
+        }
+      }
+      ;(sdk as any).DOMManipulatorLite = WithoutPendingManager
+    })
+    const manager = new PreviewManager()
+
+    manager.applyPreviewChange(
+      { selector: "#a", type: "style", value: { color: "red" } },
+      "exp"
+    )
+
+    expect(internalsErrors()).toHaveLength(1)
+    expect(internalsErrors()[0]).toContain("DOMManipulatorLite#pendingManager")
+    expect(internalsErrors()[0]).not.toContain(
+      "DOMManipulatorLite.prototype.applyChangeToSpecificElement"
+    )
+    expect(document.getElementById("a").style.color).toBe("red")
     manager.clearAll()
   })
 })

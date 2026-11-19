@@ -208,6 +208,32 @@ describe("PreviewManager", () => {
     expect(byId("h").style.color).toBe("")
   })
 
+  it.each([
+    ["html", { type: "style", value: { color: "red" } }],
+    ["text", { type: "javascript", value: "element.style.color = 'red'" }]
+  ] as const)(
+    "keeps the %s change's original children when a later change targets the same element",
+    (first, second) => {
+      document.body.innerHTML = '<div id="h"><b id="k">Keep</b></div>'
+      const child = byId("k")
+
+      manager.applyPreviewChange(
+        { selector: "#h", type: first, value: "<i>S</i>" } as DOMChange,
+        "exp"
+      )
+      manager.applyPreviewChange(
+        { selector: "#h", ...second } as DOMChange,
+        "exp"
+      )
+      expect(byId("h").style.color).toBe("red")
+      manager.removePreviewChanges("exp")
+
+      expect(byId("h").childNodes).toHaveLength(1)
+      expect(byId("h").firstChild).toBe(child)
+      expect(byId("h").style.color).toBe("")
+    }
+  )
+
   it("leaves no class attribute on an element that had none", () => {
     document.body.innerHTML = '<p id="p">P</p><p id="q" class="">Q</p>'
 
