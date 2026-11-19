@@ -120,6 +120,79 @@ describe("EditModes rearrange replayed through PreviewManager", () => {
     expect(Array.from(container.children)).toEqual([a, b, g])
   })
 
+  // The cached raw next sibling is an element that a later drop moves away,
+  // so the slot must be recovered from the previous sibling (or, for a first
+  // child, from the parent's first position).
+  describe.each([
+    [
+      "next sibling moved, drop before the first span",
+      "<span>A</span><span>B</span><span>G</span><span>C</span>",
+      2,
+      (b: Element) =>
+        dispatchDrag(b, topLevel("1"), { altKey: true, before: true }),
+      ["B", "A", "C"]
+    ],
+    [
+      "next sibling moved, drop after the last span",
+      "<span>A</span><span>B</span><span>G</span><span>C</span>",
+      2,
+      (b: Element) => dispatchDrag(b, topLevel("3"), { altKey: true }),
+      ["A", "C", "B"]
+    ],
+    [
+      "next sibling moved, nest into the first span",
+      "<span>A</span><span>B</span><span>G</span><span>C</span>",
+      2,
+      (b: Element) => dispatchDrag(b, topLevel("1")),
+      ["A", "C"]
+    ],
+    [
+      "first child whose next sibling moved",
+      "<span>B</span><span>G</span><span>C</span>",
+      1,
+      (b: Element) => dispatchDrag(b, topLevel("2"), { altKey: true }),
+      ["C", "B"]
+    ]
+  ])("%s", (_name, markup, bIndex, drop, expected) => {
+    it("replays to the live order and restores every node", () => {
+      document.body.innerHTML = `<p id="rearrange-inline">${markup}</p>`
+      const container = document.getElementById("rearrange-inline")
+      const original = Array.from(container.children)
+      const b = original[bIndex - 1]
+      const g = original[bIndex]
+      const c = original[bIndex + 1]
+
+      // Pick B up and drop it nowhere before G moves away from its side.
+      editModes.enableRearrangeMode(b)
+      b.dispatchEvent(new Event("dragend"))
+      editModes.enableRearrangeMode(g)
+      dispatchDrag(g, c)
+      expect(c.lastElementChild).toBe(g)
+      editModes.enableRearrangeMode(b)
+      drop(b)
+      expect(topLevelLabels()).toEqual(expected)
+
+      replayOnCleanPage()
+      expect(topLevelLabels()).toEqual(expected)
+      previewManager.removePreviewChanges("replay")
+      expect(Array.from(container.children)).toEqual(original)
+    })
+  })
+
+  it("restores whitespace-separated siblings by identity after a sibling drop", () => {
+    document.body.innerHTML =
+      '<p id="rearrange-inline"> <span>A</span> <span>B</span> <span>G</span> </p>'
+    const container = document.getElementById("rearrange-inline")
+    const originalNodes = Array.from(container.childNodes)
+    const b = topLevel("2")
+    editModes.enableRearrangeMode(b)
+    dispatchDrag(b, topLevel("3"), { altKey: true })
+    expect(topLevelLabels()).toEqual(["A", "G", "B"])
+
+    previewManager.removePreviewChanges(VISUAL_EDITOR_EXPERIMENT_NAME)
+    expect(Array.from(container.childNodes)).toEqual(originalNodes)
+  })
+
   it("keeps both moves of two elements that share a positional selector", () => {
     const beta = topLevel("2")
     editModes.enableRearrangeMode(beta)

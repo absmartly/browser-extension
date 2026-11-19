@@ -3,6 +3,7 @@
  * Handles rearrange mode (drag & drop) and resize mode functionality
  */
 
+import { slotAnchor } from "~src/sdk-bridge/dom/mutation-journal"
 import { debugLog, debugWarn } from "~src/utils/debug"
 
 import type { DOMChange } from "../types/visual-editor"
@@ -10,7 +11,7 @@ import { generateRobustSelector } from "../utils/selector-generator"
 import StateManager from "./state-manager"
 
 // Pre-drag neighbours as raw nodes, whitespace text included. PreviewManager
-// unwinds the drop relative to these same raw siblings, so
+// unwinds the drop relative to these same raw siblings (slotAnchor), so
 // reverting anywhere else (appendChild lands after trailing whitespace)
 // leaves sibling order different from the order the positional selectors
 // are generated against.
@@ -25,14 +26,7 @@ function revertToOriginalPosition(
   original: OriginalPosition
 ): void {
   const { parent, previousSibling, nextSibling } = original
-  let anchor: Node | null = null
-  if (nextSibling && nextSibling.parentNode === parent) {
-    anchor = nextSibling
-  } else if (previousSibling && previousSibling.parentNode === parent) {
-    anchor = previousSibling.nextSibling
-  } else if (previousSibling === null) {
-    anchor = parent.firstChild
-  }
+  const anchor = slotAnchor(parent, previousSibling, nextSibling)
   if (anchor === element) return
   parent.insertBefore(element, anchor)
 }
