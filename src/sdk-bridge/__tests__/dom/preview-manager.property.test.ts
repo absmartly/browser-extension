@@ -335,35 +335,50 @@ describe("PreviewManager restore property", () => {
   )
 })
 
-// Interleaved page writes and overlapping experiments.
+// Interleaved page writes, late SPA mounts and overlapping experiments.
 //
 // Two or three experiments apply changes drawn from the same selector
-// pool, so their targets overlap. Between applies and removals "page code"
-// writes outside any journal: attributes, inline style declarations, text
-// data, and (in some cases) replaces an element's children. One experiment
-// may be replaced in place (replace-mode update), then the previews are
-// removed in a given order or by clearAll.
+// pool, so their targets overlap. Applies are interleaved across
+// experiments in an order drawn from the seed, so experiments write while
+// another experiment's preview is newer. Each experiment may also carry
+// changes whose selector is not on the page yet: ids another experiment
+// creates (create, html, javascript) or late SPA mounts the run appends to
+// #spa. Those changes are pending until a newer preview or a mount
+// produces the element. Between operations "page code" writes outside any
+// journal: attributes, inline style declarations, text data, and (in some
+// cases) replaces an element's children. One experiment may be replaced in
+// place (replace-mode update), then the previews are removed in a given
+// order or by clearAll.
 //
 // Invariant without child replacement: the page equals the original page
-// with only the page's writes applied (same element objects, in order;
-// attributes compared as sets, inline style as a declaration map). With
-// child replacement the page owns that subtree, so the check is weaker:
-// the page's node is still in the element it was put in, and every page
-// attribute, declaration and text write survives. Always: no errors and
-// no duplicate ids. In runs without page writes, the page after each
-// removal must also equal a fresh application of the previews still live,
-// in their order, to the original page.
+// with only the page's writes and mounts applied (same element objects, in
+// order; attributes compared as sets, inline style as a declaration map).
+// With child replacement the page owns that subtree, so the check is
+// weaker: the page's node is still in the element it was put in, and
+// every page attribute, declaration and text write survives. Always: no
+// errors, no duplicate ids, and pending SPA work settles.
+//
+// Stacked runs also run without page writes. There, after the replace and
+// after each removal, the page must equal the page produced by a separate
+// manager that ran the same operations on the original page minus the
+// removed experiments' applies (a replaced experiment's new list applied
+// where its first change was), and every original element still on that
+// page must be on the real page by identity at the same position.
 
+const SPA_FIXTURE = `${FIXTURE}\n<div id="spa"></div>`
 const INTERLEAVED_BASE_SEED = 0x1a7e0000
 const INTERLEAVED_CASES = 3000
 const STACKED_BASE_SEED = 0x3e000000
 const STACKED_CASES = 500
+const MOUNTS = 5
+const FLUSH_LIMIT = 20
 
 type PageWrite =
   | { kind: "attribute"; element: Element; name: string; value: string | null }
   | { kind: "style"; element: HTMLElement; property: string; value: string }
   | { kind: "text"; node: Text; value: string }
   | { kind: "children"; element: Element; child: Element }
+  | { kind: "mount"; parent: Element; id: string; child: Element }
 
 function pageWrite(
   rng: Rng,
@@ -406,6 +421,14 @@ function pageWrite(
   return { kind: "children", element, child }
 }
 
+function lateMount(id: string): Element {
+  const element = document.createElement("div")
+  element.id = id
+  element.className = "late"
+  element.textContent = "L"
+  return element
+}
+
 function runPageWrite(write: PageWrite, map: (node: Node) => Node): void {
   switch (write.kind) {
     case "attribute": {
@@ -426,6 +449,26 @@ function runPageWrite(write: PageWrite, map: (node: Node) => Node): void {
     case "children":
       ;(map(write.element) as Element).replaceChildren(write.child)
       break
+    case "mount": {
+      const parent = map(write.parent) as Element
+      parent.append(parent === write.parent ? write.child : lateMount(write.id))
+      break
+    }
+  }
+}
+
+// Nodes a page write touches directly, observed in addition to the body so
+// a write to an element a preview has detached is still seen.
+function writeTargets(write: PageWrite): Node[] {
+  switch (write.kind) {
+    case "attribute":
+    case "style":
+    case "children":
+      return [write.element]
+    case "text":
+      return [write.node]
+    case "mount":
+      return [write.parent]
   }
 }
 
@@ -462,19 +505,6 @@ function allNodes(root: Node): Node[] {
   return nodes
 }
 
-function slotValue(write: PageWrite): string | null {
-  switch (write.kind) {
-    case "attribute":
-      return write.element.getAttribute(write.name)
-    case "style":
-      return write.element.getAttribute("style")
-    case "text":
-      return write.node.data
-    case "children":
-      return null
-  }
-}
-
 function unmarkedCanonical(): string {
   const body = document.body.cloneNode(true) as HTMLElement
   for (const element of body.querySelectorAll("*")) {
@@ -484,20 +514,241 @@ function unmarkedCanonical(): string {
   return canonical(body)
 }
 
+// Child indexes from document.body down to `node`.
+function pathOf(node: Node): number[] {
+  const path: number[] = []
+  for (let n = node; n !== document.body; n = n.parentNode)
+    path.unshift(Array.prototype.indexOf.call(n.parentNode.childNodes, n))
+  return path
+}
+
+function nodeAt(path: number[]): Node | undefined {
+  let node: Node = document.body
+  for (const index of path) {
+    node = node?.childNodes[index]
+    if (!node) return undefined
+  }
+  return node
+}
+
 type Experiment = { name: string; changes: DOMChange[] }
+
+type Operation =
+  | { kind: "apply"; name: string; change: DOMChange }
+  | { kind: "mount"; id: string }
 
 type StackRun = {
   seed: number
   experiments: Experiment[]
+  operations: Operation[]
   // Experiment index to replace and its new change list.
   replace: { index: number; changes: DOMChange[] } | null
   removal: string[] | "clearAll"
   childReplacement: boolean
 }
 
-function runStack(manager: PreviewManager, run: StackRun): void {
-  const { seed, removal, childReplacement } = run
-  const experiments = run.experiments.map((e) => ({ ...e }))
+// Ids the changes create exactly once: markup or javascript-appended spans
+// of a change anchored on an id of the original page, not repeated
+// elsewhere. An id
+// created more than once would match several elements, and a pending
+// change applies to its first match only where an immediate one applies to
+// every match.
+function createdIds(changes: DOMChange[]): string[] {
+  const ids = changes.flatMap((change) => {
+    const anchor =
+      change.type === "create" ? change.targetSelector : change.selector
+    const found = Array.from(
+      JSON.stringify(change).matchAll(/id=\\"([^\\"]+)\\"|s\.id = '([^']+)'/g),
+      (match) => match[1] ?? match[2]
+    )
+    const unique = anchor.startsWith("#") && EXISTING.includes(anchor)
+    return unique ? found : found.map(() => "")
+  })
+  return ids.filter(
+    (id) => id !== "" && ids.indexOf(id) === ids.lastIndexOf(id)
+  )
+}
+
+// Changes on elements that are not on the original page, on distinct ids:
+// the SDK applies only the first of an experiment's pending changes on one
+// selector within a session, so a second one would apply or not depending
+// on how the writes are split into sessions. Each writes an attribute or
+// class named after its experiment, so experiments never overwrite each
+// other's late writes.
+function lateChanges(
+  rng: Rng,
+  name: string,
+  others: Experiment[]
+): DOMChange[] {
+  const ids = [
+    ...Array.from({ length: MOUNTS }, (_, i) => `lm${i}`),
+    ...createdIds(others.flatMap((e) => e.changes))
+  ]
+  return Array.from({ length: 1 + rng.int(2) }, (_, i) => {
+    const [id] = ids.splice(rng.int(ids.length), 1)
+    const selector = `#${id}`
+    return rng.next() < 0.5
+      ? ({
+          selector,
+          type: "attribute",
+          value: { [`data-late-${name}`]: `v${i}` }
+        } as DOMChange)
+      : ({
+          selector,
+          type: "class",
+          add: [`late-${name}`],
+          remove: []
+        } as DOMChange)
+  })
+}
+
+// Adds late changes to the experiments and draws an interleaved order of
+// applies and late mounts. Uses its own generator so the experiments'
+// original changes stay those of the seed.
+function schedule(
+  seed: number,
+  base: Experiment[]
+): { experiments: Experiment[]; operations: Operation[] } {
+  const rng = prng(seed ^ 0x51ed0bad)
+  const experiments = base.map((experiment) => {
+    if (rng.next() < 0.3) return experiment
+    const changes = [...experiment.changes]
+    const others = base.filter((e) => e !== experiment)
+    for (const change of lateChanges(rng, experiment.name, others))
+      changes.splice(rng.int(changes.length + 1), 0, change)
+    return { name: experiment.name, changes }
+  })
+  const cursors = experiments.map(() => 0)
+  const operations: Operation[] = []
+  let mounts = 0
+  for (;;) {
+    const open = experiments.filter((e, i) => cursors[i] < e.changes.length)
+    if (open.length === 0) break
+    if (mounts < MOUNTS && rng.next() < 0.2) {
+      operations.push({ kind: "mount", id: `lm${mounts++}` })
+      continue
+    }
+    const experiment = rng.pick(open)
+    const index = experiments.indexOf(experiment)
+    operations.push({
+      kind: "apply",
+      name: experiment.name,
+      change: experiment.changes[cursors[index]++]
+    })
+  }
+  for (let i = rng.int(3); i > 0 && mounts < MOUNTS; i--)
+    operations.push({ kind: "mount", id: `lm${mounts++}` })
+  return { experiments, operations }
+}
+
+// requestAnimationFrame callbacks, run by flush(). The SDK batches late
+// matches into a frame after its MutationObserver callback (a microtask).
+const frames: FrameRequestCallback[] = []
+
+const stats = {
+  runs: 0,
+  noWriteRuns: 0,
+  runsWithCheckpoints: 0,
+  checkpoints: 0,
+  identityChecks: 0,
+  nonTopApplies: 0,
+  mounts: 0,
+  lateFrames: 0,
+  runsWithLateFrames: 0,
+  // Late-change writes on the page once every apply and mount has run.
+  lateWrites: 0,
+  runsWithLateWrites: 0
+}
+
+async function flush(): Promise<number> {
+  let ran = 0
+  for (let i = 0; i < FLUSH_LIMIT; i++) {
+    await Promise.resolve()
+    await Promise.resolve()
+    if (frames.length === 0) return ran
+    for (const frame of frames.splice(0)) {
+      frame(0)
+      ran++
+    }
+  }
+  throw new Error(
+    `pending SPA work still scheduling after ${FLUSH_LIMIT} frames`
+  )
+}
+
+type Expected = { page: string; originals: Array<[number, number[]]> }
+
+// The page a separate manager produces running `operations` on the
+// original page with only `live` experiments' applies.
+async function expectedPage(
+  operations: Operation[],
+  live: Set<string>,
+  replaced: { name: string; changes: DOMChange[] } | null
+): Promise<Expected> {
+  document.body.innerHTML = SPA_FIXTURE
+  const originals = Array.from(document.body.querySelectorAll("*"))
+  const fresh = new PreviewManager()
+  const applied = new Set<string>()
+  try {
+    for (const operation of operations) {
+      if (operation.kind === "mount") {
+        document.getElementById("spa").append(lateMount(operation.id))
+        await flush()
+        continue
+      }
+      const { name, change } = operation
+      if (!live.has(name)) continue
+      if (name !== replaced?.name) {
+        fresh.applyPreviewChange(change, name)
+        await flush()
+      } else if (!applied.has(name)) {
+        // The replacement list takes the replaced experiment's first slot.
+        for (const replacement of replaced.changes) {
+          fresh.applyPreviewChange(replacement, name)
+          await flush()
+        }
+      }
+      applied.add(name)
+    }
+    return {
+      page: unmarkedCanonical(),
+      originals: originals.flatMap((element, i) =>
+        element.isConnected ? [[i, pathOf(element)] as [number, number[]]] : []
+      )
+    }
+  } finally {
+    fresh.clearAll()
+    frames.length = 0
+  }
+}
+
+async function runStack(
+  manager: PreviewManager,
+  run: StackRun,
+  pageWrites = true
+): Promise<void> {
+  const { seed, removal, childReplacement, operations } = run
+  const replacement = run.replace && {
+    name: run.experiments[run.replace.index].name,
+    changes: run.replace.changes
+  }
+
+  // Expected pages after the replace and each removal, computed before the
+  // run so the separate manager never observes the real page.
+  const expectations: Expected[] = []
+  if (!pageWrites) {
+    const live = new Set(run.experiments.map((e) => e.name))
+    if (replacement)
+      expectations.push(await expectedPage(operations, live, replacement))
+    if (removal !== "clearAll") {
+      for (const name of removal) {
+        live.delete(name)
+        expectations.push(await expectedPage(operations, live, replacement))
+      }
+    }
+    document.body.innerHTML = SPA_FIXTURE
+  }
+
   const rng = prng(seed ^ 0x9e3779b9)
   const expected = document.body.cloneNode(true)
   const originalNodes = allNodes(document.body)
@@ -512,12 +763,13 @@ function runStack(manager: PreviewManager, run: StackRun): void {
     (node): node is Text => node.nodeType === Node.TEXT_NODE
   )
   const originalElements = Array.from(document.body.querySelectorAll("*"))
+  const mounted = new Set<Node>()
 
   const writes: PageWrite[] = []
   const log: string[] = []
   const fail = (reason: string) =>
     new Error(
-      `seed ${seed}: ${reason}\n` +
+      `seed ${seed}${pageWrites ? "" : " (no page writes)"}: ${reason}\n` +
         `steps: ${log.join(" | ")}\n` +
         run.experiments
           .map((e) => `${e.name}: ${JSON.stringify(e.changes)}`)
@@ -527,74 +779,117 @@ function runStack(manager: PreviewManager, run: StackRun): void {
           : "") +
         `\nbody: ${document.body.innerHTML}`
     )
-  const step = (label: string, action: () => void) => {
+  let lateFrames = 0
+  const step = async (label: string, action: () => void) => {
     log.push(label)
     try {
       action()
+      lateFrames += await flush()
     } catch (error) {
       throw fail(`${label} threw ${(error as Error).stack}`)
     }
   }
-  const maybePage = (probability: number) => {
-    if (rng.next() >= probability) return
-    const write = pageWrite(
-      rng,
-      elements,
-      texts,
-      `${writes.length}`,
-      childReplacement
-    )
+  const pageStep = async (write: PageWrite) => {
+    const observer = new MutationObserver(() => {})
+    const options = {
+      attributes: true,
+      characterData: true,
+      childList: true
+    }
+    observer.observe(document.body, { ...options, subtree: true })
+    for (const target of writeTargets(write)) observer.observe(target, options)
     // A write that changes nothing (removing an attribute a preview already
     // removed) produces no mutation, so no restorer can tell it happened.
-    // It is left out of the expected page.
-    const before = slotValue(write)
-    step(`page ${write.kind}`, () => runPageWrite(write, (node) => node))
-    if (write.kind === "children" || slotValue(write) !== before)
+    // It is left out of the expected page. Records are taken before the
+    // step yields, when the observer would otherwise receive them.
+    let observable = false
+    await step(`page ${write.kind}`, () => {
+      runPageWrite(write, (node) => node)
+      observable = observer.takeRecords().length > 0
+      observer.disconnect()
+    })
+    if (write.kind === "children" || write.kind === "mount" || observable)
       writes.push(write)
     else log.push("(no-op)")
   }
-
-  // Live previews after each removal, with the page they produced.
-  const checkpoints: Array<{ live: Experiment[]; page: string }> = []
-  const live = [...experiments]
-  const checkpoint = () => {
-    if (writes.length === 0)
-      checkpoints.push({ live: [...live], page: unmarkedCanonical() })
-  }
-
-  for (const { name, changes } of experiments) {
-    for (const change of changes) {
-      step(`apply ${name} ${change.type} ${change.selector}`, () =>
-        manager.applyPreviewChange(change, name)
-      )
-      maybePage(0.3)
-    }
-    for (let i = rng.int(3); i > 0; i--) maybePage(1)
-  }
-  if (run.replace) {
-    const target = experiments[run.replace.index]
-    const changes = run.replace.changes
-    step(`replace ${target.name}`, () =>
-      manager.replacePreviewChanges(target.name, changes)
+  const maybePage = async (probability: number) => {
+    if (!pageWrites || rng.next() >= probability) return
+    await pageStep(
+      pageWrite(rng, elements, texts, `${writes.length}`, childReplacement)
     )
-    const replaced = { name: target.name, changes }
-    live[run.replace.index] = replaced
-    checkpoint()
-    for (let i = rng.int(3); i > 0; i--) maybePage(1)
+  }
+
+  let checkpoints = 0
+  const checkpoint = (label: string) => {
+    if (pageWrites) return
+    const want = expectations[checkpoints++]
+    if (unmarkedCanonical() !== want.page) {
+      throw fail(
+        `page after ${label} differs from running the remaining operations on the original page\n` +
+          `expected: ${want.page}\nactual:   ${unmarkedCanonical()}`
+      )
+    }
+    for (const [index, path] of want.originals) {
+      stats.identityChecks++
+      if (nodeAt(path) !== originalElements[index])
+        throw fail(`after ${label} original element #${index} was replaced`)
+    }
+  }
+
+  const seen = new Set<string>()
+  let lastWriter: string | null = null
+  for (const operation of operations) {
+    if (operation.kind === "mount") {
+      stats.mounts++
+      const child = lateMount(operation.id)
+      mounted.add(child)
+      await pageStep({
+        kind: "mount",
+        parent: document.getElementById("spa"),
+        id: operation.id,
+        child
+      })
+      continue
+    }
+    const { name, change } = operation
+    if (seen.has(name) && lastWriter !== name) stats.nonTopApplies++
+    seen.add(name)
+    lastWriter = name
+    await step(`apply ${name} ${change.type} ${change.selector}`, () =>
+      manager.applyPreviewChange(change, name)
+    )
+    await maybePage(0.3)
+  }
+  const lateWrites = document.querySelectorAll(
+    "[data-late-a], [data-late-b], [data-late-c], .late-a, .late-b, .late-c"
+  ).length
+  stats.lateWrites += lateWrites
+  if (lateWrites > 0) stats.runsWithLateWrites++
+  for (const experiment of run.experiments)
+    for (let i = rng.int(3); i > 0; i--) await maybePage(1)
+  if (replacement) {
+    await step(`replace ${replacement.name}`, () =>
+      manager.replacePreviewChanges(replacement.name, replacement.changes)
+    )
+    checkpoint(`replace ${replacement.name}`)
+    for (let i = rng.int(3); i > 0; i--) await maybePage(1)
   }
   if (removal === "clearAll") {
-    step("clearAll", () => manager.clearAll())
+    await step("clearAll", () => manager.clearAll())
   } else {
     for (const name of removal) {
-      step(`remove ${name}`, () => manager.removePreviewChanges(name))
-      live.splice(
-        live.findIndex((e) => e.name === name),
-        1
-      )
-      checkpoint()
-      for (let i = rng.int(3); i > 0; i--) maybePage(1)
+      await step(`remove ${name}`, () => manager.removePreviewChanges(name))
+      checkpoint(`remove ${name}`)
+      for (let i = rng.int(3); i > 0; i--) await maybePage(1)
     }
   }
+
+  stats.runs++
+  if (!pageWrites) stats.noWriteRuns++
+  if (checkpoints > 0) stats.runsWithCheckpoints++
+  stats.checkpoints += checkpoints
+  stats.lateFrames += lateFrames
+  if (lateFrames > 0) stats.runsWithLateFrames++
 
   const ids = Array.from(document.querySelectorAll("[id]"), (e) => e.id)
   const duplicates = ids.filter((id, i) => ids.indexOf(id) !== i)
@@ -610,27 +905,13 @@ function runStack(manager: PreviewManager, run: StackRun): void {
           `expected: ${canonical(expected)}\nactual:   ${canonical(document.body)}`
       )
     }
-    const nodes = Array.from(document.body.querySelectorAll("*"))
+    const nodes = Array.from(document.body.querySelectorAll("*")).filter(
+      (node) =>
+        !mounted.has(node) && !Array.from(mounted).some((m) => m.contains(node))
+    )
     const index = originalElements.findIndex((node, i) => nodes[i] !== node)
     if (nodes.length !== originalElements.length || index !== -1)
       throw fail(`original element #${index} was replaced`)
-
-    // The page is the original again: rebuild each checkpoint's live set
-    // from scratch with a separate manager and compare. Only meaningful
-    // when no page write happened at all.
-    for (const { live: previews, page } of writes.length ? [] : checkpoints) {
-      const fresh = new PreviewManager()
-      for (const { name, changes } of previews)
-        for (const change of changes) fresh.applyPreviewChange(change, name)
-      const want = unmarkedCanonical()
-      fresh.clearAll()
-      if (want !== page) {
-        throw fail(
-          `page with [${previews.map((e) => e.name).join(",")}] live differs from applying them fresh\n` +
-            `expected: ${want}\nactual:   ${page}`
-        )
-      }
-    }
     return
   }
 
@@ -647,7 +928,8 @@ function runStack(manager: PreviewManager, run: StackRun): void {
     else if (write.kind === "style")
       last.set(`s${keyOf(write.element)}:${write.property}`, write)
     else if (write.kind === "text") last.set(`t${keyOf(write.node)}`, write)
-    else last.set(`c${keyOf(write.element)}`, write)
+    else if (write.kind === "children")
+      last.set(`c${keyOf(write.element)}`, write)
   }
   for (const write of last.values()) {
     if (write.kind === "attribute") {
@@ -668,7 +950,10 @@ function runStack(manager: PreviewManager, run: StackRun): void {
     } else if (write.kind === "text") {
       if (write.node.data !== write.value)
         throw fail(`page text ${write.value} became ${write.node.data}`)
-    } else if (write.child.parentNode !== write.element) {
+    } else if (
+      write.kind === "children" &&
+      write.child.parentNode !== write.element
+    ) {
       throw fail(`page child #${write.child.id} left its parent`)
     }
   }
@@ -678,28 +963,44 @@ function useFixture(): () => PreviewManager {
   let manager: PreviewManager
   beforeEach(() => {
     document.head.innerHTML = ""
-    document.body.innerHTML = FIXTURE
+    document.body.innerHTML = SPA_FIXTURE
+    frames.length = 0
+    jest
+      .spyOn(window, "requestAnimationFrame")
+      .mockImplementation((frame) => frames.push(frame))
     manager = new PreviewManager()
     jest.spyOn(console, "error").mockImplementation(() => {})
   })
   afterEach(() => {
     manager.clearAll()
+    frames.length = 0
     jest.restoreAllMocks()
   })
   return () => manager
 }
 
+// Reach of the generated runs, printed with PROPERTY_STATS=1.
+afterAll(() => {
+  if (process.env.PROPERTY_STATS) console.log(JSON.stringify(stats))
+})
+
 const interleavedCases = Array.from({ length: INTERLEAVED_CASES }, (_, i) => {
   const seed = INTERLEAVED_BASE_SEED + i
   const rng = prng(seed)
-  const experiments = [
+  const base = [
     { name: "a", changes: generateCase(rng, "a") },
     { name: "b", changes: generateCase(rng, "b") }
   ]
   const childReplacement = rng.next() < 0.25
   const removal: StackRun["removal"] =
     rng.next() < 0.2 ? "clearAll" : rng.next() < 0.5 ? ["a", "b"] : ["b", "a"]
-  return { seed, experiments, childReplacement, removal, replace: null }
+  return {
+    seed,
+    ...schedule(seed, base),
+    childReplacement,
+    removal,
+    replace: null
+  }
 })
 
 describe("PreviewManager restore property with page writes and overlapping experiments", () => {
@@ -724,7 +1025,7 @@ const REMOVALS: StackRun["removal"][] = [
 const stackedCases = Array.from({ length: STACKED_CASES }, (_, i) => {
   const seed = STACKED_BASE_SEED + i
   const rng = prng(seed)
-  const experiments = ["a", "b", "c"].map((name) => ({
+  const base = ["a", "b", "c"].map((name) => ({
     name,
     changes: generateCase(rng, name)
   }))
@@ -732,30 +1033,34 @@ const stackedCases = Array.from({ length: STACKED_CASES }, (_, i) => {
   let replace: StackRun["replace"] = null
   if (rng.next() < 0.5) {
     const index = rng.int(3)
-    const name = experiments[index].name
+    const name = base[index].name
     replace = {
       index,
       changes:
-        rng.next() < 0.5
-          ? experiments[index].changes
-          : generateCase(rng, `${name}r`)
+        rng.next() < 0.5 ? base[index].changes : generateCase(rng, `${name}r`)
     }
   }
-  return { seed, experiments, childReplacement, replace }
+  return { seed, ...schedule(seed, base), childReplacement, replace }
 })
 
 describe("PreviewManager restore property with three stacked experiments", () => {
   const manager = useFixture()
 
-  it.each(stackedCases)(
-    "seed $seed: every removal order and clearAll restore the page",
-    (run) => {
+  it.each(
+    stackedCases.flatMap((run) => [
+      { ...run, pageWrites: true },
+      { ...run, pageWrites: false }
+    ])
+  )(
+    "seed $seed (page writes: $pageWrites): every removal order and clearAll restore the page",
+    async ({ pageWrites, ...run }) => {
       for (const removal of REMOVALS) {
-        document.body.innerHTML = FIXTURE
+        document.body.innerHTML = SPA_FIXTURE
         try {
-          runStack(manager(), { ...run, removal })
+          await runStack(manager(), { ...run, removal }, pageWrites)
         } finally {
           manager().clearAll()
+          frames.length = 0
         }
       }
     }
