@@ -5,7 +5,7 @@
  *
  * Why postMessage and not a direct call into window.__absmartlyDOMChangesPlugin:
  * the production code path is rooted at the sdk-bridge orchestrator, which
- * captures original element state in PreviewManager.previewStateMap before
+ * journals the DOM mutations of each change in PreviewManager while
  * delegating to the SDK. Going through the orchestrator keeps that capture
  * intact.
  */
@@ -13,8 +13,8 @@
 import type { DOMChange } from "../types/visual-editor"
 
 // Dedicated experiment name for VE-applied previews. Isolates VE state from
-// any active production-experiment preview so previewStateMap stays coherent
-// (one (element, experimentName) → originalState mapping).
+// any active production-experiment preview: each experiment name has its own
+// mutation journal in PreviewManager.
 export const VISUAL_EDITOR_EXPERIMENT_NAME = "__visual_editor__"
 
 /**
@@ -78,7 +78,7 @@ export function applyChangesViaSDK(
 
 /**
  * Tear down all preview state for the given experiment name.
- * PreviewManager restores from previewStateMap and strips marker attributes.
+ * PreviewManager inverts its mutation journal and strips marker attributes.
  */
 export function clearChangesViaSDK(experimentName: string): void {
   if (typeof window === "undefined") return

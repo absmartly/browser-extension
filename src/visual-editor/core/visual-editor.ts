@@ -492,8 +492,8 @@ export class VisualEditor {
     const squashedChanges = this.squashChanges(currentChanges)
     debugLog("[ABSmartly] Squashed changes count:", squashedChanges.length)
 
-    // Original element state is captured by PreviewManager.previewStateMap
-    // when changes are applied via the SDK path; no need for the legacy
+    // PreviewManager journals the original DOM when changes are applied via
+    // the SDK path; no need for the legacy
     // data-absmartly-original sidecar.
 
     // Log what we're sending to sidebar

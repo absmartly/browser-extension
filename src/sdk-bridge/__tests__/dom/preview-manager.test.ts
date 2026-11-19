@@ -418,6 +418,165 @@ describe("PreviewManager", () => {
     expect(byId("p").style.color).toBe("")
   })
 
+  describe("a javascript change on an ancestor of an earlier change", () => {
+    const parentJs: DOMChange = {
+      selector: "#p",
+      type: "javascript",
+      value:
+        "element.dataset.x = '1'; element.querySelector('span').title = 'js'"
+    }
+    const original = '<div id="p"><span id="c" class="label">orig</span></div>'
+
+    it.each([
+      ["style", { selector: "#c", type: "style", value: { color: "red" } }],
+      ["text", { selector: "#c", type: "text", value: "PREVIEW" }]
+    ] as const)(
+      "restores a single original child after %s on the child",
+      (_name, childChange) => {
+        document.body.innerHTML = original
+        const child = byId("c")
+        const click = jest.fn()
+        child.addEventListener("click", click)
+
+        manager.applyPreviewChange(childChange as DOMChange, "exp")
+        manager.applyPreviewChange(parentJs, "exp")
+        manager.removePreviewChanges("exp")
+
+        expect(document.querySelectorAll("#c")).toHaveLength(1)
+        expect(byId("c")).toBe(child)
+        expect(document.body.innerHTML).toBe(original)
+        byId("c").click()
+        expect(click).toHaveBeenCalledTimes(1)
+      }
+    )
+
+    it("does not multiply the child over visual-editor replays", () => {
+      document.body.innerHTML = original
+      const changes: DOMChange[] = [
+        { selector: "span.label", type: "style", value: { color: "red" } },
+        parentJs
+      ]
+
+      for (let cycle = 0; cycle < 3; cycle++) {
+        for (const change of changes) manager.applyPreviewChange(change, "exp")
+        expect(document.querySelectorAll("span.label")).toHaveLength(1)
+        manager.removePreviewChanges("exp")
+        expect(document.body.innerHTML).toBe(original)
+      }
+    })
+
+    it("removes a node created before the javascript change", () => {
+      document.body.innerHTML = original
+      manager.applyPreviewChange(
+        {
+          selector: "",
+          type: "create",
+          element: '<i id="new">N</i>',
+          targetSelector: "#c",
+          position: "after"
+        },
+        "exp"
+      )
+      manager.applyPreviewChange(parentJs, "exp")
+      manager.removePreviewChanges("exp")
+
+      expect(byId("new")).toBeNull()
+      expect(document.body.innerHTML).toBe(original)
+    })
+
+    it("keeps form controls and their state when javascript rewrites the container", () => {
+      document.body.innerHTML =
+        '<form id="p"><label for="q">Q</label><input id="q" data-track="1" type="search"><button id="go" type="submit" aria-label="Go"><svg viewBox="0 0 1 1"></svg></button><span>s</span></form>'
+      const markup = document.body.innerHTML
+      const input = byId("q") as HTMLInputElement
+      input.value = "typed"
+
+      manager.applyPreviewChange(
+        {
+          selector: "#p",
+          type: "javascript",
+          value: "element.innerHTML = '<p>replaced</p>'"
+        },
+        "exp"
+      )
+      expect(byId("q")).toBeNull()
+      manager.removePreviewChanges("exp")
+
+      expect(document.body.innerHTML).toBe(markup)
+      expect(byId("q")).toBe(input)
+      expect(input.value).toBe("typed")
+    })
+  })
+
+  it("restores the page when two experiments overlap and are removed in either order", () => {
+    const original = '<div id="p"><span id="c">orig</span></div>'
+    for (const order of [
+      ["a", "b"],
+      ["b", "a"]
+    ]) {
+      document.body.innerHTML = original
+      const child = byId("c")
+      manager.applyPreviewChange(
+        {
+          selector: "#p",
+          type: "javascript",
+          value: "element.querySelector('span').textContent = 'JS'"
+        },
+        "a"
+      )
+      manager.applyPreviewChange(
+        { selector: "#c", type: "style", value: { color: "red" } },
+        "b"
+      )
+      for (const name of order) manager.removePreviewChanges(name)
+
+      expect(document.body.innerHTML).toBe(original)
+      expect(byId("c")).toBe(child)
+    }
+  })
+
+  it.each([
+    ["the next sibling", "x", '<li id="y">Y</li><li id="z">Z</li>'],
+    [
+      "the previous sibling",
+      "z",
+      '<li id="x">X</li><li id="y">Y</li><li id="w">W</li>'
+    ]
+  ])(
+    "reinserts a deleted element beside %s when page code removed the other one",
+    (_name, removedByPage, expected) => {
+      document.body.innerHTML =
+        '<ul id="l"><li id="x">X</li><li id="y">Y</li><li id="z">Z</li></ul>'
+      const deleted = byId("y")
+
+      manager.applyPreviewChange({ selector: "#y", type: "delete" }, "exp")
+      byId(removedByPage).remove()
+      const late = document.createElement("li")
+      late.id = "w"
+      late.textContent = "W"
+      if (removedByPage === "z") byId("l").append(late)
+      manager.removePreviewChanges("exp")
+
+      expect(byId("l").innerHTML).toBe(expected)
+      expect(byId("y")).toBe(deleted)
+    }
+  )
+
+  it("reinstates original children when page code rewrote html-preview content", () => {
+    document.body.innerHTML = '<div id="h"><b id="k">Keep</b></div>'
+    const child = byId("k")
+
+    manager.applyPreviewChange(
+      { selector: "#h", type: "html", value: "<i>Preview</i>" },
+      "exp"
+    )
+    byId("h").innerHTML = "<u>edited</u>"
+    manager.removePreviewChanges("exp")
+
+    expect(byId("h").innerHTML).toBe('<b id="k">Keep</b>')
+    expect(byId("k")).toBe(child)
+  })
+
   it("restores visual-editor marked elements from their serialized original", () => {
     document.body.innerHTML = '<div id="ve">Edited</div>'
     const element = byId("ve")

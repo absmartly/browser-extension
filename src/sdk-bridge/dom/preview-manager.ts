@@ -15,16 +15,18 @@ import type { DOMChange } from "~src/types/dom-changes"
 import { sanitizeHTML } from "../utils/html-sanitizer"
 import { Logger } from "../utils/logger"
 import {
-  ElementStateManager,
-  type ChildRestore,
-  type ElementState
-} from "./element-state"
+  recordAttributeOrder,
+  recordMutations,
+  restoreAttributeOrder,
+  undoMutations,
+  type JournalEntry
+} from "./mutation-journal"
 
-interface PreviewState {
-  experimentName: string
-  originalState: ElementState
-  selector: string
-  changeType: string
+// Everything one experiment's preview did to the page, in application order.
+interface PreviewJournal {
+  entries: JournalEntry[]
+  attributeOrder: Map<Element, string[]>
+  marked: Set<Element>
 }
 
 type OwnedApplication = (
@@ -81,26 +83,52 @@ class PreviewDOMManipulator extends DOMManipulatorLite {
   }
 }
 
-// text/html replace children, leaving the originals detached and intact.
-// JavaScript can mutate the original descendants in place, so only a
-// serialized copy taken before it ran is a faithful restore source.
-function childRestoreFor(change: DOMChange): ChildRestore {
-  if (change.type === "javascript") return "serialized"
-  if (change.type === "text" || change.type === "html") return "live"
-  return "none"
-}
-
 export class PreviewManager {
-  private previewStateMap: Map<Element, PreviewState>
+  private journals: Map<string, PreviewJournal> = new Map()
   private sessions: Map<string, PreviewDOMManipulator> = new Map()
   private styleManagers: Map<string, StyleSheetManager> = new Map()
-  // Elements created by 'create' changes, keyed by experiment. The SDK's
-  // createElement doesn't expose the new nodes, so mutation records around
-  // the call identify them for removal.
-  private createdElementsMap: Map<string, Set<Element>> = new Map()
 
-  constructor() {
-    this.previewStateMap = new Map()
+  private getJournal(experimentName: string): PreviewJournal {
+    let journal = this.journals.get(experimentName)
+    if (!journal) {
+      journal = { entries: [], attributeOrder: new Map(), marked: new Set() }
+      this.journals.set(experimentName, journal)
+    }
+    return journal
+  }
+
+  // Applies one change to `targets` and journals every DOM mutation it
+  // makes so removal can invert it. Tracking markers are written outside the
+  // journal (the marker sweep in removePreviewChanges clears them): another
+  // experiment may re-mark the same element, and undoing a marker write
+  // would resurrect a stale experiment name.
+  private applyJournaled(
+    experimentName: string,
+    change: DOMChange,
+    targets: Element[],
+    apply: () => boolean
+  ): boolean {
+    const journal = this.getJournal(experimentName)
+    recordAttributeOrder(journal.attributeOrder, targets)
+    if (change.type === "javascript") {
+      for (const target of targets) {
+        recordAttributeOrder(
+          journal.attributeOrder,
+          target.querySelectorAll("*")
+        )
+      }
+    }
+    const { result, entries } = recordMutations(document, apply)
+    journal.entries.push(...entries)
+    if (result) {
+      for (const element of targets) {
+        if (element.isConnected) {
+          this.markElement(element, experimentName)
+          journal.marked.add(element)
+        }
+      }
+    }
+    return result
   }
 
   private getSession(experimentName: string): PreviewDOMManipulator {
@@ -131,10 +159,7 @@ export class PreviewManager {
         ) {
           return false
         }
-        this.captureOriginalState(element, change, experimentName)
-        const success = apply()
-        if (success) this.markElement(element, experimentName)
-        return success
+        return this.applyJournaled(experimentName, change, [element], apply)
       }
     )
     this.sessions.set(experimentName, session)
@@ -193,81 +218,20 @@ export class PreviewManager {
     }
 
     const session = this.getSession(experimentName)
-    if (change.type === "create") {
-      return this.applyCreateChange(change, experimentName, session)
-    }
-
-    // Capture original state BEFORE applying (for undo functionality)
-    if (change.type !== "styleRules") {
-      for (const element of this.findPreviewTargets(change.selector)) {
-        this.captureOriginalState(element, change, experimentName)
-      }
+    // styleRules only write the experiment's stylesheet, which removal
+    // destroys as a whole.
+    if (change.type === "styleRules") {
+      return session.applyChange(change, experimentName)
     }
 
     // The session's SDK manipulator applies current matches and registers
     // waitForElement/SPA selectors with its pending manager, whose late
-    // matches go through applyOwned (see getSession).
-    const success = session.applyChange(change, experimentName)
-
-    // Mark applied elements AFTER for undo tracking. Late SPA matches are
-    // captured and marked by the session's pending callback instead.
-    if (success && change.type !== "styleRules") {
-      for (const element of this.findPreviewTargets(change.selector)) {
-        if (
-          this.previewStateMap.get(element)?.experimentName === experimentName
-        ) {
-          this.markElement(element, experimentName)
-        }
-      }
-    }
-
-    return success
-  }
-
-  private applyCreateChange(
-    change: DOMChange,
-    experimentName: string,
-    session: PreviewDOMManipulator
-  ): boolean {
-    let target: Element | null = null
-    try {
-      const targetSelector =
-        "targetSelector" in change ? change.targetSelector : undefined
-      target = targetSelector ? document.querySelector(targetSelector) : null
-    } catch {
-      // Invalid selector: the SDK reports its own failure.
-    }
-    const root = target?.parentNode || target
-    if (!root) return session.applyChange(change, experimentName)
-
-    // Observe the anchor's parent subtree so before/after and
-    // firstChild/lastChild insertions are all attributed to this change.
-    const observer = new MutationObserver(() => {})
-    observer.observe(root, { childList: true, subtree: true })
-    let success = false
-    let records: MutationRecord[] = []
-    try {
-      success = session.applyChange(change, experimentName)
-    } finally {
-      records = observer.takeRecords()
-      observer.disconnect()
-    }
-    if (!success) return false
-
-    let bucket = this.createdElementsMap.get(experimentName)
-    if (!bucket) {
-      bucket = new Set()
-      this.createdElementsMap.set(experimentName, bucket)
-    }
-    for (const record of records) {
-      for (const node of Array.from(record.addedNodes)) {
-        if (node instanceof Element && node.isConnected) {
-          bucket.add(node)
-          this.markElement(node, experimentName)
-        }
-      }
-    }
-    return true
+    // matches are journaled through applyOwned (see getSession).
+    const targets =
+      change.type === "create" ? [] : this.findPreviewTargets(change.selector)
+    return this.applyJournaled(experimentName, change, targets, () =>
+      session.applyChange(change, experimentName)
+    )
   }
 
   private findPreviewTargets(selector: string): Element[] {
@@ -279,33 +243,6 @@ export class PreviewManager {
       // Invalid selector: the SDK reports its own failure.
       return []
     }
-  }
-
-  private captureOriginalState(
-    element: Element,
-    change: DOMChange,
-    experimentName: string
-  ): void {
-    const childRestore = childRestoreFor(change)
-    const existing = this.previewStateMap.get(element)
-    if (existing?.experimentName === experimentName) {
-      // The first snapshot already holds the original children and markup.
-      // Once a text/html change detached the originals, later changes cannot
-      // reach them, so only a "none" snapshot needs upgrading.
-      if (existing.originalState.childRestore === "none") {
-        existing.originalState.childRestore = childRestore
-      }
-      return
-    }
-    this.previewStateMap.set(element, {
-      experimentName,
-      originalState: ElementStateManager.captureElementState(
-        element,
-        childRestore
-      ),
-      selector: change.selector,
-      changeType: change.type
-    })
   }
 
   private markElement(element: Element, experimentName: string): void {
@@ -328,27 +265,12 @@ export class PreviewManager {
 
     let restoredCount = 0
 
-    // Undo snapshots newest-first. A snapshot taken inside content introduced
-    // by an earlier ancestor change is unwound before that ancestor restores
-    // its original children, so the descendant is not reinserted.
-    const tracked = Array.from(this.previewStateMap).filter(
-      ([, data]) => data.experimentName === experimentName
-    )
-    for (const [element, data] of tracked.reverse()) {
-      ElementStateManager.restoreElementState(element, data.originalState)
-      this.previewStateMap.delete(element)
-      restoredCount++
-    }
-
-    // Remove created nodes after the snapshots: a snapshot of a created node
-    // (a later change targeted it) or of its parent reinserts it on restore.
-    const created = this.createdElementsMap.get(experimentName)
-    if (created) {
-      for (const el of created) {
-        el.remove()
-        restoredCount++
-      }
-      this.createdElementsMap.delete(experimentName)
+    const journal = this.journals.get(experimentName)
+    if (journal) {
+      this.journals.delete(experimentName)
+      undoMutations(journal.entries)
+      restoreAttributeOrder(journal.attributeOrder)
+      restoredCount += journal.entries.length
     }
 
     // Also remove markers from any elements with this experiment (e.g., from visual editor)
@@ -446,12 +368,9 @@ export class PreviewManager {
   clearAll(): void {
     const experimentNames = new Set<string>([
       ...this.sessions.keys(),
-      ...this.createdElementsMap.keys(),
+      ...this.journals.keys(),
       ...this.styleManagers.keys()
     ])
-    for (const data of this.previewStateMap.values()) {
-      experimentNames.add(data.experimentName)
-    }
 
     for (const name of experimentNames) {
       this.removePreviewChanges(name)
@@ -462,7 +381,9 @@ export class PreviewManager {
    * Get count of tracked preview elements
    */
   getPreviewCount(): number {
-    return this.previewStateMap.size
+    let count = 0
+    for (const journal of this.journals.values()) count += journal.marked.size
+    return count
   }
 
   /**
