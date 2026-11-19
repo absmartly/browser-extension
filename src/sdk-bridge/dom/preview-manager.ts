@@ -74,21 +74,24 @@ interface PreviewJournal {
   formWrites: FormPropertyWrite[]
 }
 
-// A pending change the SDK applied to one element after it mounted.
-interface LateMatch {
+// One write in a segment: a change applied by selector, or a pending
+// change the SDK applied to `element` after it mounted (a late match).
+// `matchedLate` marks a selector write whose pending work later matched;
+// replay re-applies it at its late match instead.
+interface Write {
   change: DOMChange
-  element: Element
+  element?: Element
+  matchedLate?: boolean
 }
 
 // One contiguous run of one experiment's writes. An experiment gets a new
 // segment whenever it writes while another experiment's segment is on top:
-// its first apply, a later apply, or a late SPA match. `changes` and `late`
+// its first apply, a later apply, or a late SPA match. `writes`, in order,
 // are what replay re-applies; `journal` is what applying them did; the
-// session holds the pending SPA work `changes` registered.
+// session holds the pending SPA work the writes registered.
 interface Segment {
   name: string
-  changes: DOMChange[]
-  late: LateMatch[]
+  writes: Write[]
   journal: PreviewJournal
   session?: PreviewDOMManipulator
 }
@@ -160,8 +163,7 @@ class PreviewDOMManipulator extends DOMManipulatorLite {
 function newSegment(name: string): Segment {
   return {
     name,
-    changes: [],
-    late: [],
+    writes: [],
     journal: {
       entries: [],
       attributeOrder: new Map(),
@@ -300,50 +302,48 @@ export class PreviewManager {
     }
   }
 
-  // Re-applies unwound segments in their original order with fresh
+  // Re-applies unwound segments' writes in their original order with fresh
   // journals and sessions, so their pending SPA work is registered again.
-  // A change listed by several segments of one experiment is applied once.
-  // A late match is re-applied to its element unless its change is
-  // re-applied here anyway; if the element is gone (the newer preview that
-  // created it was removed), the change is re-applied by selector so its
-  // pending work is recreated. A change that throws is logged; the rest
-  // still apply.
+  // A change that was pending when applied and matched an element later is
+  // replayed where its late match was: to that element if it is still on
+  // the page and matches, otherwise by selector (pending again if nothing
+  // matches). A change that throws is logged; the rest still apply.
   private replay(segments: Segment[]): void {
-    const listed = new Set(segments.flatMap((s) => s.changes))
-    const applied = new Set<DOMChange>()
-    const guarded = (run: () => void) => {
-      try {
-        run()
-      } catch (error) {
-        Logger.error("[PreviewManager] Re-applying preview failed:", error)
+    for (const { name, writes } of segments) {
+      const segment = this.topFor(name)
+      for (const { change, element, matchedLate } of writes) {
+        if (matchedLate) continue
+        try {
+          if (element?.isConnected && matches(element, change.selector)) {
+            const session = this.sessionFor(segment)
+            if (
+              this.applyJournaled(segment, change, [element], () =>
+                session.applyToElement(change, name, element)
+              )
+            )
+              segment.writes.push({ change, element })
+          } else {
+            segment.writes.push({ change })
+            this.applyChange(segment, change)
+          }
+        } catch (error) {
+          Logger.error("[PreviewManager] Re-applying preview failed:", error)
+        }
       }
     }
-    const reapply = (segment: Segment, change: DOMChange) => {
-      if (applied.has(change)) return
-      applied.add(change)
-      segment.changes.push(change)
-      guarded(() => this.applyChange(segment, change))
-    }
-    for (const { name, changes, late } of segments) {
-      const segment = this.topFor(name)
-      for (const change of changes) reapply(segment, change)
-      for (const match of late) {
-        const { change, element } = match
-        if (listed.has(change)) continue
-        if (!element.isConnected) {
-          reapply(segment, change)
-          continue
-        }
-        if (!matches(element, change.selector)) continue
-        const session = this.sessionFor(segment)
-        guarded(() => {
-          if (
-            this.applyJournaled(segment, change, [element], () =>
-              session.applyToElement(change, name, element)
-            )
-          )
-            segment.late.push(match)
-        })
+  }
+
+  // Marks the selector write whose pending work produced a late match.
+  private resolvePending(experimentName: string, change: DOMChange): void {
+    for (let i = this.stack.length - 1; i >= 0; i--) {
+      const { name, writes } = this.stack[i]
+      if (name !== experimentName) continue
+      const write = writes.find(
+        (w) => w.change === change && !w.element && !w.matchedLate
+      )
+      if (write) {
+        write.matchedLate = true
+        return
       }
     }
   }
@@ -446,17 +446,25 @@ export class PreviewManager {
     const session: PreviewDOMManipulator = new PreviewDOMManipulator(
       plugin,
       (element, change, apply) => {
-        if (owner.session !== session || this.isExtensionElement(element))
+        // The SDK matches added nodes when their MutationRecords are
+        // delivered, which can be after an unwind or replay detached them
+        // again; such a match stays pending.
+        if (
+          owner.session !== session ||
+          !element.isConnected ||
+          this.isExtensionElement(element)
+        )
           return false
         // Journaled on top: in the experiment's top segment if it is the
         // newest, otherwise in a new segment above the newer previews.
         const segment = this.topFor(experimentName)
         const result = this.applyJournaled(segment, change, [element], apply)
-        if (result) segment.late.push({ change, element })
-        else if (
+        if (result) {
+          this.resolvePending(experimentName, change)
+          segment.writes.push({ change, element })
+        } else if (
           segment.journal.entries.length === 0 &&
-          segment.changes.length === 0 &&
-          segment.late.length === 0
+          segment.writes.length === 0
         )
           this.stack.pop()
         return result
@@ -513,7 +521,7 @@ export class PreviewManager {
       return false
     }
     const segment = this.topFor(experimentName)
-    segment.changes.push(change)
+    segment.writes.push({ change })
     return this.applyChange(segment, change)
   }
 
