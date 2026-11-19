@@ -704,6 +704,34 @@ describe("PreviewManager", () => {
     expect(element.hasAttribute("title")).toBe(false)
   })
 
+  it("restores a javascript outer removal with nested descendant removals", () => {
+    document.body.innerHTML =
+      '<div id="host"><div id="outer"><span id="first">First</span><span id="second">Second</span></div></div>'
+    const host = byId("host")
+    const outer = byId("outer")
+    const first = byId("first")
+    const second = byId("second")
+
+    expect(
+      manager.applyPreviewChange(
+        {
+          selector: "#outer",
+          type: "javascript",
+          value:
+            "const outer = document.getElementById('outer'); const host = outer.parentNode; const first = outer.querySelector('#first'); const second = outer.querySelector('#second'); host.removeChild(outer); outer.removeChild(first); outer.removeChild(second)"
+        },
+        "exp"
+      )
+    ).toBe(true)
+
+    manager.removePreviewChanges("exp")
+
+    expect(host.firstElementChild).toBe(outer)
+    expect(outer.children).toHaveLength(2)
+    expect(outer.firstElementChild).toBe(first)
+    expect(outer.lastElementChild).toBe(second)
+  })
+
   it("restores a detached and reinserted javascript target without stale ownership", () => {
     document.body.innerHTML =
       '<div id="host"><span id="target" data-state="original">Original</span></div>'

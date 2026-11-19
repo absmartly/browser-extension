@@ -86,14 +86,66 @@ function attributeValue(
 type AttributeState = Extract<JournalEntry, { kind: "attributes" }>
 type CharacterDataState = Extract<JournalEntry, { kind: "characterData" }>
 
-function markDetached(
+export type MutationJournalDiagnostics = {
+  records: number
+  detachedSubtreeVisits: number
+}
+
+function isWithinRetiredSubtree(node: Node, retiredRoots: Set<Node>): boolean {
+  let current: Node | null = node
+  while (current) {
+    if (retiredRoots.has(current)) return true
+    current = current.parentNode
+  }
+  return false
+}
+
+function restoreAttachedSubtree(
   node: Node,
+  retiredRoots: Set<Node>,
   attributes: Map<Element, Map<string, AttributeState>>,
   characterData: Map<CharacterData, CharacterDataState>,
   retiredAttributes: Map<Element, Map<string, AttributeState>>,
   retiredCharacterData: Map<CharacterData, CharacterDataState>
 ): void {
   const visit = (current: Node) => {
+    retiredRoots.delete(current)
+    if (current.nodeType === Node.ELEMENT_NODE) {
+      const element = current as Element
+      const states = retiredAttributes.get(element)
+      if (states) {
+        attributes.set(element, states)
+        retiredAttributes.delete(element)
+      }
+    } else if (
+      current.nodeType === Node.TEXT_NODE ||
+      current.nodeType === Node.CDATA_SECTION_NODE
+    ) {
+      const character = current as CharacterData
+      const state = retiredCharacterData.get(character)
+      if (state) {
+        characterData.set(character, state)
+        retiredCharacterData.delete(character)
+      }
+    }
+    for (const child of current.childNodes) visit(child)
+  }
+  visit(node)
+}
+
+function markDetached(
+  node: Node,
+  retiredRoots: Set<Node>,
+  attributes: Map<Element, Map<string, AttributeState>>,
+  characterData: Map<CharacterData, CharacterDataState>,
+  retiredAttributes: Map<Element, Map<string, AttributeState>>,
+  retiredCharacterData: Map<CharacterData, CharacterDataState>,
+  diagnostics?: MutationJournalDiagnostics
+): void {
+  if (isWithinRetiredSubtree(node, retiredRoots)) return
+  retiredRoots.add(node)
+  const visit = (current: Node) => {
+    diagnostics && (diagnostics.detachedSubtreeVisits += 1)
     if (current.nodeType === Node.ELEMENT_NODE) {
       const element = current as Element
       const states = attributes.get(element)
@@ -125,22 +177,38 @@ function markDetached(
   visit(node)
 }
 
-function toEntries(records: MutationRecord[]): JournalEntry[] {
+function toEntries(
+  records: MutationRecord[],
+  diagnostics?: MutationJournalDiagnostics
+): JournalEntry[] {
   const entries: JournalEntry[] = []
   const attributes = new Map<Element, Map<string, AttributeState>>()
   const characterData = new Map<CharacterData, CharacterDataState>()
+  const retiredRoots = new Set<Node>()
   const retiredAttributes = new Map<Element, Map<string, AttributeState>>()
   const retiredCharacterData = new Map<CharacterData, CharacterDataState>()
 
   for (const record of records) {
+    diagnostics && (diagnostics.records += 1)
     if (record.type === "childList") {
-      for (const removed of record.removedNodes)
-        markDetached(
-          removed,
+      for (const added of record.addedNodes)
+        restoreAttachedSubtree(
+          added,
+          retiredRoots,
           attributes,
           characterData,
           retiredAttributes,
           retiredCharacterData
+        )
+      for (const removed of record.removedNodes)
+        markDetached(
+          removed,
+          retiredRoots,
+          attributes,
+          characterData,
+          retiredAttributes,
+          retiredCharacterData,
+          diagnostics
         )
       entries.push(toEntry(record))
       continue
@@ -152,19 +220,25 @@ function toEntries(records: MutationRecord[]): JournalEntry[] {
         { kind: "attributes" }
       >
       const key = `${record.attributeNamespace ?? ""}\u0000${record.attributeName ?? ""}`
-      let states = attributes.get(entry.target)
-      if (!states) {
-        states = new Map()
-        attributes.set(entry.target, states)
-      }
-      const previous = states.get(key)
-      if (previous) previous.newValue = entry.oldValue
       const retired = retiredAttributes.get(entry.target)?.get(key)
-      if (retired) {
-        retired.newValue = entry.oldValue
-        retiredAttributes.get(entry.target)?.delete(key)
+      if (retired || isWithinRetiredSubtree(entry.target, retiredRoots)) {
+        if (retired) retired.newValue = entry.oldValue
+        let states = retiredAttributes.get(entry.target)
+        if (!states) {
+          states = new Map()
+          retiredAttributes.set(entry.target, states)
+        }
+        states.set(key, entry)
+      } else {
+        let states = attributes.get(entry.target)
+        if (!states) {
+          states = new Map()
+          attributes.set(entry.target, states)
+        }
+        const previous = states.get(key)
+        if (previous) previous.newValue = entry.oldValue
+        states.set(key, entry)
       }
-      states.set(key, entry)
       entries.push(entry)
       continue
     }
@@ -173,14 +247,15 @@ function toEntries(records: MutationRecord[]): JournalEntry[] {
       JournalEntry,
       { kind: "characterData" }
     >
-    const previous = characterData.get(entry.target)
-    if (previous) previous.newValue = entry.oldValue
-    const retired = retiredCharacterData.get(entry.target)
-    if (retired) {
-      retired.newValue = entry.oldValue
-      retiredCharacterData.delete(entry.target)
+    if (isWithinRetiredSubtree(entry.target, retiredRoots)) {
+      const previous = retiredCharacterData.get(entry.target)
+      if (previous) previous.newValue = entry.oldValue
+      retiredCharacterData.set(entry.target, entry)
+    } else {
+      const previous = characterData.get(entry.target)
+      if (previous) previous.newValue = entry.oldValue
+      characterData.set(entry.target, entry)
     }
-    characterData.set(entry.target, entry)
     entries.push(entry)
   }
 
@@ -190,6 +265,14 @@ function toEntries(records: MutationRecord[]): JournalEntry[] {
     }
   }
   for (const state of characterData.values()) {
+    state.newValue = state.target.data
+  }
+  for (const states of retiredAttributes.values()) {
+    for (const state of states.values()) {
+      state.newValue = attributeValue(state.target, state.namespace, state.name)
+    }
+  }
+  for (const state of retiredCharacterData.values()) {
     state.newValue = state.target.data
   }
   return entries
@@ -203,7 +286,8 @@ function toEntries(records: MutationRecord[]): JournalEntry[] {
  */
 export function recordMutations<T>(
   roots: Iterable<Node>,
-  apply: () => T
+  apply: () => T,
+  diagnostics?: MutationJournalDiagnostics
 ): { result: T; entries: JournalEntry[] } {
   const observer = new MutationObserver(() => {})
   for (const root of new Set(roots)) observer.observe(root, OBSERVE_ALL)
@@ -215,7 +299,7 @@ export function recordMutations<T>(
     records = observer.takeRecords()
     observer.disconnect()
   }
-  return { result, entries: toEntries(records) }
+  return { result, entries: toEntries(records, diagnostics) }
 }
 
 function isStructural(node: Node): boolean {
