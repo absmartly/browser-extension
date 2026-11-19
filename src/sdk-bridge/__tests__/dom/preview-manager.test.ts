@@ -1892,14 +1892,19 @@ describe("PreviewManager", () => {
           "__visual_editor__"
         )
         manager.removePreviewChanges("older")
+        expect(byId("e").textContent).toBe("ve")
+        manager.clearAll()
+        manager.clearAll()
+        manager.removePreviewChanges("older")
       } finally {
         window.removeEventListener("absmartly:preview-unwind", listener)
       }
       expect(seen).toEqual([
         { experiments: ["older"], text: "page" },
-        { experiments: ["older", "__visual_editor__"], text: "ve" }
+        { experiments: ["older", "__visual_editor__"], text: "ve" },
+        { experiments: ["__visual_editor__"], text: "ve" }
       ])
-      expect(byId("e").textContent).toBe("ve")
+      expect(byId("e").textContent).toBe("page")
     })
   })
 

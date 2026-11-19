@@ -260,23 +260,26 @@ export class PreviewManager {
     return segment
   }
 
+  // An open visual-editor session may hold nodes of any segment about to be
+  // unwound (its live writes, or the children it restores on cancel), so it
+  // is told to close before form values are read or anything is inverted.
+  private signalUnwind(segments: Segment[]): void {
+    if (segments.length === 0) return
+    window.dispatchEvent(
+      new CustomEvent(PREVIEW_UNWIND_EVENT, {
+        detail: {
+          experiments: Array.from(new Set(segments.map((s) => s.name)))
+        }
+      })
+    )
+  }
+
   // Takes every segment from `experimentName`'s lowest one up off the
   // stack and inverts them newest first. Pending SPA work of each is
   // cancelled before any DOM is inverted, so no late mount re-applies.
+  // Callers run signalUnwind first.
   private unwindFrom(index: number): Segment[] {
     const unwound = this.stack.splice(index)
-    // An open visual-editor session may hold nodes of any unwound segment
-    // (its live writes, or the children it restores on cancel), so it is
-    // closed before anything is inverted.
-    if (unwound.length > 0) {
-      window.dispatchEvent(
-        new CustomEvent(PREVIEW_UNWIND_EVENT, {
-          detail: {
-            experiments: Array.from(new Set(unwound.map((s) => s.name)))
-          }
-        })
-      )
-    }
     for (const segment of unwound) {
       segment.session?.destroy()
       segment.session = undefined
@@ -679,6 +682,7 @@ export class PreviewManager {
     if (slot === -1) return { others: [], own: [], form: [] }
     const above = this.stack.slice(slot)
     const others = above.filter((s) => s.name !== experimentName)
+    this.signalUnwind(above)
     const form = this.snapshotForm(above, others)
     const unwound = this.unwindFrom(slot)
     return {
@@ -742,6 +746,7 @@ export class PreviewManager {
    * Clear all preview changes
    */
   clearAll(): void {
+    this.signalUnwind(this.stack)
     const segments = this.unwindFrom(0)
     const experimentNames = new Set<string>([
       ...segments.map((segment) => segment.name),

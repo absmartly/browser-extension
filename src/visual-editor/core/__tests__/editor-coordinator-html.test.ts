@@ -742,6 +742,36 @@ describe("EditorCoordinator HTML Editor Integration", () => {
       )
     })
 
+    it("keeps a value typed into a control the HTML editor's live edit detached", async () => {
+      document.body.innerHTML =
+        '<p id="a">A</p><div id="wrap"><input id="field" value="orig"></div>'
+      preview.applyPreviewChange(
+        { selector: "#a", type: "text", value: "AA" },
+        "older"
+      )
+      preview.applyPreviewChange(
+        {
+          selector: "#wrap",
+          type: "javascript",
+          value: "element.querySelector('#field').value = 'js'"
+        },
+        "js"
+      )
+      const field = document.getElementById("field") as HTMLInputElement
+      expect(field.value).toBe("js")
+      field.value = "typed"
+      const element = document.getElementById("wrap")!
+      const session = coordinator.handleEditHtmlAction(element, {})
+      element.innerHTML = "<i>typing</i>"
+
+      preview.removePreviewChanges("older")
+      await session
+
+      expect(document.getElementById("field")).toBe(field)
+      expect(field.value).toBe("typed")
+      expect(document.getElementById("a").textContent).toBe("A")
+    })
+
     it("closes a session when a preview above the visual editor's is removed", () => {
       document.body.innerHTML = '<p id="a">A</p><div id="e">page</div>'
       const element = document.getElementById("e")!
