@@ -688,6 +688,39 @@ describe("PreviewManager", () => {
     expect(field<HTMLInputElement>("kept").value).toBe("user")
   })
 
+  it.each([
+    ["the user selected another radio", true, "z"],
+    ["the preview's selection is still in place", false, "x"]
+  ])(
+    "restores a radio group a javascript preview changed only if %s",
+    (_case, userSelects, expected) => {
+      document.body.innerHTML = `<form id="f">
+        <input type="radio" name="g" id="x" checked>
+        <input type="radio" name="g" id="y">
+        <input type="radio" name="g" id="z">
+      </form>`
+      manager.applyPreviewChange(
+        {
+          selector: "#f",
+          type: "javascript",
+          value: "element.querySelector('#y').checked = true"
+        },
+        "exp"
+      )
+      expect((byId("y") as HTMLInputElement).checked).toBe(true)
+      if (userSelects) (byId("z") as HTMLInputElement).checked = true
+
+      manager.removePreviewChanges("exp")
+
+      const checked = Array.from(
+        document.querySelectorAll<HTMLInputElement>("input[name=g]")
+      )
+        .filter((radio) => radio.checked)
+        .map((radio) => radio.id)
+      expect(checked).toEqual([expected])
+    }
+  )
+
   it("restores an extension host that an immediate change's selector also matched", () => {
     document.body.innerHTML =
       '<div id="absmartly-visual-editor-toolbar-host" class="box"></div><div id="page" class="box"></div>'

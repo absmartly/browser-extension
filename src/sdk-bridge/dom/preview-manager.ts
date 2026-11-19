@@ -64,6 +64,48 @@ function formProperties(control: FormControl) {
   return { value: control.value }
 }
 
+const isRadio = (element: Element): element is HTMLInputElement =>
+  element instanceof HTMLInputElement && element.type === "radio"
+
+// Radios that check and uncheck each other: same name, same form owner,
+// same tree. An unnamed radio is a group of its own.
+function inSameGroup(a: HTMLInputElement, b: HTMLInputElement): boolean {
+  if (a === b) return true
+  return (
+    a.name !== "" &&
+    a.name === b.name &&
+    a.form === b.form &&
+    a.getRootNode() === b.getRootNode()
+  )
+}
+
+function checkedInGroup(radio: HTMLInputElement): HTMLInputElement | null {
+  if (radio.name === "") return radio.checked ? radio : null
+  const scope = radio.form ?? radio.getRootNode()
+  if (!("querySelectorAll" in scope)) return radio.checked ? radio : null
+  const radios = (scope as ParentNode).querySelectorAll("input")
+  for (const other of radios)
+    if (isRadio(other) && other.checked && inSameGroup(radio, other))
+      return other
+  return null
+}
+
+// The radio in `write`'s group that `writes` left checked, or null.
+function radioLeftChecked(
+  writes: FormPropertyWrite[],
+  write: FormPropertyWrite
+): Element | null {
+  const radio = write.element as HTMLInputElement
+  let left: Element | null = null
+  for (const { element, property, after } of writes) {
+    if (property !== "checked" || !isRadio(element)) continue
+    if (!inSameGroup(radio, element)) continue
+    if (after === true) left = element
+    else if (left === element) left = null
+  }
+  return left
+}
+
 // Everything one segment did to the page, in application order.
 interface PreviewJournal {
   entries: JournalEntry[]
@@ -433,12 +475,23 @@ export class PreviewManager {
   }
 
   // Newest first, and only where the property still holds the preview's
-  // value: a value the user or page has since entered is theirs.
+  // value: a value the user or page has since entered is theirs. Checking
+  // a radio unchecks the rest of its group, so a radio is re-checked only
+  // while the group's selection is still the one the writes left.
   private undoFormWrites(writes: FormPropertyWrite[]): void {
+    // Evaluated before any undo: undoing one radio write changes the
+    // group's selection the next one is checked against.
+    const groupChanged = new Set<FormPropertyWrite>()
+    for (const write of writes) {
+      if (write.before !== true || !isRadio(write.element)) continue
+      if (checkedInGroup(write.element) !== radioLeftChecked(writes, write))
+        groupChanged.add(write)
+    }
     for (let i = writes.length - 1; i >= 0; i--) {
       const { element, property, before, after } = writes[i]
       const control = element as unknown as Record<string, string | boolean>
-      if (control[property] === after) control[property] = before
+      if (control[property] === after && !groupChanged.has(writes[i]))
+        control[property] = before
     }
   }
 
