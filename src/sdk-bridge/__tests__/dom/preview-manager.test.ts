@@ -1146,6 +1146,24 @@ describe("PreviewManager", () => {
     expect(byId("l").innerHTML).toBe('<b id="d">Gone</b>')
   })
 
+  it("clears a selection sidecar that undoing a javascript preview put back", () => {
+    document.body.innerHTML = '<p id="p">Original</p>'
+    const paragraph = byId("p")
+    paragraph.setAttribute("data-absmartly-original", '{"textContent":"Old"}')
+    paragraph.setAttribute("data-absmartly-experiment", "gone")
+    manager.applyPreviewChange(
+      {
+        selector: "#p",
+        type: "javascript",
+        value: "element.removeAttribute('data-absmartly-original')"
+      },
+      "exp"
+    )
+    manager.removePreviewChanges("exp")
+
+    expect(paragraph.outerHTML).toBe('<p id="p">Original</p>')
+  })
+
   it("keeps markers owned by another experiment whose preview is still applied", () => {
     document.body.innerHTML = '<p id="p">Original</p>'
     manager.applyPreviewChange(

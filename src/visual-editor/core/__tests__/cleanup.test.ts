@@ -46,3 +46,41 @@ describe("Cleanup on visual-editor exit with unsaved changes", () => {
     )
   })
 })
+
+describe("visual-editor selection over a journaled preview", () => {
+  it("restores the original text node after selection, html preview and removal", () => {
+    document.body.innerHTML = '<p id="p">Original</p>'
+    const paragraph = document.getElementById("p")
+    const text = paragraph.firstChild
+    const stateManager = new StateManager({
+      variantName: "v",
+      experimentName: "exp",
+      logoUrl: ""
+    })
+    const handlers = new EventHandlers(stateManager)
+    handlers.showContextMenu = () => {}
+    const preview = new PreviewManager()
+
+    handlers.handleClick({
+      target: paragraph,
+      preventDefault: () => {},
+      stopPropagation: () => {}
+    } as unknown as MouseEvent)
+    preview.applyPreviewChange(
+      { selector: "#p", type: "html", value: "<b>Preview</b>" },
+      "exp"
+    )
+    // Selecting again after the preview applied keeps the first sidecar.
+    handlers.handleClick({
+      target: paragraph,
+      preventDefault: () => {},
+      stopPropagation: () => {}
+    } as unknown as MouseEvent)
+    preview.removePreviewChanges("exp")
+
+    expect(paragraph.firstChild).toBe(text)
+    expect(paragraph.childNodes).toHaveLength(1)
+    expect(paragraph.hasAttribute("data-absmartly-original")).toBe(false)
+    expect(paragraph.hasAttribute("data-absmartly-experiment")).toBe(false)
+  })
+})
