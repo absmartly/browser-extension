@@ -283,22 +283,29 @@ function toEntries(
  * Records are taken synchronously, so other code cannot interleave.
  * Observing a node directly keeps recording it after it is detached, which
  * observing only an ancestor does not guarantee.
+ *
+ * If `apply` throws, the mutations it made before throwing are passed to
+ * `onThrow` and the error is rethrown, so the caller can still undo them.
  */
 export function recordMutations<T>(
   roots: Iterable<Node>,
   apply: () => T,
-  diagnostics?: MutationJournalDiagnostics
+  diagnostics?: MutationJournalDiagnostics,
+  onThrow?: (entries: JournalEntry[]) => void
 ): { result: T; entries: JournalEntry[] } {
   const observer = new MutationObserver(() => {})
   for (const root of new Set(roots)) observer.observe(root, OBSERVE_ALL)
   let result: T
-  let records: MutationRecord[] = []
   try {
     result = apply()
-  } finally {
-    records = observer.takeRecords()
+  } catch (error) {
+    const records = observer.takeRecords()
     observer.disconnect()
+    onThrow?.(toEntries(records, diagnostics))
+    throw error
   }
+  const records = observer.takeRecords()
+  observer.disconnect()
   return { result, entries: toEntries(records, diagnostics) }
 }
 

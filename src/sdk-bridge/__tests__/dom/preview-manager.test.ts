@@ -2,6 +2,8 @@
  * PreviewManager tests against the real @absmartly/sdk-plugins manipulator.
  */
 
+import { DOMManipulatorLite } from "@absmartly/sdk-plugins/core/dom-manipulator"
+
 import type { DOMChange } from "~src/types/dom-changes"
 
 import { PreviewManager } from "../../dom/preview-manager"
@@ -38,6 +40,30 @@ describe("PreviewManager", () => {
 
   afterEach(() => {
     manager.clearAll()
+  })
+
+  it("undoes writes an SDK apply made before throwing", () => {
+    document.body.innerHTML = '<p id="p" title="orig">P</p>'
+    // The SDK catches its own errors; an escaping throw (for example from a
+    // future SDK version) is simulated by a partial write followed by throw.
+    const spy = jest
+      .spyOn(DOMManipulatorLite.prototype, "applyChange")
+      .mockImplementation(() => {
+        byId("p").setAttribute("title", "half")
+        throw new Error("sdk failure")
+      })
+
+    expect(() =>
+      manager.applyPreviewChange(
+        { selector: "#p", type: "attribute", value: { title: "x" } },
+        "exp"
+      )
+    ).toThrow("sdk failure")
+    spy.mockRestore()
+    expect(byId("p").getAttribute("title")).toBe("half")
+
+    manager.removePreviewChanges("exp")
+    expect(byId("p").getAttribute("title")).toBe("orig")
   })
 
   it("keeps host descendants by identity when a style preview is removed", () => {

@@ -128,9 +128,14 @@ export class PreviewManager {
     // A change matching nested targets detaches an inner target (text or
     // html on the outer one) before applying to it; observing each target
     // directly keeps those writes in the journal.
-    const { result, entries } = recordMutations([document, ...targets], apply)
-    journal.entries.push(...entries)
     for (const element of targets) journal.targets.add(element)
+    const { result, entries } = recordMutations(
+      [document, ...targets],
+      apply,
+      undefined,
+      (partial) => journal.entries.push(...partial)
+    )
+    journal.entries.push(...entries)
     if (result) {
       for (const element of targets) {
         if (element.isConnected) {
