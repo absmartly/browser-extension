@@ -1424,6 +1424,70 @@ describe("PreviewManager", () => {
       }
     )
 
+    it("replays a late multi-match title only onto its original connected match", async () => {
+      document.body.innerHTML = '<p id="base">B</p>'
+      manager.applyPreviewChange(
+        { selector: ".promo", type: "attribute", value: { title: "A" } },
+        "a"
+      )
+      manager.applyPreviewChange(
+        { selector: "#base", type: "text", value: "B preview" },
+        "b"
+      )
+      const [one, two] = mount(
+        '<span id="one" class="promo"></span><span id="two" class="promo"></span>'
+      ) as HTMLSpanElement[]
+      await settle()
+      expect([one.title, two.title]).toEqual(["A", ""])
+      manager.removePreviewChanges("b")
+      expect([one.title, two.title]).toEqual(["A", ""])
+      manager.removePreviewChanges("a")
+      expect([one.title, two.title]).toEqual(["", ""])
+      manager.clearAll()
+      expect(document.body.innerHTML).toBe(
+        '<p id="base">B</p><span id="one" class="promo"></span><span id="two" class="promo"></span>'
+      )
+    })
+
+    it.each(["disconnected", "no-longer-matching"])(
+      "falls back to the selector when a late match is %s",
+      async (state) => {
+        document.body.innerHTML = '<p id="base">B</p>'
+        manager.applyPreviewChange(
+          { selector: ".promo", type: "attribute", value: { title: "A" } },
+          "a"
+        )
+        manager.applyPreviewChange(
+          { selector: "#base", type: "text", value: "B preview" },
+          "b"
+        )
+        const [one] = mount(
+          '<span id="one" class="promo"></span>'
+        ) as HTMLSpanElement[]
+        await settle()
+        expect(one.title).toBe("A")
+        if (state === "disconnected") one.remove()
+        else one.className = "former-promo"
+        const [two] = mount(
+          '<span id="two" class="promo"></span>'
+        ) as HTMLSpanElement[]
+        await settle()
+        expect(two.title).toBe("")
+        manager.removePreviewChanges("b")
+        expect([one.title, two.title]).toEqual(["", "A"])
+        manager.removePreviewChanges("a")
+        expect([one.title, two.title]).toEqual(["", ""])
+        manager.clearAll()
+        expect(document.body.innerHTML).toBe(
+          '<p id="base">B</p>' +
+            (state === "disconnected"
+              ? ""
+              : '<span id="one" class="former-promo"></span>') +
+            '<span id="two" class="promo"></span>'
+        )
+      }
+    )
+
     it("journals a later apply to an older experiment on top of the newer one", () => {
       document.body.innerHTML = '<div id="h" title="orig">x</div>'
       const title = () => byId("h").getAttribute("title")
