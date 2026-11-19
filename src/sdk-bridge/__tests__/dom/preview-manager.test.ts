@@ -645,6 +645,28 @@ describe("PreviewManager", () => {
     expect(field<HTMLInputElement>("kept").value).toBe("user")
   })
 
+  it("restores an extension host that an immediate change's selector also matched", () => {
+    document.body.innerHTML =
+      '<div id="absmartly-visual-editor-toolbar-host" class="box"></div><div id="page" class="box"></div>'
+    const host = byId("absmartly-visual-editor-toolbar-host")
+
+    manager.applyPreviewChange(
+      { selector: ".box", type: "style", value: { color: "red" } },
+      "exp"
+    )
+    expect(byId("page").style.color).toBe("red")
+    // The SDK applies the change to every match, extension host included;
+    // the document-wide journal records that write too.
+    expect(host.style.color).toBe("red")
+    manager.removePreviewChanges("exp")
+
+    expect(host.hasAttribute("style")).toBe(false)
+    expect(host.outerHTML).toBe(
+      '<div id="absmartly-visual-editor-toolbar-host" class="box"></div>'
+    )
+    expect(byId("page").hasAttribute("style")).toBe(false)
+  })
+
   it("restores the page when two experiments overlap and are removed in either order", () => {
     const original = '<div id="p"><span id="c">orig</span></div>'
     for (const order of [
