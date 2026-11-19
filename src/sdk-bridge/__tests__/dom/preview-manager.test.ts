@@ -830,6 +830,68 @@ describe("PreviewManager", () => {
     expect(byId("h").style.color).toBe("")
   })
 
+  it.each([
+    [
+      "removePreviewChanges",
+      (m: PreviewManager) => {
+        m.removePreviewChanges("a")
+        expect(byId("h").getAttribute("title")).toBe("blue")
+        m.removePreviewChanges("b")
+      }
+    ],
+    ["clearAll", (m: PreviewManager) => m.clearAll()]
+  ])(
+    "does not bring back an earlier experiment's value after it was removed (%s)",
+    (_name, removeAll) => {
+      document.body.innerHTML = '<div id="h" title="orig">Original</div>'
+      manager.applyPreviewChange(
+        { selector: "#h", type: "attribute", value: { title: "red" } },
+        "a"
+      )
+      manager.applyPreviewChange(
+        { selector: "#h", type: "attribute", value: { title: "blue" } },
+        "b"
+      )
+      removeAll(manager)
+      expect(byId("h").getAttribute("title")).toBe("orig")
+    }
+  )
+
+  it("hands a removed experiment's old value only to the experiment that overwrote it", () => {
+    document.body.innerHTML = '<div id="h" title="x">Original</div>'
+    const apply = (title: string, name: string) =>
+      manager.applyPreviewChange(
+        { selector: "#h", type: "attribute", value: { title } },
+        name
+      )
+    apply("red", "c")
+    apply("x", "a")
+    apply("blue", "b")
+
+    manager.removePreviewChanges("a")
+    expect(byId("h").getAttribute("title")).toBe("blue")
+    manager.removePreviewChanges("b")
+    expect(byId("h").getAttribute("title")).toBe("red")
+    manager.removePreviewChanges("c")
+    expect(byId("h").getAttribute("title")).toBe("x")
+  })
+
+  it("keeps a page write made between two overlapping experiments", () => {
+    document.body.innerHTML = '<div id="h" title="orig">Original</div>'
+    manager.applyPreviewChange(
+      { selector: "#h", type: "attribute", value: { title: "red" } },
+      "a"
+    )
+    byId("h").setAttribute("title", "page")
+    manager.applyPreviewChange(
+      { selector: "#h", type: "attribute", value: { title: "blue" } },
+      "b"
+    )
+    manager.removePreviewChanges("a")
+    manager.removePreviewChanges("b")
+    expect(byId("h").getAttribute("title")).toBe("page")
+  })
+
   it("restores visual-editor marked elements from their serialized original", () => {
     document.body.innerHTML = '<div id="ve">Edited</div>'
     const element = byId("ve")

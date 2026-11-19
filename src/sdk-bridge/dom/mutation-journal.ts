@@ -85,6 +85,24 @@ function attributeValue(
 
 type AttributeState = Extract<JournalEntry, { kind: "attributes" }>
 type CharacterDataState = Extract<JournalEntry, { kind: "characterData" }>
+export type ValueEntry = AttributeState | CharacterDataState
+
+/**
+ * Whether `later` overwrote the value `earlier` wrote: same attribute or
+ * text node, and `later` started from exactly the value `earlier` left.
+ */
+export function overwrites(later: JournalEntry, earlier: ValueEntry): boolean {
+  if (later.kind !== earlier.kind || later.target !== earlier.target)
+    return false
+  if (later.kind === "attributes" && earlier.kind === "attributes") {
+    return (
+      later.name === earlier.name &&
+      later.namespace === earlier.namespace &&
+      later.oldValue === earlier.newValue
+    )
+  }
+  return later.oldValue === earlier.newValue
+}
 
 export type MutationJournalDiagnostics = {
   records: number
@@ -407,8 +425,15 @@ export function restoreAttributeOrder(order: Map<Element, string[]>): void {
   }
 }
 
-/** Invert entries newest-first, restoring the DOM they were recorded on. */
-export function undoMutations(entries: JournalEntry[]): void {
+/**
+ * Invert entries newest-first, restoring the DOM they were recorded on.
+ * An attribute or text entry whose value something else has since
+ * overwritten is left alone and passed to `onSkip`.
+ */
+export function undoMutations(
+  entries: JournalEntry[],
+  onSkip?: (entry: ValueEntry) => void
+): void {
   // How many not-yet-undone entries put each node back.
   const pendingReinserts = new Map<Node, number>()
   const countReinserts = (entry: JournalEntry, delta: number) => {
@@ -424,7 +449,10 @@ export function undoMutations(entries: JournalEntry[]): void {
     if (entry.kind === "attributes") {
       const { target, name, namespace, oldValue, newValue } = entry
       const current = target.getAttributeNodeNS(namespace, name)?.value ?? null
-      if (current !== newValue) continue
+      if (current !== newValue) {
+        onSkip?.(entry)
+        continue
+      }
       if (oldValue === null) {
         target.removeAttributeNS(namespace, name)
       } else {
@@ -435,6 +463,7 @@ export function undoMutations(entries: JournalEntry[]): void {
     } else if (entry.kind === "characterData") {
       if (entry.target.data === entry.newValue)
         entry.target.data = entry.oldValue
+      else onSkip?.(entry)
     } else {
       undoChildList(entry, (node) => (pendingReinserts.get(node) ?? 0) > 0)
     }

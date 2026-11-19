@@ -15,11 +15,13 @@ import type { DOMChange } from "~src/types/dom-changes"
 import { sanitizeHTML } from "../utils/html-sanitizer"
 import { Logger } from "../utils/logger"
 import {
+  overwrites,
   recordAttributeOrder,
   recordMutations,
   restoreAttributeOrder,
   undoMutations,
-  type JournalEntry
+  type JournalEntry,
+  type ValueEntry
 } from "./mutation-journal"
 
 // Everything one experiment's preview did to the page, in application order.
@@ -89,6 +91,40 @@ export class PreviewManager {
   private journals: Map<string, PreviewJournal> = new Map()
   private sessions: Map<string, PreviewDOMManipulator> = new Map()
   private styleManagers: Map<string, StyleSheetManager> = new Map()
+  // Global application order of every journaled entry, across experiments.
+  private entrySeq = new WeakMap<JournalEntry, number>()
+  private nextSeq = 0
+
+  private append(journal: PreviewJournal, entries: JournalEntry[]): void {
+    for (const entry of entries) {
+      this.entrySeq.set(entry, this.nextSeq++)
+      journal.entries.push(entry)
+    }
+  }
+
+  // Removing a preview whose value a later live preview overwrote leaves
+  // that value in place, but the later entry still remembers this
+  // preview's value as the one to restore. Hand it this preview's own
+  // old value instead, so removing the later preview restores the page.
+  private spliceIntoLaterOwner(skipped: ValueEntry): void {
+    const seq = this.entrySeq.get(skipped) ?? -1
+    let owner: JournalEntry | null = null
+    let ownerSeq = Infinity
+    for (const journal of this.journals.values()) {
+      for (const entry of journal.entries) {
+        const entrySeq = this.entrySeq.get(entry) ?? -1
+        if (
+          entrySeq > seq &&
+          entrySeq < ownerSeq &&
+          overwrites(entry, skipped)
+        ) {
+          owner = entry
+          ownerSeq = entrySeq
+        }
+      }
+    }
+    if (owner && owner.kind !== "childList") owner.oldValue = skipped.oldValue
+  }
 
   private getJournal(experimentName: string): PreviewJournal {
     let journal = this.journals.get(experimentName)
@@ -133,9 +169,9 @@ export class PreviewManager {
       [document, ...targets],
       apply,
       undefined,
-      (partial) => journal.entries.push(...partial)
+      (partial) => this.append(journal, partial)
     )
-    journal.entries.push(...entries)
+    this.append(journal, entries)
     if (result) {
       for (const element of targets) {
         if (element.isConnected) {
@@ -302,7 +338,9 @@ export class PreviewManager {
     const journal = this.journals.get(experimentName)
     if (journal) {
       this.journals.delete(experimentName)
-      undoMutations(journal.entries)
+      undoMutations(journal.entries, (skipped) =>
+        this.spliceIntoLaterOwner(skipped)
+      )
       restoreAttributeOrder(journal.attributeOrder)
       restoredCount += journal.entries.length
       this.clearEditorMarkers(journal.targets)
