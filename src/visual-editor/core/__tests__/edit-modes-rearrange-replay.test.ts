@@ -36,6 +36,7 @@ function dispatchDrag(
 describe("EditModes rearrange replayed through PreviewManager", () => {
   let previewManager: PreviewManager
   let editModes: EditModes
+  let undoRedo: UndoRedoManager
 
   beforeEach(() => {
     // jsdom applies no UA stylesheet, so spans must be declared inline for
@@ -45,7 +46,7 @@ describe("EditModes rearrange replayed through PreviewManager", () => {
       <span>Alpha-i</span><span>Beta-i</span><span>Gamma-i</span>
     </p>`
     previewManager = new PreviewManager()
-    const undoRedo = new UndoRedoManager()
+    undoRedo = new UndoRedoManager()
     editModes = new EditModes(
       new StateManager({ variantName: "v", experimentName: "e", logoUrl: "" })
     )
@@ -68,6 +69,27 @@ describe("EditModes rearrange replayed through PreviewManager", () => {
     Array.from(document.querySelectorAll("#rearrange-inline > span")).map(
       (span) => span.firstChild?.textContent?.trim()
     )
+
+  it("replays only the final drop when one element is dragged twice", () => {
+    const gamma = topLevel("3")
+    editModes.enableRearrangeMode(gamma)
+    dispatchDrag(gamma, topLevel("1"), { altKey: true, before: true })
+    expect(topLevelLabels()).toEqual(["Gamma-i", "Alpha-i", "Beta-i"])
+
+    editModes.enableRearrangeMode(gamma)
+    dispatchDrag(gamma, topLevel("3"), { altKey: true, before: true })
+    expect(topLevelLabels()).toEqual(["Alpha-i", "Gamma-i", "Beta-i"])
+
+    // Both drops carry gamma's positional selector from the unmodified
+    // page; replaying the first one too would shift which span the second
+    // selector names.
+    const saved = undoRedo.squashChanges()
+    expect(saved).toHaveLength(1)
+    previewManager.removePreviewChanges(VISUAL_EDITOR_EXPERIMENT_NAME)
+    for (const change of saved)
+      previewManager.applyPreviewChange(change, "replay")
+    expect(topLevelLabels()).toEqual(["Alpha-i", "Gamma-i", "Beta-i"])
+  })
 
   it("keeps a positional move correct after an earlier move changed sibling positions", () => {
     const container = document.getElementById("rearrange-inline")

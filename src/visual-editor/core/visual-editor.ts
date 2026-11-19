@@ -20,7 +20,7 @@ import {
 } from "./sdk-applier"
 import StateManager from "./state-manager"
 import type { VisualEditorConfig } from "./state-manager"
-import UndoRedoManager from "./undo-redo-manager"
+import UndoRedoManager, { squashKey } from "./undo-redo-manager"
 
 export interface VisualEditorOptions {
   variantName: string
@@ -438,12 +438,7 @@ export class VisualEditor {
     const changeMap = new Map<string, DOMChange>()
 
     changes.forEach((change, i) => {
-      // Each 'create' adds a distinct new element, so they must not collapse
-      // onto each other — give every one a unique key.
-      const key =
-        change.type === "create"
-          ? `create-${i}`
-          : `${change.selector}-${change.type}`
+      const key = squashKey(change, i)
       const existing = changeMap.get(key)
 
       if (existing) {

@@ -562,6 +562,25 @@ describe("VisualEditor", () => {
       expect(mockOnChangesUpdate).not.toHaveBeenCalled()
     })
 
+    it("saves both deletes that share a positional selector", () => {
+      const visualEditor = new VisualEditor(mockOptions)
+      const selector = "#list > div:nth-of-type(2)"
+      ;(visualEditor as any).undoRedoManager.addChange(
+        { selector, type: "delete" },
+        null
+      )
+      ;(visualEditor as any).undoRedoManager.addChange(
+        { selector, type: "delete" },
+        null
+      )
+      ;(visualEditor as any).saveChanges()
+
+      expect(mockOnChangesUpdate).toHaveBeenCalledWith([
+        { selector, type: "delete" },
+        { selector, type: "delete" }
+      ])
+    })
+
     it("should save changes when saveChanges is called", () => {
       const visualEditor = new VisualEditor(mockOptions)
 
