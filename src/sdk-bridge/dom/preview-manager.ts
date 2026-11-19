@@ -604,11 +604,9 @@ export class PreviewManager {
     others: Segment[]
     own: Segment[]
     form: FormSnapshot
-    slot: number
   } {
     const slot = this.stack.findIndex((s) => s.name === experimentName)
-    if (slot === -1)
-      return { others: [], own: [], form: [], slot: this.stack.length }
+    if (slot === -1) return { others: [], own: [], form: [] }
     const above = this.stack.slice(slot)
     const others = above.filter((s) => s.name !== experimentName)
     const form = this.snapshotForm(above, others)
@@ -616,8 +614,7 @@ export class PreviewManager {
     return {
       others,
       own: unwound.filter((s) => s.name === experimentName),
-      form,
-      slot
+      form
     }
   }
 
