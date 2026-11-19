@@ -5,6 +5,7 @@
 import UIComponents from "../../ui/components"
 import HtmlEditor from "../../ui/html-editor"
 import { Notifications } from "../../ui/notifications"
+import { generateRobustSelector } from "../../utils/selector-generator"
 import Cleanup from "../cleanup"
 import ContextMenu from "../context-menu"
 import EditModes from "../edit-modes"
@@ -181,6 +182,34 @@ describe("EditorCoordinator HTML Editor Integration", () => {
         "",
         "success"
       )
+    })
+
+    it("leaves edit mode and reports the refusal when the page detached the target", async () => {
+      document.body.innerHTML = "<main><p>Plain</p></main>"
+      const paragraph = document.querySelector("p")!
+      mockCallbacks.getSelector.mockImplementation((el: HTMLElement) =>
+        generateRobustSelector(el)
+      )
+      const notificationSpy = jest.spyOn(Notifications.prototype, "show")
+      mockHtmlEditor.mockImplementation(async () => {
+        // The SPA replaces the paragraph while the editor is open.
+        document.querySelector("main")!.innerHTML = "<p>Replaced</p>"
+        return "<b>Edited</b>"
+      })
+      const eventHandlers = (coordinator as any).eventHandlers as EventHandlers
+
+      await coordinator.handleEditHtmlAction(paragraph, {})
+
+      expect(undoRedoManager.canUndo()).toBe(false)
+      expect(eventHandlers.isEditingMode).toBe(false)
+      expect(notificationSpy).toHaveBeenCalledWith(
+        "Failed to update HTML",
+        "The element is no longer on the page",
+        "error"
+      )
+      const replaced = document.querySelector("p")!
+      eventHandlers.handleMouseOver({ target: replaced } as any)
+      expect(replaced.classList.contains("absmartly-hover")).toBe(true)
     })
 
     it("should remove context menu before opening editor", async () => {

@@ -510,29 +510,39 @@ export class EditorCoordinator {
     const currentHtml = element.innerHTML
     const newHtml = await this.htmlEditor.show(element, currentHtml)
 
-    if (newHtml !== null && newHtml !== currentHtml) {
-      // The HTML editor used direct innerHTML writes for live preview during
-      // typing. Discard those by restoring the pre-edit innerHTML; the SDK
-      // will repaint via PreviewManager when the change lands. Sanitize
-      // the persisted value — same reasoning as in handleEditAction:
-      // type: "html" payloads are replayed into innerHTML on every apply.
-      element.innerHTML = currentHtml
-      const selector = this.callbacks.getSelector(element as HTMLElement)
-      this.undoRedoManager.addChange(
-        {
-          selector,
-          type: "html",
-          value: DOMPurify.sanitize(newHtml)
-        },
-        null
+    try {
+      if (newHtml !== null && newHtml !== currentHtml) {
+        // The HTML editor used direct innerHTML writes for live preview during
+        // typing. Discard those by restoring the pre-edit innerHTML; the SDK
+        // will repaint via PreviewManager when the change lands. Sanitize
+        // the persisted value — same reasoning as in handleEditAction:
+        // type: "html" payloads are replayed into innerHTML on every apply.
+        element.innerHTML = currentHtml
+        const selector = this.callbacks.getSelector(element as HTMLElement)
+        this.undoRedoManager.addChange(
+          {
+            selector,
+            type: "html",
+            value: DOMPurify.sanitize(newHtml)
+          },
+          null
+        )
+
+        this.notifications.show("HTML updated successfully", "", "success")
+      }
+    } catch (error) {
+      // getSelector refuses a target the page detached while the editor was
+      // open; the edit is dropped but the editor must stay usable.
+      debugWarn("[handleEditHtmlAction] HTML change not recorded:", error)
+      this.notifications.show(
+        "Failed to update HTML",
+        "The element is no longer on the page",
+        "error"
       )
-
-      this.notifications.show("HTML updated successfully", "", "success")
+    } finally {
+      this.eventHandlers.setEditing(false)
+      this.eventHandlers.setHoverEnabled(true)
     }
-
-    // Clear editing mode and re-enable hover tooltips after HTML editor closes
-    this.eventHandlers.setEditing(false)
-    this.eventHandlers.setHoverEnabled(true)
   }
 
   handleSelectRelativeElement(element: Element): void {
