@@ -10,12 +10,14 @@
  * intact.
  */
 
+import { VISUAL_EDITOR_EXPERIMENT_NAME } from "~src/sdk-bridge/dom/preview-events"
+
 import type { DOMChange } from "../types/visual-editor"
 
 // Dedicated experiment name for VE-applied previews. Isolates VE state from
 // any active production-experiment preview: each experiment name has its own
 // mutation journal in PreviewManager.
-export const VISUAL_EDITOR_EXPERIMENT_NAME = "__visual_editor__"
+export { VISUAL_EDITOR_EXPERIMENT_NAME }
 
 /**
  * postMessage uses targetOrigin to gate which window can receive the

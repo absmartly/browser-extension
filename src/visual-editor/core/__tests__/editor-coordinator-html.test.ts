@@ -628,4 +628,112 @@ describe("EditorCoordinator HTML Editor Integration", () => {
       expect(element.innerHTML).toBe("Original")
     })
   })
+
+  describe("an older preview removed during an open edit session", () => {
+    let preview: PreviewManager
+    let notify: jest.SpyInstance
+
+    beforeEach(() => {
+      mockHtmlEditor.mockRestore()
+      notify = jest
+        .spyOn(Notifications.prototype, "show")
+        .mockImplementation(() => {})
+      preview = new PreviewManager()
+      coordinator.setupEventListeners()
+    })
+
+    afterEach(() => {
+      coordinator.removeEventListeners()
+      preview.clearAll()
+    })
+
+    const applyPreviews = (veChange: any) => {
+      preview.applyPreviewChange(
+        { selector: "#a", type: "text", value: "AA" },
+        "older"
+      )
+      preview.applyPreviewChange(veChange, "__visual_editor__")
+    }
+
+    it("closes the HTML editor and leaves the original children once every preview is removed", async () => {
+      document.body.innerHTML =
+        '<p id="a">A</p><div id="e"><span id="c0">page</span></div>'
+      const original = document.body.innerHTML
+      const c0 = document.getElementById("c0")
+      applyPreviews({ selector: "#e", type: "html", value: "<b>ve</b>" })
+      const element = document.getElementById("e")!
+      const session = coordinator.handleEditHtmlAction(element, {})
+      element.innerHTML = "<i>typing</i>"
+
+      preview.removePreviewChanges("older")
+      expect(await session).toBeUndefined()
+
+      expect(document.getElementById("absmartly-html-editor-host")).toBeNull()
+      expect(element.innerHTML).toBe("<b>ve</b>")
+      expect(undoRedoManager.canUndo()).toBe(false)
+      expect(notify).toHaveBeenCalledWith(
+        "Edit closed: another preview changed",
+        "",
+        "warning"
+      )
+      preview.removePreviewChanges("__visual_editor__")
+      expect(document.getElementById("c0")).toBe(c0)
+      expect(element.firstChild).toBe(c0)
+      expect(document.body.innerHTML).toBe(original)
+    })
+
+    it("ends a contenteditable session and leaves the original text once every preview is removed", () => {
+      document.body.innerHTML = '<p id="a">A</p><div id="e">page</div>'
+      const original = document.body.innerHTML
+      const element = document.getElementById("e")!
+      const text = element.firstChild
+      applyPreviews({ selector: "#e", type: "text", value: "ve" })
+      coordinator.handleEditAction(element, {
+        textContent: "ve",
+        innerHTML: "ve"
+      })
+      ;(element.firstChild as Text).data = "vetyped"
+
+      preview.removePreviewChanges("older")
+
+      expect((element as HTMLElement).contentEditable).toBe("false")
+      expect(element.classList.contains("absmartly-editing")).toBe(false)
+      expect(element.textContent).toBe("ve")
+      expect(notify).toHaveBeenCalledWith(
+        "Edit closed: another preview changed",
+        "",
+        "warning"
+      )
+      element.dispatchEvent(new Event("blur"))
+      expect(undoRedoManager.canUndo()).toBe(false)
+      preview.removePreviewChanges("__visual_editor__")
+      expect(element.firstChild).toBe(text)
+      // The editing class is the visual editor's own, removed by its cleanup.
+      element.removeAttribute("class")
+      expect(document.body.innerHTML).toBe(original)
+    })
+
+    it("leaves a session open when only a preview above the visual editor's is removed", () => {
+      document.body.innerHTML = '<p id="a">A</p><div id="e">page</div>'
+      const element = document.getElementById("e")!
+      preview.applyPreviewChange(
+        { selector: "#e", type: "text", value: "ve" },
+        "__visual_editor__"
+      )
+      preview.applyPreviewChange(
+        { selector: "#a", type: "text", value: "AA" },
+        "newer"
+      )
+      coordinator.handleEditAction(element, {
+        textContent: "ve",
+        innerHTML: "ve"
+      })
+
+      preview.removePreviewChanges("newer")
+
+      expect((element as HTMLElement).contentEditable).toBe("true")
+      expect(notify).not.toHaveBeenCalled()
+      coordinator.teardownAll(true)
+    })
+  })
 })

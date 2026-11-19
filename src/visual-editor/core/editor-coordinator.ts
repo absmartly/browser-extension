@@ -9,6 +9,7 @@ import {
   undoMutations,
   watchMutations
 } from "~src/sdk-bridge/dom/mutation-journal"
+import { PREVIEW_UNWIND_EVENT } from "~src/sdk-bridge/dom/preview-events"
 import { debugLog, debugWarn } from "~src/utils/debug"
 
 import type { DOMChange } from "../types/visual-editor"
@@ -185,6 +186,22 @@ export class EditorCoordinator {
     // Add coordinator-specific event listeners
     document.addEventListener("mousedown", this.handleMouseDown, true)
     document.addEventListener("mouseup", this.handleMouseUp, true)
+    window.addEventListener(PREVIEW_UNWIND_EVENT, this.handlePreviewUnwind)
+  }
+
+  // The preview manager is about to undo the visual editor's preview to
+  // remove or replace an older one. An open session's live writes sit on
+  // top of that preview, so the session is closed and its writes undone
+  // first; otherwise the unwind would run against the typed DOM.
+  private handlePreviewUnwind = (): void => {
+    if (!this.pendingLiveEdit) return
+    this.pendingLiveEdit()
+    this.htmlEditor.cleanup()
+    this.notifications.show(
+      "Edit closed: another preview changed",
+      "",
+      "warning"
+    )
   }
 
   removeEventListeners(): void {
@@ -195,6 +212,7 @@ export class EditorCoordinator {
     // Remove coordinator-specific event listeners
     document.removeEventListener("mousedown", this.handleMouseDown, true)
     document.removeEventListener("mouseup", this.handleMouseUp, true)
+    window.removeEventListener(PREVIEW_UNWIND_EVENT, this.handlePreviewUnwind)
     this.removeHoverTooltip()
   }
 
@@ -440,7 +458,11 @@ export class EditorCoordinator {
       element.removeEventListener("click", preventDefault, true)
       return typed
     }
-    const discard = () => undoMutations(endSession())
+    const discard = () => {
+      undoMutations(endSession())
+      element.classList.remove("absmartly-editing")
+      this.eventHandlers.setEditing(false)
+    }
     this.pendingLiveEdit = discard
 
     const handleBlur = () => {

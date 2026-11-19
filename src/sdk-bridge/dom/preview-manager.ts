@@ -20,6 +20,10 @@ import {
   undoMutations,
   type JournalEntry
 } from "./mutation-journal"
+import {
+  PREVIEW_UNWIND_EVENT,
+  VISUAL_EDITOR_EXPERIMENT_NAME
+} from "./preview-events"
 
 // A live form property (value, checked, selectedness) that javascript can
 // change without writing an attribute, so no MutationRecord sees it.
@@ -60,7 +64,7 @@ function formProperties(control: FormControl) {
   return { value: control.value }
 }
 
-// Everything one experiment's preview did to the page, in application order.
+// Everything one segment did to the page, in application order.
 interface PreviewJournal {
   entries: JournalEntry[]
   attributeOrder: Map<Element, string[]>
@@ -70,12 +74,23 @@ interface PreviewJournal {
   formWrites: FormPropertyWrite[]
 }
 
-// One live preview: the changes it was given, so it can be re-applied, and
-// the journal of what applying them did.
-interface PreviewLayer {
+// A pending change the SDK applied to one element after it mounted.
+interface LateMatch {
+  change: DOMChange
+  element: Element
+}
+
+// One contiguous run of one experiment's writes. An experiment gets a new
+// segment whenever it writes while another experiment's segment is on top:
+// its first apply, a later apply, or a late SPA match. `changes` and `late`
+// are what replay re-applies; `journal` is what applying them did; the
+// session holds the pending SPA work `changes` registered.
+interface Segment {
   name: string
   changes: DOMChange[]
+  late: LateMatch[]
   journal: PreviewJournal
+  session?: PreviewDOMManipulator
 }
 
 type OwnedApplication = (
@@ -94,10 +109,10 @@ interface SpecificElementApplier {
   ): boolean
 }
 
-// One SDK manipulator per preview session: destroying it disconnects that
-// experiment's observers and drops its pending work without touching other
-// previews. Late matches are routed through applyOwned so they are captured
-// for restoration and rejected once the session is no longer current.
+// One SDK manipulator per segment: destroying it disconnects that segment's
+// observers and drops its pending work without touching other segments.
+// Late matches are routed through applyOwned so they are captured for
+// restoration and rejected once the segment is no longer live.
 // Depends on two SDK internals pinned by the ~1.3.2 range; if an upgrade
 // renames either, late SPA matches are no longer captured or restorable.
 let reportedMissingInternals = false
@@ -124,18 +139,29 @@ class PreviewDOMManipulator extends DOMManipulatorLite {
       (change, experimentName, element) => {
         if (!element) return this.applyChange(change, experimentName)
         return applyOwned(element, change, () =>
-          applier.applyChangeToSpecificElement(change, experimentName, element)
+          this.applyToElement(change, experimentName, element)
         )
       },
       true
     )
   }
+
+  applyToElement(
+    change: DOMChange,
+    experimentName: string,
+    element: Element
+  ): boolean {
+    return (
+      this as unknown as SpecificElementApplier
+    ).applyChangeToSpecificElement(change, experimentName, element)
+  }
 }
 
-function newLayer(name: string, changes: DOMChange[]): PreviewLayer {
+function newSegment(name: string): Segment {
   return {
     name,
-    changes,
+    changes: [],
+    late: [],
     journal: {
       entries: [],
       attributeOrder: new Map(),
@@ -146,84 +172,84 @@ function newLayer(name: string, changes: DOMChange[]): PreviewLayer {
   }
 }
 
+function matches(element: Element, selector: string): boolean {
+  try {
+    return element.matches(selector)
+  } catch {
+    return false
+  }
+}
+
 const isDisabled = (change: DOMChange) =>
   ("disabled" in change && change.disabled) ||
   ("enabled" in change && change.enabled === false)
 
+type FormSnapshot = Array<{
+  control: FormControl
+  property: string
+  value: string | boolean
+}>
+
 export class PreviewManager {
-  // Live previews in application order, oldest first. A journal is only
-  // ever inverted against the DOM its own records produced: removing or
-  // changing a layer first unwinds every layer above it, newest first, and
-  // re-applies those layers from their change lists afterwards.
-  private stack: PreviewLayer[] = []
-  private sessions: Map<string, PreviewDOMManipulator> = new Map()
+  // Live segments in application order, oldest first. A journal is only
+  // ever inverted against the DOM its own records produced: a write by an
+  // experiment that is not on top opens a new segment on top instead of
+  // reaching under newer ones, and removing or replacing an experiment
+  // first unwinds every segment from its lowest one up, newest first, then
+  // re-applies the other experiments' unwound segments in order.
+  private stack: Segment[] = []
   private styleManagers: Map<string, StyleSheetManager> = new Map()
 
-  private layer(experimentName: string): PreviewLayer | undefined {
-    return this.stack.find((layer) => layer.name === experimentName)
+  private isLive(experimentName: string): boolean {
+    return this.stack.some((segment) => segment.name === experimentName)
   }
 
-  private getLayer(experimentName: string): PreviewLayer {
-    let layer = this.layer(experimentName)
-    if (!layer) {
-      layer = newLayer(experimentName, [])
-      this.stack.push(layer)
+  // The segment `experimentName`'s next write goes into.
+  private topFor(experimentName: string): Segment {
+    const top = this.stack[this.stack.length - 1]
+    if (top?.name === experimentName) return top
+    const segment = newSegment(experimentName)
+    this.stack.push(segment)
+    return segment
+  }
+
+  // Takes every segment from `experimentName`'s lowest one up off the
+  // stack and inverts them newest first. Pending SPA work of each is
+  // cancelled before any DOM is inverted, so no late mount re-applies.
+  private unwindFrom(index: number): Segment[] {
+    const unwound = this.stack.splice(index)
+    if (unwound.some((s) => s.name === VISUAL_EDITOR_EXPERIMENT_NAME)) {
+      window.dispatchEvent(
+        new CustomEvent(PREVIEW_UNWIND_EVENT, {
+          detail: {
+            experiments: Array.from(new Set(unwound.map((s) => s.name)))
+          }
+        })
+      )
     }
-    return layer
-  }
-
-  // Takes `experimentName`'s layer and every newer one off the stack and
-  // unwinds them newest first. Returns the newer layers, oldest first, for
-  // replay, and how much of `experimentName`'s preview was undone.
-  private unwindFrom(experimentName: string): {
-    removed?: PreviewLayer
-    above: PreviewLayer[]
-    undone: number
-  } {
-    const index = this.stack.findIndex((l) => l.name === experimentName)
-    if (index === -1) return { above: [], undone: this.release(experimentName) }
-    const [removed, ...above] = this.stack.splice(index)
-    for (let i = above.length - 1; i >= 0; i--) this.unwind(above[i])
-    return { removed, above, undone: this.unwind(removed) }
-  }
-
-  // Runs `run` while `experimentName` is the newest layer.
-  private onTop<T>(experimentName: string, run: () => T): T {
-    const index = this.stack.findIndex((l) => l.name === experimentName)
-    if (index === -1 || index === this.stack.length - 1) return run()
-    const above = this.stack.splice(index + 1)
-    for (let i = above.length - 1; i >= 0; i--) this.unwind(above[i])
-    try {
-      return run()
-    } finally {
-      this.replay(above)
+    for (const segment of unwound) {
+      segment.session?.destroy()
+      segment.session = undefined
     }
+    for (let i = unwound.length - 1; i >= 0; i--) this.undo(unwound[i])
+    return unwound
   }
 
-  // Inverts everything `layer` did, cancels its pending SPA work and drops
-  // its stylesheet. Returns the number of entries and stylesheets undone.
-  private unwind(layer: PreviewLayer): number {
-    const count = this.release(layer.name)
-    const { journal } = layer
+  private undo(segment: Segment): void {
+    const { journal } = segment
     undoMutations(journal.entries)
     restoreAttributeOrder(journal.attributeOrder)
     this.undoFormWrites(journal.formWrites)
     for (const element of journal.marked) {
-      if (element.getAttribute("data-absmartly-experiment") !== layer.name)
+      if (element.getAttribute("data-absmartly-experiment") !== segment.name)
         continue
       element.removeAttribute("data-absmartly-experiment")
       element.removeAttribute("data-absmartly-modified")
     }
-    return count + journal.entries.length
   }
 
-  private release(experimentName: string): number {
-    // Cancel pending SPA work first, so no late mount re-applies.
-    const session = this.sessions.get(experimentName)
-    if (session) {
-      this.sessions.delete(experimentName)
-      session.destroy()
-    }
+  // Drops the experiment's stylesheet; returns 1 if one was on the page.
+  private releaseStyles(experimentName: string): number {
     const styleManager = this.styleManagers.get(experimentName)
     if (styleManager) {
       styleManager.destroy()
@@ -238,33 +264,102 @@ export class PreviewManager {
     return 1
   }
 
-  // Re-applies unwound layers in their original order with fresh journals
-  // and sessions. A change that throws is logged; the rest still apply.
-  private replay(layers: PreviewLayer[]): void {
-    for (const { name, changes } of layers) {
-      this.stack.push(newLayer(name, changes))
-      for (const change of changes) {
-        try {
-          this.applyChange(change, name)
-        } catch (error) {
-          Logger.error("[PreviewManager] Re-applying preview failed:", error)
+  // Values the user or page entered into form controls after the last
+  // preview write to them. `unwound` is every segment about to be unwound,
+  // oldest first; only controls inside `replayed` targets are considered,
+  // since replaying those segments is what would overwrite the value.
+  private snapshotForm(unwound: Segment[], replayed: Segment[]): FormSnapshot {
+    const lastWrite = new Map<FormControl, Map<string, string | boolean>>()
+    for (const { journal } of unwound) {
+      for (const { element, property, after } of journal.formWrites) {
+        const control = element as FormControl
+        if (!lastWrite.has(control)) lastWrite.set(control, new Map())
+        lastWrite.get(control).set(property, after)
+      }
+    }
+    const targets = replayed.flatMap(({ journal }) =>
+      Array.from(journal.targets)
+    )
+    const snapshot: FormSnapshot = []
+    for (const control of formControlsIn(targets)) {
+      const written = lastWrite.get(control)
+      if (!written) continue
+      const live = formProperties(control) as Record<string, string | boolean>
+      for (const [property, after] of written) {
+        if (property in live && live[property] !== after)
+          snapshot.push({ control, property, value: live[property] })
+      }
+    }
+    return snapshot
+  }
+
+  private restoreForm(snapshot: FormSnapshot): void {
+    for (const { control, property, value } of snapshot) {
+      const live = control as unknown as Record<string, string | boolean>
+      if (live[property] !== value) live[property] = value
+    }
+  }
+
+  // Re-applies unwound segments in their original order with fresh
+  // journals and sessions, so their pending SPA work is registered again.
+  // A change listed by several segments of one experiment is applied once.
+  // A late match is re-applied to its element unless its change is
+  // re-applied here anyway; if the element is gone (the newer preview that
+  // created it was removed), the change is re-applied by selector so its
+  // pending work is recreated. A change that throws is logged; the rest
+  // still apply.
+  private replay(segments: Segment[]): void {
+    const listed = new Set(segments.flatMap((s) => s.changes))
+    const applied = new Set<DOMChange>()
+    const guarded = (run: () => void) => {
+      try {
+        run()
+      } catch (error) {
+        Logger.error("[PreviewManager] Re-applying preview failed:", error)
+      }
+    }
+    const reapply = (segment: Segment, change: DOMChange) => {
+      if (applied.has(change)) return
+      applied.add(change)
+      segment.changes.push(change)
+      guarded(() => this.applyChange(segment, change))
+    }
+    for (const { name, changes, late } of segments) {
+      const segment = this.topFor(name)
+      for (const change of changes) reapply(segment, change)
+      for (const match of late) {
+        const { change, element } = match
+        if (listed.has(change)) continue
+        if (!element.isConnected) {
+          reapply(segment, change)
+          continue
         }
+        if (!matches(element, change.selector)) continue
+        const session = this.sessionFor(segment)
+        guarded(() => {
+          if (
+            this.applyJournaled(segment, change, [element], () =>
+              session.applyToElement(change, name, element)
+            )
+          )
+            segment.late.push(match)
+        })
       }
     }
   }
 
   // Applies one change to `targets` and journals every DOM mutation it
-  // makes so removal can invert it. Tracking markers are written outside the
-  // journal (the marker sweep in removePreviewChanges clears them): another
-  // experiment may re-mark the same element, and undoing a marker write
-  // would resurrect a stale experiment name.
+  // makes into `segment`, which must be on top. Tracking markers are
+  // written outside the journal (the marker sweep in removePreviewChanges
+  // clears them): another experiment may re-mark the same element, and
+  // undoing a marker write would resurrect a stale experiment name.
   private applyJournaled(
-    experimentName: string,
+    segment: Segment,
     change: DOMChange,
     targets: Element[],
     apply: () => boolean
   ): boolean {
-    const { journal } = this.getLayer(experimentName)
+    const { journal } = segment
     recordAttributeOrder(journal.attributeOrder, targets)
     let formBefore: Array<[FormControl, Record<string, string | boolean>]> = []
     if (change.type === "javascript") {
@@ -294,7 +389,7 @@ export class PreviewManager {
     if (result) {
       for (const element of targets) {
         if (element.isConnected) {
-          this.markElement(element, experimentName)
+          this.markElement(element, segment.name)
           journal.marked.add(element)
         }
       }
@@ -330,10 +425,9 @@ export class PreviewManager {
     }
   }
 
-  private getSession(experimentName: string): PreviewDOMManipulator {
-    const existing = this.sessions.get(experimentName)
-    if (existing) return existing
-
+  private sessionFor(owner: Segment): PreviewDOMManipulator {
+    if (owner.session) return owner.session
+    const experimentName = owner.name
     const plugin = {
       config: { spa: true },
       reapplyingElements: new Set(),
@@ -352,24 +446,23 @@ export class PreviewManager {
     const session: PreviewDOMManipulator = new PreviewDOMManipulator(
       plugin,
       (element, change, apply) => {
-        if (
-          this.sessions.get(experimentName) !== session ||
-          this.isExtensionElement(element)
-        ) {
+        if (owner.session !== session || this.isExtensionElement(element))
           return false
-        }
-        // A late match is journaled with this preview as the newest layer,
-        // so newer previews are unwound around it and re-applied on top. If
-        // unwinding them detached the match, it stays pending instead.
-        const connected = element.isConnected
-        return this.onTop(experimentName, () =>
-          connected && !element.isConnected
-            ? false
-            : this.applyJournaled(experimentName, change, [element], apply)
+        // Journaled on top: in the experiment's top segment if it is the
+        // newest, otherwise in a new segment above the newer previews.
+        const segment = this.topFor(experimentName)
+        const result = this.applyJournaled(segment, change, [element], apply)
+        if (result) segment.late.push({ change, element })
+        else if (
+          segment.journal.entries.length === 0 &&
+          segment.changes.length === 0 &&
+          segment.late.length === 0
         )
+          this.stack.pop()
+        return result
       }
     )
-    this.sessions.set(experimentName, session)
+    owner.session = session
     return session
   }
 
@@ -419,26 +512,26 @@ export class PreviewManager {
       Logger.log("Skipping disabled change:", change.selector)
       return false
     }
-    this.getLayer(experimentName).changes.push(change)
-    return this.onTop(experimentName, () =>
-      this.applyChange(change, experimentName)
-    )
+    const segment = this.topFor(experimentName)
+    segment.changes.push(change)
+    return this.applyChange(segment, change)
   }
 
-  private applyChange(change: DOMChange, experimentName: string): boolean {
-    const session = this.getSession(experimentName)
+  private applyChange(segment: Segment, change: DOMChange): boolean {
+    const session = this.sessionFor(segment)
+    const experimentName = segment.name
     // styleRules only write the experiment's stylesheet, which removal
     // destroys as a whole.
     if (change.type === "styleRules") {
       return session.applyChange(change, experimentName)
     }
 
-    // The session's SDK manipulator applies current matches and registers
+    // The segment's SDK manipulator applies current matches and registers
     // waitForElement/SPA selectors with its pending manager, whose late
-    // matches are journaled through applyOwned (see getSession).
+    // matches are journaled through applyOwned (see sessionFor).
     const targets =
       change.type === "create" ? [] : this.findPreviewTargets(change.selector)
-    return this.applyJournaled(experimentName, change, targets, () =>
+    return this.applyJournaled(segment, change, targets, () =>
       session.applyChange(change, experimentName)
     )
   }
@@ -470,7 +563,7 @@ export class PreviewManager {
     for (const element of targets) {
       element.removeAttribute("data-absmartly-original")
       const owner = element.getAttribute("data-absmartly-experiment")
-      if (owner !== null && !this.layer(owner)) {
+      if (owner !== null && !this.isLive(owner)) {
         element.removeAttribute("data-absmartly-experiment")
         element.removeAttribute("data-absmartly-modified")
       }
@@ -494,30 +587,65 @@ export class PreviewManager {
     return markedElements.length
   }
 
+  // Unwinds `experimentName`'s segments and every segment above its lowest
+  // one. Returns the unwound segments of other experiments, oldest first,
+  // the removed experiment's segments, and the form values to carry over.
+  private takeDown(experimentName: string): {
+    others: Segment[]
+    own: Segment[]
+    form: FormSnapshot
+    slot: number
+  } {
+    const slot = this.stack.findIndex((s) => s.name === experimentName)
+    if (slot === -1)
+      return { others: [], own: [], form: [], slot: this.stack.length }
+    const above = this.stack.slice(slot)
+    const others = above.filter((s) => s.name !== experimentName)
+    const form = this.snapshotForm(above, others)
+    const unwound = this.unwindFrom(slot)
+    return {
+      others,
+      own: unwound.filter((s) => s.name === experimentName),
+      form,
+      slot
+    }
+  }
+
+  // Re-applies the other experiments' segments taken down by takeDown.
+  private putBack(others: Segment[], form: FormSnapshot): void {
+    this.replay(others)
+    this.restoreForm(form)
+  }
+
   /**
    * Remove all preview changes for an experiment
    */
   removePreviewChanges(experimentName: string): boolean {
     Logger.log("Removing preview changes for experiment:", experimentName)
-    const { removed, above, undone } = this.unwindFrom(experimentName)
+    const { others, own, form } = this.takeDown(experimentName)
+    const undone =
+      own.reduce((n, s) => n + s.journal.entries.length, 0) +
+      this.releaseStyles(experimentName)
     const restoredCount = undone + this.sweepMarkers(experimentName)
-    this.replay(above)
-    if (removed) this.clearEditorMarkers(removed.journal.targets)
+    this.putBack(others, form)
+    for (const segment of own) this.clearEditorMarkers(segment.journal.targets)
     Logger.log(`Removed preview changes, cleaned ${restoredCount} elements`)
     return restoredCount > 0
   }
 
   /**
    * Replace an experiment's preview with `changes`, keeping its place among
-   * the other live previews. Returns how many changes applied.
-   * `beforeApply` runs before each change, against the page it will see.
+   * the other live previews (the slot of its oldest segment). Returns how
+   * many changes applied. `beforeApply` runs before each change, against
+   * the page it will see.
    */
   replacePreviewChanges(
     experimentName: string,
     changes: DOMChange[],
     beforeApply?: (change: DOMChange) => void
   ): number {
-    const { removed: replaced, above } = this.unwindFrom(experimentName)
+    const { others, own, form } = this.takeDown(experimentName)
+    this.releaseStyles(experimentName)
     this.sweepMarkers(experimentName)
     let applied = 0
     try {
@@ -526,8 +654,9 @@ export class PreviewManager {
         if (this.applyPreviewChange(change, experimentName)) applied++
       }
     } finally {
-      this.replay(above)
-      if (replaced) this.clearEditorMarkers(replaced.journal.targets)
+      this.putBack(others, form)
+      for (const segment of own)
+        this.clearEditorMarkers(segment.journal.targets)
     }
     return applied
   }
@@ -536,27 +665,27 @@ export class PreviewManager {
    * Clear all preview changes
    */
   clearAll(): void {
-    const layers = this.stack.splice(0)
-    for (let i = layers.length - 1; i >= 0; i--) this.unwind(layers[i])
+    const segments = this.unwindFrom(0)
     const experimentNames = new Set<string>([
-      ...layers.map((layer) => layer.name),
-      ...this.sessions.keys(),
+      ...segments.map((segment) => segment.name),
       ...this.styleManagers.keys()
     ])
     for (const name of experimentNames) {
-      this.release(name)
+      this.releaseStyles(name)
       this.sweepMarkers(name)
     }
-    for (const layer of layers) this.clearEditorMarkers(layer.journal.targets)
+    for (const segment of segments)
+      this.clearEditorMarkers(segment.journal.targets)
   }
 
   /**
    * Get count of tracked preview elements
    */
   getPreviewCount(): number {
-    let count = 0
-    for (const { journal } of this.stack) count += journal.marked.size
-    return count
+    const marked = new Set<Element>()
+    for (const { journal } of this.stack)
+      for (const element of journal.marked) marked.add(element)
+    return marked.size
   }
 
   /**

@@ -1067,7 +1067,7 @@ describe("PreviewManager", () => {
       expect(byId("r").innerHTML).toBe(original)
     })
 
-    it("restores html content an earlier preview replaced after a later preview moved it on", () => {
+    it("restores html content an earlier preview replaced after a later preview moved it on", async () => {
       document.body.innerHTML =
         '<div id="h"><s id="k">Keep</s></div><div id="to"></div>'
       const kept = byId("k")
@@ -1089,7 +1089,13 @@ describe("PreviewManager", () => {
       expect(byId("n")).toBeNull()
       expect(byId("h").firstChild).toBe(kept)
       expect(byId("to").childNodes).toHaveLength(0)
+      // b is still live, so its move waits for #n and applies when it mounts.
+      const [n] = mount('<b id="n">Page</b>')
+      await settle()
+      expect(n.parentNode).toBe(byId("to"))
       manager.removePreviewChanges("b")
+      expect(n.parentNode).toBe(document.body)
+      n.remove()
       expect(byId("h").firstChild).toBe(kept)
       expect(document.body.innerHTML).toBe(
         '<div id="h"><s id="k">Keep</s></div><div id="to"></div>'
@@ -1314,6 +1320,208 @@ describe("PreviewManager", () => {
       expect(byId("late").style.color).toBe("green")
       manager.removePreviewChanges("b")
       expect(byId("late").hasAttribute("style")).toBe(false)
+    })
+  })
+
+  describe("later writes to an experiment below the newest preview", () => {
+    const runs = () => (window as any).__runs as number
+    const counter: DOMChange = {
+      selector: "#t",
+      type: "javascript",
+      value: "window.__runs++"
+    }
+
+    beforeEach(() => {
+      ;(window as any).__runs = 0
+    })
+
+    it.each([
+      [
+        "creates",
+        {
+          selector: "",
+          type: "create",
+          element: '<div class="promo">P</div>',
+          targetSelector: "#t",
+          position: "after"
+        } as DOMChange
+      ],
+      [
+        "renders",
+        {
+          selector: "#t",
+          type: "html",
+          value: '<span class="promo">P</span>'
+        } as DOMChange
+      ]
+    ])(
+      "applies an older pending change once to an element a newer preview %s",
+      async (_, insert) => {
+        document.body.innerHTML = '<div id="t">T</div>'
+        const original = document.body.innerHTML
+        manager.applyPreviewChange(
+          { selector: ".promo", type: "attribute", value: { title: "A" } },
+          "a"
+        )
+        manager.applyPreviewChange(insert, "b")
+        manager.applyPreviewChange(counter, "b")
+        expect(runs()).toBe(1)
+        const promo = document.querySelector(".promo")
+
+        for (let i = 0; i < 20; i++) await nextFrame()
+
+        expect(runs()).toBe(1)
+        expect(document.querySelector(".promo")).toBe(promo)
+        expect(promo.getAttribute("title")).toBe("A")
+        manager.removePreviewChanges("b")
+        manager.removePreviewChanges("a")
+        expect(unmarked()).toBe(original)
+      }
+    )
+
+    it("journals a later apply to an older experiment on top of the newer one", () => {
+      document.body.innerHTML = '<div id="h" title="orig">x</div>'
+      const title = () => byId("h").getAttribute("title")
+      const attribute = (value: string) =>
+        ({
+          selector: "#h",
+          type: "attribute",
+          value: { title: value }
+        }) as DOMChange
+      manager.applyPreviewChange(attribute("red"), "a")
+      manager.applyPreviewChange(attribute("blue"), "b")
+      expect(title()).toBe("blue")
+      manager.applyPreviewChange(attribute("green"), "a")
+      // a's green is a segment above b's blue, so it is the live value.
+      // Removing b unwinds that segment and b, then re-applies a's green over
+      // a's red: green stays. Removing a restores the original.
+      const seen = [title()]
+      manager.removePreviewChanges("b")
+      seen.push(title())
+      manager.removePreviewChanges("a")
+      seen.push(title())
+      expect(seen).toEqual(["green", "green", "orig"])
+    })
+
+    it("undoes a late match of an older experiment without re-running the newer one", async () => {
+      document.body.innerHTML = '<div id="t">T</div>'
+      manager.applyPreviewChange(
+        { selector: "#late", type: "style", value: { color: "red" } },
+        "a"
+      )
+      manager.applyPreviewChange(counter, "b")
+      const [late] = mount('<div id="late">L</div>') as HTMLElement[]
+      await settle()
+      expect(late.style.color).toBe("red")
+      expect(runs()).toBe(1)
+
+      manager.removePreviewChanges("b")
+      expect(late.style.color).toBe("red")
+      manager.removePreviewChanges("a")
+      expect(late.hasAttribute("style")).toBe(false)
+      expect(unmarked()).toBe('<div id="t">T</div><div id="late">L</div>')
+      expect(runs()).toBe(1)
+    })
+
+    it("re-runs a newer javascript preview exactly once when an older one is removed", async () => {
+      document.body.innerHTML = '<div id="t">T</div><p id="p">P</p>'
+      manager.applyPreviewChange(
+        { selector: "#p", type: "text", value: "A" },
+        "a"
+      )
+      manager.applyPreviewChange(
+        { selector: "#late", type: "style", value: { color: "red" } },
+        "a"
+      )
+      manager.applyPreviewChange(counter, "b")
+      mount('<div id="late">L</div>')
+      await settle()
+      expect(runs()).toBe(1)
+
+      manager.removePreviewChanges("a")
+      expect(runs()).toBe(2)
+      await settle()
+      expect(runs()).toBe(2)
+      expect(byId("p").textContent).toBe("P")
+      expect(byId("late").hasAttribute("style")).toBe(false)
+    })
+
+    it("keeps a value the user typed after a newer javascript preview when an older one is removed", () => {
+      document.body.innerHTML =
+        '<p id="a">A</p><form id="f"><input id="i" value="orig"></form>'
+      const input = byId("i") as HTMLInputElement
+      manager.applyPreviewChange(
+        { selector: "#a", type: "text", value: "AA" },
+        "a"
+      )
+      manager.applyPreviewChange(
+        {
+          selector: "#f",
+          type: "javascript",
+          value: "element.querySelector('input').value = 'prefill'"
+        },
+        "b"
+      )
+      expect(input.value).toBe("prefill")
+      input.value = "user typed"
+
+      manager.removePreviewChanges("a")
+      expect(input.value).toBe("user typed")
+      expect(byId("a").textContent).toBe("A")
+      manager.removePreviewChanges("b")
+      expect(input.value).toBe("user typed")
+    })
+
+    it("resets a page attribute written over a newer preview's value when an older one is removed", () => {
+      document.body.innerHTML = '<p id="a">A</p><p id="h" title="orig">H</p>'
+      manager.applyPreviewChange(
+        { selector: "#a", type: "text", value: "AA" },
+        "a"
+      )
+      manager.applyPreviewChange(
+        { selector: "#h", type: "attribute", value: { title: "blue" } },
+        "b"
+      )
+      byId("h").setAttribute("title", "page")
+      manager.removePreviewChanges("a")
+      // b is re-applied over the page's write; its new journal records the
+      // page's value as the one to put back.
+      expect(byId("h").getAttribute("title")).toBe("blue")
+      manager.removePreviewChanges("b")
+      expect(byId("h").getAttribute("title")).toBe("page")
+    })
+
+    it("signals an unwind of the visual editor's preview before undoing it", () => {
+      document.body.innerHTML = '<p id="a">A</p><div id="e">page</div>'
+      const seen: Array<{ experiments: string[]; text: string }> = []
+      const listener = (event: Event) =>
+        seen.push({
+          experiments: (event as CustomEvent).detail.experiments,
+          text: byId("e").textContent
+        })
+      window.addEventListener("absmartly:preview-unwind", listener)
+      try {
+        manager.applyPreviewChange(
+          { selector: "#a", type: "text", value: "AA" },
+          "older"
+        )
+        manager.removePreviewChanges("older")
+        manager.applyPreviewChange(
+          { selector: "#a", type: "text", value: "AA" },
+          "older"
+        )
+        manager.applyPreviewChange(
+          { selector: "#e", type: "text", value: "ve" },
+          "__visual_editor__"
+        )
+        manager.removePreviewChanges("older")
+      } finally {
+        window.removeEventListener("absmartly:preview-unwind", listener)
+      }
+      expect(seen).toEqual([
+        { experiments: ["older", "__visual_editor__"], text: "ve" }
+      ])
+      expect(byId("e").textContent).toBe("ve")
     })
   })
 
