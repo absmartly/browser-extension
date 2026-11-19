@@ -1030,6 +1030,77 @@ describe("PreviewManager", () => {
     expect(byId("h").getAttribute("style")).toBe("margin: 1px;")
   })
 
+  describe("overlapping child-list previews removed earliest first", () => {
+    it("puts back a node an earlier preview deleted next to siblings a later preview moved", () => {
+      document.body.innerHTML =
+        '<div id="r"><b id="x"></b><i id="y"></i><u id="z"></u></div><div id="to"></div>'
+      const original = byId("r").innerHTML
+      manager.applyPreviewChange({ selector: "#y", type: "delete" }, "a")
+      for (const id of ["x", "z"])
+        manager.applyPreviewChange(
+          {
+            selector: `#${id}`,
+            type: "move",
+            targetSelector: "#to",
+            position: "lastChild"
+          } as DOMChange,
+          "b"
+        )
+      manager.removePreviewChanges("a")
+      expect(byId("y")).toBeNull()
+      manager.removePreviewChanges("b")
+      expect(byId("r").innerHTML).toBe(original)
+    })
+
+    it("restores html content an earlier preview replaced after a later preview moved it on", () => {
+      document.body.innerHTML =
+        '<div id="h"><s id="k">Keep</s></div><div id="to"></div>'
+      const kept = byId("k")
+      manager.applyPreviewChange(
+        { selector: "#h", type: "html", value: '<b id="n">New</b>' },
+        "a"
+      )
+      manager.applyPreviewChange(
+        {
+          selector: "#n",
+          type: "move",
+          targetSelector: "#to",
+          position: "lastChild"
+        } as DOMChange,
+        "b"
+      )
+      manager.removePreviewChanges("a")
+      expect(byId("n").parentElement).toBe(byId("to"))
+      manager.removePreviewChanges("b")
+      expect(byId("h").firstChild).toBe(kept)
+      expect(document.body.innerHTML).toBe(
+        '<div id="h"><s id="k">Keep</s></div><div id="to"></div>'
+      )
+    })
+
+    it("returns a node moved by both previews to its first slot", () => {
+      document.body.innerHTML =
+        '<div id="a1"><b id="m"></b></div><div id="a2"></div><div id="a3"></div>'
+      const original = document.body.innerHTML
+      const move = (target: string, name: string) =>
+        manager.applyPreviewChange(
+          {
+            selector: "#m",
+            type: "move",
+            targetSelector: target,
+            position: "lastChild"
+          } as DOMChange,
+          name
+        )
+      move("#a2", "a")
+      move("#a3", "b")
+      manager.removePreviewChanges("a")
+      expect(byId("m").parentElement).toBe(byId("a3"))
+      manager.removePreviewChanges("b")
+      expect(document.body.innerHTML).toBe(original)
+    })
+  })
+
   it("keeps a page write made between two overlapping experiments", () => {
     document.body.innerHTML = '<div id="h" title="orig">Original</div>'
     manager.applyPreviewChange(

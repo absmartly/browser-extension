@@ -62,6 +62,8 @@ function formProperties(control: FormControl) {
   return { value: control.value }
 }
 
+type ChildListEntry = Extract<JournalEntry, { kind: "childList" }>
+
 // Everything one experiment's preview did to the page, in application order.
 interface PreviewJournal {
   entries: JournalEntry[]
@@ -141,25 +143,136 @@ export class PreviewManager {
     }
   }
 
-  // Removing a preview whose value a later live preview overwrote leaves
-  // that value in place, but the later entry still remembers this
-  // preview's value as the one to restore. Hand it this preview's own
-  // old value instead, so removing the later preview restores the page.
-  private spliceIntoLaterOwner(skipped: JournalEntry): void {
-    if (skipped.kind === "childList") return
-    const seq = this.entrySeq.get(skipped) ?? -1
-    let owner: JournalEntry | null = null
-    let ownerSeq = Infinity
+  // The earliest entry of a live preview applied after `entry` that
+  // matches `test`, with the journal holding it.
+  private laterLiveEntry<T extends JournalEntry>(
+    entry: JournalEntry,
+    test: (candidate: JournalEntry) => candidate is T
+  ): { entry: T; journal: PreviewJournal } | null {
+    const seq = this.entrySeq.get(entry) ?? -1
+    let found: { entry: T; journal: PreviewJournal } | null = null
+    let foundSeq = Infinity
     for (const journal of this.journals.values()) {
-      for (const entry of journal.entries) {
-        const entrySeq = this.entrySeq.get(entry) ?? -1
-        if (entrySeq > seq && entrySeq < ownerSeq && sameSlot(entry, skipped)) {
-          owner = entry
-          ownerSeq = entrySeq
+      for (const candidate of journal.entries) {
+        const candidateSeq = this.entrySeq.get(candidate) ?? -1
+        if (candidateSeq > seq && candidateSeq < foundSeq && test(candidate)) {
+          found = { entry: candidate, journal }
+          foundSeq = candidateSeq
         }
       }
     }
-    if (owner && owner.kind !== "childList") inheritOldValue(owner, skipped)
+    return found
+  }
+
+  // Removing a preview whose write a later live preview overwrote leaves
+  // that write's result in place, but the later entry still records it as
+  // the state to restore. Hand the later entry this preview's own prior
+  // state instead, so removing the later preview restores the page.
+  private spliceIntoLaterOwner(skipped: JournalEntry): void {
+    if (skipped.kind === "childList") return
+    const found = this.laterLiveEntry(
+      skipped,
+      (candidate): candidate is typeof skipped => sameSlot(candidate, skipped)
+    )
+    if (found) inheritOldValue(found.entry, skipped)
+  }
+
+  // `taken` are nodes `skipped` added that a later live preview moved out
+  // of the parent. That preview's undo must put back what `skipped`
+  // removed in their place, so it becomes responsible for those nodes.
+  private handOver(
+    skipped: ChildListEntry,
+    removedEntries: JournalEntry[],
+    takenNodes: Node[]
+  ): boolean {
+    const added = new Set(takenNodes)
+    const found = this.laterLiveEntry(
+      skipped,
+      (candidate): candidate is ChildListEntry =>
+        candidate.kind === "childList" &&
+        candidate.target === skipped.target &&
+        takenNodes.every((node) => candidate.removed.includes(node))
+    )
+    if (!found) return false
+    const owner = found.entry
+    const taken = owner.removed.filter((node) => added.has(node))
+    const at = owner.removed.findIndex((node) => added.has(node))
+    const kept = owner.removed.filter((node) => !added.has(node))
+    const before = owner.removed.slice(0, at).filter((node) => !added.has(node))
+    owner.removed = [
+      ...before,
+      ...skipped.removed,
+      ...kept.slice(before.length)
+    ]
+    // A node this preview moved here and the later one moved on: the later
+    // preview's undo now returns it to where this preview found it, and
+    // this preview's own reinsert there is dropped.
+    const index = removedEntries.indexOf(skipped)
+    for (const node of taken) {
+      for (let i = index - 1; i >= 0; i--) {
+        const source = removedEntries[i]
+        if (source.kind !== "childList" || !source.removed.includes(node))
+          continue
+        source.removed = source.removed.filter((other) => other !== node)
+        const moved: ChildListEntry = {
+          kind: "childList",
+          target: source.target,
+          added: [],
+          removed: [node],
+          previousSibling: source.previousSibling,
+          nextSibling: source.nextSibling
+        }
+        this.entrySeq.set(moved, this.entrySeq.get(owner) ?? -1)
+        const entries = found.journal.entries
+        entries.splice(entries.indexOf(owner), 0, moved)
+        break
+      }
+    }
+    return true
+  }
+
+  // Undoing `entry` moves `node` away from where a later live preview saw
+  // it. That preview's entries that use `node` as a sibling anchor are
+  // re-anchored on the node's current neighbour, which names the same slot
+  // once `node` has gone.
+  private rebaseAnchors(entry: JournalEntry, node: Node): void {
+    const seq = this.entrySeq.get(entry) ?? -1
+    for (const journal of this.journals.values()) {
+      for (const later of journal.entries) {
+        if (later.kind !== "childList") continue
+        if ((this.entrySeq.get(later) ?? -1) <= seq) continue
+        if (later.target !== node.parentNode) continue
+        if (later.nextSibling === node) later.nextSibling = node.nextSibling
+        if (later.previousSibling === node)
+          later.previousSibling = node.previousSibling
+      }
+    }
+  }
+
+  // A reinsert whose siblings a later live entry removed belongs next to
+  // them in that entry's removed list: they come back together when the
+  // later preview is removed, and stay out while it is applied.
+  private adoptUnanchored(entry: ChildListEntry): boolean {
+    const { previousSibling, nextSibling } = entry
+    const owner = this.laterLiveEntry(
+      entry,
+      (candidate): candidate is ChildListEntry =>
+        candidate.kind === "childList" &&
+        candidate.target === entry.target &&
+        candidate.removed.some(
+          (node) => node === previousSibling || node === nextSibling
+        )
+    )
+    if (!owner) return false
+    const { removed } = owner.entry
+    const afterPrevious =
+      previousSibling !== null ? removed.indexOf(previousSibling) : -1
+    const at =
+      afterPrevious !== -1
+        ? afterPrevious + 1
+        : removed.indexOf(nextSibling as Node)
+    removed.splice(at, 0, ...entry.removed)
+    return true
   }
 
   private getJournal(experimentName: string): PreviewJournal {
@@ -409,9 +522,13 @@ export class PreviewManager {
     const journal = this.journals.get(experimentName)
     if (journal) {
       this.journals.delete(experimentName)
-      undoMutations(journal.entries, (skipped) =>
-        this.spliceIntoLaterOwner(skipped)
-      )
+      undoMutations(journal.entries, {
+        onSkip: (skipped) => this.spliceIntoLaterOwner(skipped),
+        handOver: (entry, taken) =>
+          this.handOver(entry, journal.entries, taken),
+        adoptUnanchored: (entry) => this.adoptUnanchored(entry),
+        beforeDetach: (entry, node) => this.rebaseAnchors(entry, node)
+      })
       restoreAttributeOrder(journal.attributeOrder)
       this.undoFormWrites(journal.formWrites)
       restoredCount += journal.entries.length

@@ -436,31 +436,68 @@ export function watchMutations(root: Node): () => JournalEntry[] {
   }
 }
 
+type ChildListEntry = Extract<JournalEntry, { kind: "childList" }>
+
+export type UndoHooks = {
+  // An entry whose result something else has since overwritten (attribute
+  // or text value, or a node it added) is left alone and reported here.
+  onSkip?: (entry: JournalEntry) => void
+  // Neither recorded sibling of a reinsert is in the parent any more.
+  // Return true to take over the reinsert instead of appending.
+  adoptUnanchored?: (entry: ChildListEntry) => boolean
+  // `taken` (nodes `entry` added) were moved out by a later live entry.
+  // Return true if that entry now restores `entry.removed` in their place.
+  handOver?: (entry: ChildListEntry, taken: Node[]) => boolean
+  // `entry`'s undo is about to take `node` out of its current parent.
+  beforeDetach?: (entry: ChildListEntry, node: Node) => void
+}
+
 function undoChildList(
-  entry: Extract<JournalEntry, { kind: "childList" }>,
-  reinsertedLater: (node: Node) => boolean
+  entry: ChildListEntry,
+  reinsertedLater: (node: Node) => boolean,
+  hooks: UndoHooks
 ): boolean {
   const { target, added, removed, previousSibling, nextSibling } = entry
 
-  // Once something else has taken any node this entry added out of
-  // `target` (page code re-rendering the subtree), that code owns the
-  // children: putting the removed nodes back would delete its content.
-  if (!added.every((node) => node.parentNode === target)) return false
+  // Once something else has taken a node this entry added out of `target`,
+  // the taker owns the children. Page code re-rendering the subtree keeps
+  // them: putting the removed nodes back would delete its content. A later
+  // live preview can instead take over the removed nodes (`handOver`); the
+  // added nodes still here are then removed as usual.
+  const taken = added.filter((node) => node.parentNode !== target)
+  if (taken.length > 0) {
+    if (!hooks.handOver?.(entry, taken)) return false
+    for (const node of added) {
+      if (node.parentNode !== target || reinsertedLater(node)) continue
+      hooks.beforeDetach?.(entry, node)
+      target.removeChild(node)
+    }
+    return true
+  }
 
   // A node that an older entry puts back (the source half of a move) is
   // left in place here: the older insertBefore moves it in one step, and
   // if that destination has become invalid the node stays attached where
   // it is instead of being dropped.
   for (const node of added) {
-    if (!reinsertedLater(node)) target.removeChild(node)
+    if (reinsertedLater(node)) continue
+    hooks.beforeDetach?.(entry, node)
+    target.removeChild(node)
   }
   if (removed.length === 0) return true
+
+  const anchored =
+    (nextSibling !== null && nextSibling.parentNode === target) ||
+    (previousSibling !== null && previousSibling.parentNode === target) ||
+    (previousSibling === null && nextSibling === null)
+  if (!anchored && hooks.adoptUnanchored?.(entry)) return true
 
   const anchor = slotAnchor(target, previousSibling, nextSibling)
   for (const node of removed) {
     // Page code may since have put `target` inside `node`; inserting would
     // throw HierarchyRequestError.
     if (node.contains(target)) continue
+    if (node.parentNode) hooks.beforeDetach?.(entry, node)
     target.insertBefore(node, anchor)
   }
   return true
@@ -513,14 +550,15 @@ export function restoreAttributeOrder(order: Map<Element, string[]>): void {
 
 /**
  * Invert entries newest-first, restoring the DOM they were recorded on.
- * An entry whose result something else has since overwritten (attribute
- * or text value, or a node it added) is left alone and passed to `onSkip`;
- * an inline style is first undone per declaration the page left alone.
+ * An entry whose result something else has since overwritten is left
+ * alone and passed to `hooks.onSkip`; an inline style is first undone per
+ * declaration the page left alone.
  */
 export function undoMutations(
   entries: JournalEntry[],
-  onSkip?: (entry: JournalEntry) => void
+  hooks: UndoHooks = {}
 ): void {
+  const { onSkip } = hooks
   // How many not-yet-undone entries put each node back.
   const pendingReinserts = new Map<Node, number>()
   const countReinserts = (entry: JournalEntry, delta: number) => {
@@ -555,7 +593,8 @@ export function undoMutations(
     } else {
       const undone = undoChildList(
         entry,
-        (node) => (pendingReinserts.get(node) ?? 0) > 0
+        (node) => (pendingReinserts.get(node) ?? 0) > 0,
+        hooks
       )
       if (!undone) onSkip?.(entry)
     }

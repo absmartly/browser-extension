@@ -72,7 +72,7 @@ const JS_SNIPPETS = [
     "element.querySelectorAll('*').forEach((e) => e.setAttribute('data-js', '1'))",
   () =>
     "element.querySelectorAll('*').forEach((e) => { e.style.color = 'green' })",
-  (k: number) =>
+  (k: string) =>
     `const s = document.createElement('span'); s.id = 'j${k}'; element.appendChild(s)`,
   () => "element.removeAttribute('class'); element.title = 'js'",
   () =>
@@ -86,11 +86,13 @@ const JS_SNIPPETS = [
 
 // Generates 1-6 changes. Later changes may target nodes introduced by
 // earlier ones (created, html-introduced or javascript-appended ids).
-function generateCase(rng: Rng): DOMChange[] {
+// `prefix` keeps ids introduced by different experiments distinct.
+function generateCase(rng: Rng, prefix = ""): DOMChange[] {
   const pool = [...EXISTING]
   const count = 1 + rng.int(6)
   const changes: DOMChange[] = []
-  for (let k = 0; k < count; k++) {
+  for (let n = 0; n < count; n++) {
+    const k = `${prefix}${n}`
     const selector = rng.pick(pool)
     const kind = rng.pick([
       "style",
@@ -327,6 +329,287 @@ describe("PreviewManager restore property", () => {
         document.getElementById("b1").click()
         if (clicks.mock.calls.length !== cycle) {
           throw fail(cycle, "click listener on #b1 did not fire")
+        }
+      }
+    }
+  )
+})
+
+// Interleaved page writes and overlapping experiments.
+//
+// Two experiments ("a", "b") apply changes drawn from the same selector
+// pool, so their targets overlap. Between applies and removals "page code"
+// writes outside any journal: attributes, inline style declarations, text
+// data, and (in some cases) replaces an element's children. The previews
+// are then removed in random order (or by clearAll).
+//
+// Invariant without child replacement: the page equals the original page
+// with only the page's writes applied (same element objects, in order;
+// attributes compared as sets, inline style as a declaration map). With
+// child replacement the page owns that subtree, so the check is weaker:
+// the page's node is still in the element it was put in, and every page
+// attribute, declaration and text write survives. Always: no errors and
+// no duplicate ids.
+
+const INTERLEAVED_BASE_SEED = 0x1a7e0000
+const INTERLEAVED_CASES = 400
+
+type PageWrite =
+  | { kind: "attribute"; element: Element; name: string; value: string | null }
+  | { kind: "style"; element: HTMLElement; property: string; value: string }
+  | { kind: "text"; node: Text; value: string }
+  | { kind: "children"; element: Element; child: Element }
+
+function pageWrite(
+  rng: Rng,
+  elements: Element[],
+  texts: Text[],
+  serial: string,
+  allowChildren: boolean
+): PageWrite {
+  const roll = rng.int(allowChildren ? 5 : 4)
+  const element = rng.pick(elements)
+  if (roll === 0) {
+    return {
+      kind: "attribute",
+      element,
+      name: rng.pick(["title", "data-k", "class", "data-page"]),
+      value: `P${serial}`
+    }
+  }
+  if (roll === 1) {
+    return {
+      kind: "attribute",
+      element,
+      name: rng.pick(["title", "data-k"]),
+      value: null
+    }
+  }
+  if (roll === 2) {
+    const n = Number(serial.replace(/\D/g, "")) % 250
+    return {
+      kind: "style",
+      element: element as HTMLElement,
+      property: rng.pick(["color", "background-color", "outline-color"]),
+      value: `rgb(${n}, ${rng.int(250)}, ${rng.int(250)})`
+    }
+  }
+  if (roll === 3)
+    return { kind: "text", node: rng.pick(texts), value: `P${serial}` }
+  const child = document.createElement("span")
+  child.id = `pg${serial}`
+  return { kind: "children", element, child }
+}
+
+function runPageWrite(write: PageWrite, map: (node: Node) => Node): void {
+  switch (write.kind) {
+    case "attribute": {
+      const element = map(write.element) as Element
+      if (write.value === null) element.removeAttribute(write.name)
+      else element.setAttribute(write.name, write.value)
+      break
+    }
+    case "style":
+      ;(map(write.element) as HTMLElement).style.setProperty(
+        write.property,
+        write.value
+      )
+      break
+    case "text":
+      ;(map(write.node) as Text).data = write.value
+      break
+    case "children":
+      ;(map(write.element) as Element).replaceChildren(write.child)
+      break
+  }
+}
+
+function styleMap(element: Element): string {
+  if (!element.hasAttribute("style")) return "<absent>"
+  const style = (element as HTMLElement).style
+  const declarations: string[] = []
+  for (let i = 0; i < style.length; i++) {
+    const name = style.item(i)
+    declarations.push(`${name}:${style.getPropertyValue(name)}`)
+  }
+  return declarations.sort().join(";")
+}
+
+function canonical(node: Node): string {
+  if (node.nodeType === Node.TEXT_NODE)
+    return JSON.stringify((node as Text).data)
+  if (node.nodeType !== Node.ELEMENT_NODE) return ""
+  const element = node as Element
+  const attributes = element
+    .getAttributeNames()
+    .filter((name) => name !== "style")
+    .sort()
+    .map((name) => `${name}=${JSON.stringify(element.getAttribute(name))}`)
+  attributes.push(`style=${styleMap(element)}`)
+  const children = Array.from(element.childNodes, canonical).join(",")
+  return `<${element.localName} ${attributes.join(" ")}>[${children}]`
+}
+
+function allNodes(root: Node): Node[] {
+  const nodes: Node[] = []
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_ALL)
+  while (walker.nextNode()) nodes.push(walker.currentNode)
+  return nodes
+}
+
+const interleavedCases = Array.from({ length: INTERLEAVED_CASES }, (_, i) => {
+  const seed = INTERLEAVED_BASE_SEED + i
+  const rng = prng(seed)
+  return {
+    seed,
+    a: generateCase(rng, "a"),
+    b: generateCase(rng, "b"),
+    childReplacement: rng.next() < 0.25
+  }
+})
+
+describe("PreviewManager restore property with page writes and overlapping experiments", () => {
+  let manager: PreviewManager
+
+  beforeEach(() => {
+    document.head.innerHTML = ""
+    document.body.innerHTML = FIXTURE
+    manager = new PreviewManager()
+    jest.spyOn(console, "error").mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    manager.clearAll()
+    jest.restoreAllMocks()
+  })
+
+  it.each(interleavedCases)(
+    "seed $seed: page writes survive and only preview writes are undone",
+    ({ seed, a, b, childReplacement }) => {
+      const rng = prng(seed ^ 0x9e3779b9)
+      const expected = document.body.cloneNode(true)
+      const originalNodes = allNodes(document.body)
+      const cloneNodes = allNodes(expected)
+      const toClone = new Map<Node, Node>(
+        originalNodes.map((node, i) => [node, cloneNodes[i]])
+      )
+      const elements = originalNodes.filter(
+        (node): node is Element => node.nodeType === Node.ELEMENT_NODE
+      )
+      const texts = originalNodes.filter(
+        (node): node is Text => node.nodeType === Node.TEXT_NODE
+      )
+      const originalElements = Array.from(document.body.querySelectorAll("*"))
+
+      const writes: PageWrite[] = []
+      const log: string[] = []
+      const fail = (reason: string) =>
+        new Error(
+          `seed ${seed}: ${reason}\n` +
+            `steps: ${log.join(" | ")}\n` +
+            `a: ${JSON.stringify(a)}\nb: ${JSON.stringify(b)}\n` +
+            `body: ${document.body.innerHTML}`
+        )
+      const step = (label: string, run: () => void) => {
+        log.push(label)
+        try {
+          run()
+        } catch (error) {
+          throw fail(`${label} threw ${(error as Error).stack}`)
+        }
+      }
+      const maybePage = (probability: number) => {
+        if (rng.next() >= probability) return
+        const write = pageWrite(
+          rng,
+          elements,
+          texts,
+          `${writes.length}`,
+          childReplacement
+        )
+        writes.push(write)
+        step(`page ${write.kind}`, () => runPageWrite(write, (node) => node))
+      }
+      const applyAll = (name: string, changes: DOMChange[]) => {
+        for (const change of changes) {
+          step(`apply ${name} ${change.type} ${change.selector}`, () =>
+            manager.applyPreviewChange(change, name)
+          )
+          maybePage(0.3)
+        }
+      }
+
+      applyAll("a", a)
+      for (let i = rng.int(3); i > 0; i--) maybePage(1)
+      applyAll("b", b)
+      for (let i = rng.int(3); i > 0; i--) maybePage(1)
+      if (rng.next() < 0.2) {
+        step("clearAll", () => manager.clearAll())
+      } else {
+        const [first, second] = rng.next() < 0.5 ? ["a", "b"] : ["b", "a"]
+        step(`remove ${first}`, () => manager.removePreviewChanges(first))
+        for (let i = rng.int(3); i > 0; i--) maybePage(1)
+        step(`remove ${second}`, () => manager.removePreviewChanges(second))
+      }
+
+      const ids = Array.from(document.querySelectorAll("[id]"), (e) => e.id)
+      const duplicates = ids.filter((id, i) => ids.indexOf(id) !== i)
+      if (duplicates.length > 0)
+        throw fail(`duplicate ids ${duplicates.join(", ")}`)
+
+      const replaced = writes.some((write) => write.kind === "children")
+      if (!replaced) {
+        for (const write of writes)
+          runPageWrite(write, (node) => toClone.get(node))
+        if (canonical(document.body) !== canonical(expected)) {
+          throw fail(
+            `page differs from the original plus page writes\n` +
+              `expected: ${canonical(expected)}\nactual:   ${canonical(document.body)}`
+          )
+        }
+        const nodes = Array.from(document.body.querySelectorAll("*"))
+        const index = originalElements.findIndex((node, i) => nodes[i] !== node)
+        if (nodes.length !== originalElements.length || index !== -1)
+          throw fail(`original element #${index} was replaced`)
+        return
+      }
+
+      // Last write per slot wins; check each slot against it.
+      const last = new Map<string, PageWrite>()
+      const slotKey = new Map<Node, number>()
+      const keyOf = (node: Node) => {
+        if (!slotKey.has(node)) slotKey.set(node, slotKey.size)
+        return slotKey.get(node)
+      }
+      for (const write of writes) {
+        if (write.kind === "attribute")
+          last.set(`a${keyOf(write.element)}:${write.name}`, write)
+        else if (write.kind === "style")
+          last.set(`s${keyOf(write.element)}:${write.property}`, write)
+        else if (write.kind === "text") last.set(`t${keyOf(write.node)}`, write)
+        else last.set(`c${keyOf(write.element)}`, write)
+      }
+      for (const write of last.values()) {
+        if (write.kind === "attribute") {
+          const actual = write.element.getAttribute(write.name)
+          if (actual !== write.value)
+            throw fail(
+              `page ${write.name}=${write.value} became ${actual} on <${write.element.localName} id=${write.element.id}>`
+            )
+        } else if (write.kind === "style") {
+          const probe = document.createElement("i")
+          probe.style.setProperty(write.property, write.value)
+          const want = probe.style.getPropertyValue(write.property)
+          const actual = write.element.style.getPropertyValue(write.property)
+          if (actual !== want)
+            throw fail(
+              `page ${write.property}: ${want} became ${actual} on #${write.element.id}`
+            )
+        } else if (write.kind === "text") {
+          if (write.node.data !== write.value)
+            throw fail(`page text ${write.value} became ${write.node.data}`)
+        } else if (write.child.parentNode !== write.element) {
+          throw fail(`page child #${write.child.id} left its parent`)
         }
       }
     }
