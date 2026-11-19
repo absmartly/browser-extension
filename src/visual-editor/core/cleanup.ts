@@ -116,56 +116,19 @@ export class Cleanup {
     )
   }
 
+  // PreviewManager's journal restores everything the visual editor's
+  // preview wrote (clearChangesViaSDK). The selection sidecar serializes
+  // whatever was on the page at selection time, previewed content
+  // included, so it is stripped and never written back.
   private restoreOriginalValues(): void {
-    // Find all elements with original values stored
-    const modifiedElements = document.querySelectorAll(
-      "[data-absmartly-original]"
-    )
-
-    modifiedElements.forEach((element) => {
-      let originalData: any = {}
-      try {
-        originalData = JSON.parse(
-          (element as HTMLElement).dataset.absmartlyOriginal || "{}"
-        )
-      } catch (e) {
-        console.error("[Cleanup] Failed to parse original data:", e)
-        return // Skip this element if parsing fails
-      }
-
-      try {
-        const htmlElement = element as HTMLElement
-
-        // Restore text content if it was changed
-        if (
-          originalData.textContent !== undefined &&
-          element.textContent !== originalData.textContent
-        ) {
-          element.textContent = originalData.textContent
-        }
-
-        // Restore original styles if they were changed (e.g., from resize operation)
-        if (originalData.styles) {
-          if (originalData.styles.width !== undefined) {
-            htmlElement.style.width = originalData.styles.width
-          }
-          if (originalData.styles.height !== undefined) {
-            htmlElement.style.height = originalData.styles.height
-          }
-        }
-
-        // Remove our data attributes
-        delete (element as HTMLElement).dataset.absmartlyOriginal
-        delete (element as HTMLElement).dataset.absmartlyModified
-        delete (element as HTMLElement).dataset.absmartlyExperiment
-      } catch (e) {
-        debugWarn(
-          "[ABSmartly] Failed to restore original values for element:",
-          element,
-          e
-        )
-      }
-    })
+    document
+      .querySelectorAll("[data-absmartly-original]")
+      .forEach((element) => {
+        const dataset = (element as HTMLElement).dataset
+        delete dataset.absmartlyOriginal
+        delete dataset.absmartlyModified
+        delete dataset.absmartlyExperiment
+      })
   }
 
   private removeEventListeners(): void {
@@ -197,116 +160,6 @@ export class Cleanup {
     // Remove any global styles we may have added
     const globalStyles = document.querySelectorAll("style[data-absmartly]")
     globalStyles.forEach((style) => style.remove())
-  }
-
-  // Method to restore a specific element to its original state
-  restoreElement(element: Element): void {
-    let originalData: any = {}
-    try {
-      originalData = JSON.parse(
-        (element as HTMLElement).dataset.absmartlyOriginal || "{}"
-      )
-    } catch (e) {
-      console.error("[Cleanup] Failed to parse original data:", e)
-      return // Skip this element if parsing fails
-    }
-
-    try {
-      const htmlElement = element as HTMLElement
-
-      if (originalData.textContent !== undefined) {
-        element.textContent = originalData.textContent
-      }
-
-      // Restore original styles if they were changed (e.g., from resize operation)
-      if (originalData.styles) {
-        if (originalData.styles.width !== undefined) {
-          htmlElement.style.width = originalData.styles.width
-        }
-        if (originalData.styles.height !== undefined) {
-          htmlElement.style.height = originalData.styles.height
-        }
-      }
-
-      // Only restore innerHTML if it was actually changed by HTML editing
-      // Don't restore it just because it was stored when the element was selected
-      // This prevents corrupting the page with stale HTML content
-      // if (originalData.innerHTML !== undefined && originalData.htmlWasEdited) {
-      //   element.innerHTML = originalData.innerHTML
-      // }
-      // SKIP innerHTML restoration - it's too dangerous and can corrupt the page
-
-      // Remove modifications
-      ;(element as HTMLElement).style.display = ""
-      element.classList.remove(
-        "absmartly-selected",
-        "absmartly-hover",
-        "absmartly-editing"
-      )
-
-      // Clear data attributes
-      delete (element as HTMLElement).dataset.absmartlyOriginal
-      delete (element as HTMLElement).dataset.absmartlyModified
-      delete (element as HTMLElement).dataset.absmartlyExperiment
-    } catch (e) {
-      debugWarn("[ABSmartly] Failed to restore element:", element, e)
-    }
-  }
-
-  // Method to save current state before cleanup (for potential restoration)
-  saveStateBeforeCleanup(): any {
-    const state = this.stateManager.getState()
-    const modifiedElements: any[] = []
-
-    // Collect all modified elements and their states
-    const elements = document.querySelectorAll("[data-absmartly-modified]")
-    elements.forEach((element) => {
-      try {
-        modifiedElements.push({
-          selector: this.generateElementSelector(element),
-          original: (element as HTMLElement).dataset.absmartlyOriginal,
-          current: {
-            textContent: element.textContent,
-            innerHTML: element.innerHTML,
-            display: (element as HTMLElement).style.display
-          }
-        })
-      } catch (e) {
-        debugWarn("[ABSmartly] Failed to save element state:", element, e)
-      }
-    })
-
-    return {
-      changes: state.changes,
-      modifiedElements,
-      timestamp: Date.now()
-    }
-  }
-
-  private generateElementSelector(element: Element): string {
-    // Generate a simple selector for the element
-    if (element.id) return `#${element.id}`
-
-    if (element.className) {
-      const classes = element.className
-        .split(" ")
-        .filter((c) => c.trim() && !c.startsWith("absmartly-"))
-      if (classes.length > 0) {
-        return `.${classes.slice(0, 2).join(".")}`
-      }
-    }
-
-    // Fallback to tag name with nth-child
-    const parent = element.parentElement
-    if (parent) {
-      const siblings = Array.from(parent.children).filter(
-        (child) => child.tagName === element.tagName
-      )
-      const index = siblings.indexOf(element)
-      return `${element.tagName.toLowerCase()}:nth-child(${index + 1})`
-    }
-
-    return element.tagName.toLowerCase()
   }
 }
 

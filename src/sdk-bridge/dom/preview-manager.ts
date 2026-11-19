@@ -12,7 +12,6 @@ import { StyleSheetManager } from "@absmartly/sdk-plugins/core/style-sheet-manag
 
 import type { DOMChange } from "~src/types/dom-changes"
 
-import { sanitizeHTML } from "../utils/html-sanitizer"
 import { Logger } from "../utils/logger"
 import {
   inheritOldValue,
@@ -419,66 +418,16 @@ export class PreviewManager {
       this.clearEditorMarkers(journal.targets)
     }
 
-    // Also remove markers from any elements with this experiment (e.g., from visual editor)
-    // Try both the actual experiment name and __preview__ (visual editor default)
+    // Markers written outside the journal (visual-editor selection, or
+    // targets of an earlier session) are stripped by name. The selection
+    // sidecar is never replayed: it serializes whatever was on the page when
+    // the element was selected, previewed content included, and the journal
+    // has already restored everything a preview wrote.
     const markedElements = document.querySelectorAll(
       `[data-absmartly-experiment="${experimentName}"], [data-absmartly-experiment="__preview__"]`
     )
     for (const element of markedElements) {
-      if (element.hasAttribute("data-absmartly-original")) {
-        try {
-          const originalData = JSON.parse(
-            element.getAttribute("data-absmartly-original") || "{}"
-          )
-          Logger.log("Original data for element:", {
-            tagName: element.tagName,
-            id: element.id,
-            textContent: originalData.textContent?.substring(0, 100),
-            innerHTML: originalData.innerHTML?.substring(0, 100),
-            hasStyles: !!originalData.styles
-          })
-
-          // Restore innerHTML (which also restores textContent)
-          if (originalData.innerHTML !== undefined) {
-            element.innerHTML = sanitizeHTML(originalData.innerHTML)
-            Logger.log("Restored innerHTML from VE original")
-          } else if (originalData.textContent !== undefined) {
-            // Fallback to textContent if innerHTML not available
-            element.textContent = originalData.textContent
-            Logger.log("Restored text content from VE original")
-          }
-
-          // Restore styles
-          if (originalData.styles) {
-            const htmlElement = element as HTMLElement
-            for (const prop of Object.keys(originalData.styles)) {
-              htmlElement.style[prop as any] = originalData.styles[prop]
-            }
-            Logger.log("Restored styles from VE original")
-          }
-
-          // Restore attributes
-          if (originalData.attributes) {
-            for (const attr of Object.keys(originalData.attributes)) {
-              if (originalData.attributes[attr] !== null) {
-                element.setAttribute(attr, originalData.attributes[attr])
-              } else {
-                element.removeAttribute(attr)
-              }
-            }
-            Logger.log("Restored attributes from VE original")
-          }
-        } catch (e) {
-          Logger.warn(
-            "Failed to restore element from data-absmartly-original:",
-            e
-          )
-        }
-
-        // Remove the original data attribute - we're back at original state now
-        element.removeAttribute("data-absmartly-original")
-      }
-
+      element.removeAttribute("data-absmartly-original")
       element.removeAttribute("data-absmartly-experiment")
       element.removeAttribute("data-absmartly-modified")
       restoredCount++

@@ -152,34 +152,10 @@ export function createPreviewHeader(
       `[Content Script] Found ${markedElements.length} elements with preview markers`
     )
 
+    // The sidebar's preview toggle removes the preview through the
+    // journal; only the markers are stripped here. Replaying the selection
+    // sidecar would write its serialized (possibly previewed) content back.
     markedElements.forEach((element) => {
-      const original = element.getAttribute("data-absmartly-original")
-      if (original) {
-        try {
-          const originalData = JSON.parse(original)
-          if (originalData.textContent !== undefined) {
-            element.textContent = originalData.textContent
-          }
-          if (originalData.innerHTML !== undefined) {
-            element.innerHTML = originalData.innerHTML
-          }
-          if (originalData.styles) {
-            const htmlElement = element as HTMLElement
-            if (originalData.styles.display !== undefined) {
-              htmlElement.style.display = originalData.styles.display
-            }
-            if (originalData.styles.width !== undefined) {
-              htmlElement.style.width = originalData.styles.width
-            }
-            if (originalData.styles.height !== undefined) {
-              htmlElement.style.height = originalData.styles.height
-            }
-          }
-        } catch (e) {
-          console.error("[Content Script] Error restoring element:", e)
-        }
-      }
-
       element.removeAttribute("data-absmartly-experiment")
       element.removeAttribute("data-absmartly-original")
       element.removeAttribute("data-absmartly-modified")

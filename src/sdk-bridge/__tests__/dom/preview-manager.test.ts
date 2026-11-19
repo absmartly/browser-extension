@@ -1046,30 +1046,50 @@ describe("PreviewManager", () => {
     expect(byId("h").getAttribute("title")).toBe("page")
   })
 
-  it("restores visual-editor marked elements from their serialized original", () => {
-    document.body.innerHTML = '<div id="ve">Edited</div>'
+  it("strips visual-editor markers without replaying their serialized content", () => {
+    document.body.innerHTML = '<div id="ve" title="page">Page</div>'
     const element = byId("ve")
+    const text = element.firstChild
     element.setAttribute("data-absmartly-experiment", "__preview__")
     element.setAttribute("data-absmartly-modified", "true")
-    element.setAttribute("title", "edited")
     element.setAttribute(
       "data-absmartly-original",
       JSON.stringify({
-        innerHTML: "<b>Original</b>",
-        styles: { color: "" },
+        innerHTML: "<b>Stale</b>",
+        styles: { color: "red" },
         attributes: { title: null }
       })
     )
-    element.style.color = "red"
 
-    expect(manager.removePreviewChanges("exp")).toBe(true)
+    manager.removePreviewChanges("exp")
 
-    expect(element.innerHTML).toBe("<b>Original</b>")
-    expect(element.style.color).toBe("")
-    expect(element.hasAttribute("title")).toBe(false)
-    expect(element.hasAttribute("data-absmartly-original")).toBe(false)
-    expect(element.hasAttribute("data-absmartly-experiment")).toBe(false)
-    expect(element.hasAttribute("data-absmartly-modified")).toBe(false)
+    expect(element.outerHTML).toBe('<div id="ve" title="page">Page</div>')
+    expect(element.firstChild).toBe(text)
+  })
+
+  it("does not write previewed content back through a sidecar on an ancestor", () => {
+    document.body.innerHTML =
+      '<div id="wrap"><span id="child">Original</span></div>'
+    const child = byId("child")
+    manager.applyPreviewChange(
+      { selector: "#child", type: "text", value: "Preview" },
+      "exp"
+    )
+    // Selecting the container in the visual editor serializes the previewed
+    // descendant into the container's sidecar.
+    const wrap = byId("wrap")
+    wrap.setAttribute(
+      "data-absmartly-original",
+      JSON.stringify({ textContent: "Preview", innerHTML: wrap.innerHTML })
+    )
+    wrap.setAttribute("data-absmartly-experiment", "exp")
+
+    manager.removePreviewChanges("exp")
+
+    expect(byId("child")).toBe(child)
+    expect(wrap.outerHTML).toBe(
+      '<div id="wrap"><span id="child">Original</span></div>'
+    )
   })
 
   it("ignores a visual-editor sidecar written onto an element this preview journaled", () => {
@@ -1111,7 +1131,7 @@ describe("PreviewManager", () => {
     // experiment name before the delete change is replayed.
     deleted.setAttribute(
       "data-absmartly-original",
-      JSON.stringify({ textContent: "Gone", innerHTML: "Gone" })
+      JSON.stringify({ textContent: "Stale", innerHTML: "<i>stale</i>" })
     )
     deleted.setAttribute("data-absmartly-experiment", "production_exp")
 
