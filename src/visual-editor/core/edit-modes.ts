@@ -9,6 +9,43 @@ import type { DOMChange } from "../types/visual-editor"
 import { generateRobustSelector } from "../utils/selector-generator"
 import StateManager from "./state-manager"
 
+// First-seen neighbours as raw nodes, whitespace text included. An earlier
+// move may have taken one neighbour away; the other still pins the slot.
+// PreviewManager unwinds each move relative to these same raw siblings, so
+// reverting anywhere else (appendChild lands after trailing whitespace)
+// leaves sibling order after removePreviewChanges different from the order
+// the positional selectors below were generated against.
+interface OriginalPosition {
+  parent: Element
+  previousSibling: Node | null
+  nextSibling: Node | null
+}
+
+function revertToOriginalPosition(
+  element: Element,
+  original: OriginalPosition
+): void {
+  const { parent, previousSibling, nextSibling } = original
+  let anchor: Node | null = null
+  if (
+    nextSibling &&
+    nextSibling !== element &&
+    nextSibling.parentNode === parent
+  ) {
+    anchor = nextSibling
+  } else if (
+    previousSibling &&
+    previousSibling !== element &&
+    previousSibling.parentNode === parent
+  ) {
+    anchor = previousSibling.nextSibling
+  } else if (previousSibling === null) {
+    anchor = parent.firstChild
+  }
+  if (anchor === element) return
+  parent.insertBefore(element, anchor)
+}
+
 export class EditModes {
   private stateManager: StateManager
   private addChange: ((change: DOMChange) => void) | null = null
@@ -22,10 +59,7 @@ export class EditModes {
   // to the wrong sibling when replayed from the original. (Symptom Pedro
   // hit: drag #gamma before Alpha, then drag #gamma before Beta; save →
   // SDK replays only the final, mis-anchored move → live order is wrong.)
-  private originalPositions = new WeakMap<
-    Element,
-    { parent: Element; nextSibling: Element | null }
-  >()
+  private originalPositions = new WeakMap<Element, OriginalPosition>()
 
   constructor(stateManager: StateManager) {
     this.stateManager = stateManager
@@ -58,13 +92,13 @@ export class EditModes {
       if (parent) {
         cached = {
           parent,
-          nextSibling: smartElement.nextElementSibling
+          previousSibling: smartElement.previousSibling,
+          nextSibling: smartElement.nextSibling
         }
         this.originalPositions.set(smartElement, cached)
       }
     }
-    const originalParent: Element | null = cached?.parent ?? null
-    const originalNextSibling: Element | null = cached?.nextSibling ?? null
+    const originalPosition: OriginalPosition | null = cached ?? null
 
     // Make element draggable
     ;(smartElement as HTMLElement).draggable = true
@@ -259,7 +293,7 @@ export class EditModes {
           anchor.element.appendChild(smartElement)
         }
 
-        this.trackMoveChange(smartElement, originalParent, originalNextSibling)
+        this.trackMoveChange(smartElement, originalPosition)
         debugLog("[ABSmartly] Element moved successfully")
       } catch (error) {
         debugWarn("[ABSmartly] Move failed:", error)
@@ -657,8 +691,7 @@ export class EditModes {
 
   private trackMoveChange(
     element: Element,
-    originalParent: Element | null,
-    originalNextSibling: Element | null
+    originalPosition: OriginalPosition | null
   ): void {
     debugLog("[ABSmartly] Tracking move change for element:", element)
 
@@ -706,16 +739,9 @@ export class EditModes {
     // removePreviewChanges in replace mode at the start of every replay, so
     // it observes the reverted DOM — the selectors we emit have to match
     // there.
-    if (originalParent) {
+    if (originalPosition) {
       try {
-        if (
-          originalNextSibling &&
-          originalNextSibling.parentNode === originalParent
-        ) {
-          originalParent.insertBefore(element, originalNextSibling)
-        } else {
-          originalParent.appendChild(element)
-        }
+        revertToOriginalPosition(element, originalPosition)
       } catch (err) {
         debugWarn("[ABSmartly] Failed to revert drop pre-replay:", err)
         // Abort: selectors generated from the post-drop tree would persist a
