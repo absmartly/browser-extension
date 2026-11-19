@@ -666,7 +666,21 @@ describe("PreviewManager", () => {
     }
   )
 
-  it("reinstates original children when page code rewrote html-preview content", () => {
+  it("keeps children the page rendered over html-preview content", () => {
+    document.body.innerHTML = '<div id="h"><b id="k">Original</b></div>'
+
+    manager.applyPreviewChange(
+      { selector: "#h", type: "html", value: "<i>Preview</i>" },
+      "exp"
+    )
+    // The SPA re-renders the container after the preview applied.
+    byId("h").innerHTML = "<u>Current</u>"
+    manager.removePreviewChanges("exp")
+
+    expect(byId("h").innerHTML).toBe("<u>Current</u>")
+  })
+
+  it("restores html-preview content by identity while the preview's nodes are in place", () => {
     document.body.innerHTML = '<div id="h"><b id="k">Keep</b></div>'
     const child = byId("k")
 
@@ -674,10 +688,10 @@ describe("PreviewManager", () => {
       { selector: "#h", type: "html", value: "<i>Preview</i>" },
       "exp"
     )
-    byId("h").innerHTML = "<u>edited</u>"
+    byId("h").append(document.createElement("hr"))
     manager.removePreviewChanges("exp")
 
-    expect(byId("h").innerHTML).toBe('<b id="k">Keep</b>')
+    expect(byId("h").innerHTML).toBe('<b id="k">Keep</b><hr>')
     expect(byId("k")).toBe(child)
   })
 

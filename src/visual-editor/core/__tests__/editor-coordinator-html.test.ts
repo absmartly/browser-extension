@@ -2,6 +2,8 @@
  * Integration tests for EditorCoordinator with CodeMirror-based HTML Editor
  */
 
+import { PreviewManager } from "~src/sdk-bridge/dom/preview-manager"
+
 import UIComponents from "../../ui/components"
 import HtmlEditor from "../../ui/html-editor"
 import { Notifications } from "../../ui/notifications"
@@ -469,6 +471,52 @@ describe("EditorCoordinator HTML Editor Integration", () => {
       expect(changes[0]).toMatchObject({
         selector: "#test-element.test-class.another-class"
       })
+    })
+  })
+
+  describe("live edits over an applied preview", () => {
+    let preview: PreviewManager
+
+    beforeEach(() => {
+      document.body.innerHTML = '<div id="test-element">Original</div>'
+      preview = new PreviewManager()
+      preview.applyPreviewChange(
+        { selector: "#test-element", type: "html", value: "<b>Preview</b>" },
+        "exp"
+      )
+    })
+
+    afterEach(() => preview.clearAll())
+
+    it("discards contenteditable typing so the preview still restores the original node", () => {
+      const element = document.getElementById("test-element")!
+      coordinator.handleEditAction(element, {
+        textContent: element.textContent,
+        innerHTML: element.innerHTML
+      })
+      element.innerHTML = "<i>typed</i>"
+      element.dispatchEvent(new Event("blur"))
+
+      expect(element.innerHTML).toBe("<b>Preview</b>")
+      expect(undoRedoManager.squashChanges()).toEqual([
+        { selector: ".test-element", type: "html", value: "<i>typed</i>" }
+      ])
+      preview.removePreviewChanges("exp")
+      expect(element.innerHTML).toBe("Original")
+    })
+
+    it("discards the HTML editor's live writes so the preview still restores the original node", async () => {
+      const element = document.getElementById("test-element")!
+      mockHtmlEditor.mockImplementation(async (el: Element) => {
+        el.innerHTML = "<i>live</i>"
+        return "<i>live</i>"
+      })
+
+      await coordinator.handleEditHtmlAction(element, {})
+
+      expect(element.innerHTML).toBe("<b>Preview</b>")
+      preview.removePreviewChanges("exp")
+      expect(element.innerHTML).toBe("Original")
     })
   })
 })

@@ -33,6 +33,7 @@ jest.mock("../../utils/selector-generator", () => ({
 const mockMutationObserver = jest.fn()
 mockMutationObserver.prototype.observe = jest.fn()
 mockMutationObserver.prototype.disconnect = jest.fn()
+mockMutationObserver.prototype.takeRecords = jest.fn(() => [])
 global.MutationObserver = mockMutationObserver
 
 // Mock navigator.clipboard

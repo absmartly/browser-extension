@@ -5,6 +5,10 @@
 
 import DOMPurify from "dompurify"
 
+import {
+  undoMutations,
+  watchMutations
+} from "~src/sdk-bridge/dom/mutation-journal"
 import { debugLog, debugWarn } from "~src/utils/debug"
 
 import type { DOMChange } from "../types/visual-editor"
@@ -422,8 +426,10 @@ export class EditorCoordinator {
     selection?.addRange(range)
 
     this.eventHandlers.setEditing(true)
+    const stopWatching = watchMutations(element)
 
     const handleBlur = () => {
+      const typed = stopWatching()
       ;(element as HTMLElement).contentEditable = "false"
       element.classList.remove("absmartly-editing")
       element.classList.add("absmartly-selected")
@@ -437,9 +443,14 @@ export class EditorCoordinator {
       const hasHtmlChildren = Array.from(element.children).length > 0
 
       // Capture the user's edits, then DISCARD the live contenteditable
-      // mutations and let the SDK reapply via PreviewManager. That way the
-      // production codepath is what actually paints the final state, and
-      // PreviewManager captures the pre-edit state as the canonical original.
+      // mutations (undone by node identity, so a live preview's journal
+      // still matches the DOM) and let the SDK reapply via PreviewManager.
+      // That way the production codepath is what actually paints the final
+      // state, and PreviewManager captures the pre-edit state as the
+      // canonical original.
+      const newHtml = element.innerHTML
+      const newText = element.textContent || ""
+      undoMutations(typed)
       const selector = this.callbacks.getSelector(element as HTMLElement)
       if (hasHtmlChildren) {
         // Sanitize before persisting — the value is replayed verbatim into
@@ -447,8 +458,7 @@ export class EditorCoordinator {
         // (preview, save, undo/redo). DOMPurify strips <script>, inline
         // event handlers, javascript: URLs, etc, so a malicious edit
         // can't escape into the host page on later replays.
-        const newValue = DOMPurify.sanitize(element.innerHTML)
-        element.innerHTML = originalState.innerHTML
+        const newValue = DOMPurify.sanitize(newHtml)
         this.undoRedoManager.addChange(
           {
             selector,
@@ -458,8 +468,7 @@ export class EditorCoordinator {
           null
         )
       } else {
-        const newValue = element.textContent || ""
-        element.textContent = originalState.textContent
+        const newValue = newText
         this.undoRedoManager.addChange(
           {
             selector,
@@ -508,16 +517,18 @@ export class EditorCoordinator {
     this.eventHandlers.setHoverEnabled(false)
 
     const currentHtml = element.innerHTML
+    const stopWatching = watchMutations(element)
     const newHtml = await this.htmlEditor.show(element, currentHtml)
+    // The HTML editor writes innerHTML directly for live preview while
+    // typing. Discard those writes by node identity; the SDK repaints via
+    // PreviewManager when the change lands.
+    undoMutations(stopWatching())
 
     try {
       if (newHtml !== null && newHtml !== currentHtml) {
-        // The HTML editor used direct innerHTML writes for live preview during
-        // typing. Discard those by restoring the pre-edit innerHTML; the SDK
-        // will repaint via PreviewManager when the change lands. Sanitize
-        // the persisted value — same reasoning as in handleEditAction:
-        // type: "html" payloads are replayed into innerHTML on every apply.
-        element.innerHTML = currentHtml
+        // Sanitize the persisted value — same reasoning as in
+        // handleEditAction: type: "html" payloads are replayed into
+        // innerHTML on every apply.
         const selector = this.callbacks.getSelector(element as HTMLElement)
         this.undoRedoManager.addChange(
           {

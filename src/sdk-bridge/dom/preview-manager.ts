@@ -21,8 +21,7 @@ import {
   restoreAttributeOrder,
   sameSlot,
   undoMutations,
-  type JournalEntry,
-  type ValueEntry
+  type JournalEntry
 } from "./mutation-journal"
 
 // Everything one experiment's preview did to the page, in application order.
@@ -107,7 +106,8 @@ export class PreviewManager {
   // that value in place, but the later entry still remembers this
   // preview's value as the one to restore. Hand it this preview's own
   // old value instead, so removing the later preview restores the page.
-  private spliceIntoLaterOwner(skipped: ValueEntry): void {
+  private spliceIntoLaterOwner(skipped: JournalEntry): void {
+    if (skipped.kind === "childList") return
     const seq = this.entrySeq.get(skipped) ?? -1
     let owner: JournalEntry | null = null
     let ownerSeq = Infinity

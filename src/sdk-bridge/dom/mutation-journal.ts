@@ -419,49 +419,42 @@ export function recordMutations<T>(
   return { result, entries: toEntries(records, diagnostics) }
 }
 
-function isStructural(node: Node): boolean {
-  return (
-    node.nodeName === "BODY" ||
-    node.nodeName === "HTML" ||
-    node.nodeName === "HEAD"
-  )
+/**
+ * Start recording every mutation under `root` until the returned function
+ * is called; it stops recording and returns the entries. For edits that
+ * span user interaction (contenteditable, live HTML preview), so they can
+ * be undone by node identity instead of re-parsing a serialized copy.
+ */
+export function watchMutations(root: Node): () => JournalEntry[] {
+  const records: MutationRecord[] = []
+  const observer = new MutationObserver((batch) => records.push(...batch))
+  observer.observe(root, OBSERVE_ALL)
+  return () => {
+    records.push(...observer.takeRecords())
+    observer.disconnect()
+    return toEntries(records)
+  }
 }
 
 function undoChildList(
   entry: Extract<JournalEntry, { kind: "childList" }>,
   reinsertedLater: (node: Node) => boolean
-): void {
+): boolean {
   const { target, added, removed, previousSibling, nextSibling } = entry
-  const addedStillHere = added.every((node) => node.parentNode === target)
 
-  // The record replaced the whole child list (text/html, textContent or
-  // innerHTML in javascript) and something outside the journal has since
-  // rewritten those children (for example the visual editor discarding a
-  // contenteditable session). Reinstating the original list is the only
-  // faithful inverse. Body/html/head are excluded so extension UI mounted
-  // there is never swept away.
-  if (
-    !addedStillHere &&
-    removed.length > 0 &&
-    previousSibling === null &&
-    nextSibling === null &&
-    target instanceof Element &&
-    !isStructural(target) &&
-    removed.every((node) => !node.contains(target))
-  ) {
-    target.replaceChildren(...removed)
-    return
-  }
+  // Once something else has taken any node this entry added out of
+  // `target` (page code re-rendering the subtree), that code owns the
+  // children: putting the removed nodes back would delete its content.
+  if (!added.every((node) => node.parentNode === target)) return false
 
   // A node that an older entry puts back (the source half of a move) is
   // left in place here: the older insertBefore moves it in one step, and
   // if that destination has become invalid the node stays attached where
   // it is instead of being dropped.
   for (const node of added) {
-    if (node.parentNode === target && !reinsertedLater(node))
-      target.removeChild(node)
+    if (!reinsertedLater(node)) target.removeChild(node)
   }
-  if (removed.length === 0) return
+  if (removed.length === 0) return true
 
   const anchor = slotAnchor(target, previousSibling, nextSibling)
   for (const node of removed) {
@@ -470,6 +463,7 @@ function undoChildList(
     if (node.contains(target)) continue
     target.insertBefore(node, anchor)
   }
+  return true
 }
 
 /**
@@ -519,13 +513,13 @@ export function restoreAttributeOrder(order: Map<Element, string[]>): void {
 
 /**
  * Invert entries newest-first, restoring the DOM they were recorded on.
- * An attribute or text entry whose value something else has since
- * overwritten is left alone (an inline style is undone per declaration
- * instead) and passed to `onSkip`.
+ * An entry whose result something else has since overwritten (attribute
+ * or text value, or a node it added) is left alone and passed to `onSkip`;
+ * an inline style is first undone per declaration the page left alone.
  */
 export function undoMutations(
   entries: JournalEntry[],
-  onSkip?: (entry: ValueEntry) => void
+  onSkip?: (entry: JournalEntry) => void
 ): void {
   // How many not-yet-undone entries put each node back.
   const pendingReinserts = new Map<Node, number>()
@@ -559,7 +553,11 @@ export function undoMutations(
         entry.target.data = entry.oldValue
       else onSkip?.(entry)
     } else {
-      undoChildList(entry, (node) => (pendingReinserts.get(node) ?? 0) > 0)
+      const undone = undoChildList(
+        entry,
+        (node) => (pendingReinserts.get(node) ?? 0) > 0
+      )
+      if (!undone) onSkip?.(entry)
     }
   }
 }
