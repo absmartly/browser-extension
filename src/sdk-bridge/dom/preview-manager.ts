@@ -27,6 +27,8 @@ interface PreviewJournal {
   entries: JournalEntry[]
   attributeOrder: Map<Element, string[]>
   marked: Set<Element>
+  // Every element a change was applied to, including ones it detached.
+  targets: Set<Element>
 }
 
 type OwnedApplication = (
@@ -91,7 +93,12 @@ export class PreviewManager {
   private getJournal(experimentName: string): PreviewJournal {
     let journal = this.journals.get(experimentName)
     if (!journal) {
-      journal = { entries: [], attributeOrder: new Map(), marked: new Set() }
+      journal = {
+        entries: [],
+        attributeOrder: new Map(),
+        marked: new Set(),
+        targets: new Set()
+      }
       this.journals.set(experimentName, journal)
     }
     return journal
@@ -123,6 +130,7 @@ export class PreviewManager {
     // directly keeps those writes in the journal.
     const { result, entries } = recordMutations([document, ...targets], apply)
     journal.entries.push(...entries)
+    for (const element of targets) journal.targets.add(element)
     if (result) {
       for (const element of targets) {
         if (element.isConnected) {
@@ -253,6 +261,24 @@ export class PreviewManager {
     element.setAttribute("data-absmartly-modified", "true")
   }
 
+  // The visual editor writes data-absmartly-original (a serialization of the
+  // element's current, previewed content) and data-absmartly-experiment onto
+  // an element when it is selected, outside any journal. After the journal
+  // restored the element both are stale: replaying the sidecar would paint
+  // preview content back, and a marker naming an experiment without a live
+  // preview would survive the name-based sweep. Targets detached by the
+  // preview (delete) are included; they were never marked.
+  private clearEditorMarkers(targets: Set<Element>): void {
+    for (const element of targets) {
+      element.removeAttribute("data-absmartly-original")
+      const owner = element.getAttribute("data-absmartly-experiment")
+      if (owner !== null && !this.journals.has(owner)) {
+        element.removeAttribute("data-absmartly-experiment")
+        element.removeAttribute("data-absmartly-modified")
+      }
+    }
+  }
+
   /**
    * Remove all preview changes for an experiment
    */
@@ -274,6 +300,7 @@ export class PreviewManager {
       undoMutations(journal.entries)
       restoreAttributeOrder(journal.attributeOrder)
       restoredCount += journal.entries.length
+      this.clearEditorMarkers(journal.targets)
     }
 
     // Also remove markers from any elements with this experiment (e.g., from visual editor)

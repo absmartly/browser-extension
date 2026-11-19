@@ -799,4 +799,74 @@ describe("PreviewManager", () => {
     expect(element.hasAttribute("data-absmartly-experiment")).toBe(false)
     expect(element.hasAttribute("data-absmartly-modified")).toBe(false)
   })
+
+  it("ignores a visual-editor sidecar written onto an element this preview journaled", () => {
+    document.body.innerHTML = '<p id="p">Original</p>'
+    const text = byId("p").firstChild
+
+    manager.applyPreviewChange(
+      { selector: "#p", type: "html", value: "<b>Preview</b>" },
+      "__visual_editor__"
+    )
+    // Selecting an element in the visual editor serializes its current,
+    // previewed content into the sidecar.
+    byId("p").setAttribute(
+      "data-absmartly-original",
+      JSON.stringify({
+        textContent: "Preview",
+        innerHTML: "<b>Preview</b>"
+      })
+    )
+    manager.removePreviewChanges("__visual_editor__")
+
+    expect(byId("p").innerHTML).toBe("Original")
+    expect(byId("p").firstChild).toBe(text)
+    expect(byId("p").hasAttribute("data-absmartly-original")).toBe(false)
+
+    manager.applyPreviewChange(
+      { selector: "#p", type: "text", value: "Again" },
+      "__visual_editor__"
+    )
+    manager.removePreviewChanges("__visual_editor__")
+    expect(byId("p").firstChild).toBe(text)
+    expect(byId("p").outerHTML).toBe('<p id="p">Original</p>')
+  })
+
+  it("clears visual-editor selection markers from an element the preview deleted", () => {
+    document.body.innerHTML = '<div id="l"><b id="d">Gone</b></div>'
+    const deleted = byId("d")
+    // The visual editor marks a selected element with the production
+    // experiment name before the delete change is replayed.
+    deleted.setAttribute(
+      "data-absmartly-original",
+      JSON.stringify({ textContent: "Gone", innerHTML: "Gone" })
+    )
+    deleted.setAttribute("data-absmartly-experiment", "production_exp")
+
+    manager.applyPreviewChange(
+      { selector: "#d", type: "delete" },
+      "__visual_editor__"
+    )
+    expect(byId("d")).toBeNull()
+    manager.removePreviewChanges("__visual_editor__")
+
+    expect(byId("d")).toBe(deleted)
+    expect(byId("l").innerHTML).toBe('<b id="d">Gone</b>')
+  })
+
+  it("keeps markers owned by another experiment whose preview is still applied", () => {
+    document.body.innerHTML = '<p id="p">Original</p>'
+    manager.applyPreviewChange(
+      { selector: "#p", type: "style", value: { color: "red" } },
+      "__visual_editor__"
+    )
+    manager.applyPreviewChange(
+      { selector: "#p", type: "style", value: { fontSize: "2px" } },
+      "other"
+    )
+    manager.removePreviewChanges("__visual_editor__")
+
+    expect(byId("p").getAttribute("data-absmartly-experiment")).toBe("other")
+    expect(byId("p").getAttribute("data-absmartly-modified")).toBe("true")
+  })
 })
