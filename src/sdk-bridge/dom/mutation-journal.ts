@@ -87,21 +87,113 @@ type AttributeState = Extract<JournalEntry, { kind: "attributes" }>
 type CharacterDataState = Extract<JournalEntry, { kind: "characterData" }>
 export type ValueEntry = AttributeState | CharacterDataState
 
-/**
- * Whether `later` overwrote the value `earlier` wrote: same attribute or
- * text node, and `later` started from exactly the value `earlier` left.
- */
-export function overwrites(later: JournalEntry, earlier: ValueEntry): boolean {
-  if (later.kind !== earlier.kind || later.target !== earlier.target)
-    return false
-  if (later.kind === "attributes" && earlier.kind === "attributes") {
-    return (
-      later.name === earlier.name &&
-      later.namespace === earlier.namespace &&
-      later.oldValue === earlier.newValue
-    )
+/** Whether both entries record writes to the same attribute or text node. */
+export function sameSlot(a: JournalEntry, b: ValueEntry): boolean {
+  if (a.kind !== b.kind || a.target !== b.target) return false
+  if (a.kind === "attributes" && b.kind === "attributes")
+    return a.name === b.name && a.namespace === b.namespace
+  return true
+}
+
+type Declaration = { value: string; priority: string }
+
+function isInlineStyle(entry: ValueEntry): entry is AttributeState {
+  return (
+    entry.kind === "attributes" &&
+    entry.name === "style" &&
+    entry.namespace === null &&
+    "style" in entry.target
+  )
+}
+
+function declarations(
+  doc: Document,
+  cssText: string | null
+): Map<string, Declaration> {
+  const map = new Map<string, Declaration>()
+  if (!cssText) return map
+  const scratch = doc.createElement("div")
+  scratch.setAttribute("style", cssText)
+  const style = scratch.style
+  for (let i = 0; i < style.length; i++) {
+    const name = style.item(i)
+    map.set(name, {
+      value: style.getPropertyValue(name),
+      priority: style.getPropertyPriority(name)
+    })
   }
-  return later.oldValue === earlier.newValue
+  return map
+}
+
+const sameDeclaration = (a?: Declaration, b?: Declaration) =>
+  a?.value === b?.value && a?.priority === b?.priority
+
+// Declarations whose value differs between the entry's old and new style.
+function changedDeclarations(entry: AttributeState) {
+  const doc = entry.target.ownerDocument
+  const before = declarations(doc, entry.oldValue)
+  const after = declarations(doc, entry.newValue)
+  const names = new Set([...before.keys(), ...after.keys()])
+  return Array.from(names)
+    .filter((name) => !sameDeclaration(before.get(name), after.get(name)))
+    .map((name) => ({ name, before: before.get(name), after: after.get(name) }))
+}
+
+function writeDeclaration(
+  style: CSSStyleDeclaration,
+  name: string,
+  declaration: Declaration | undefined
+): void {
+  if (declaration)
+    style.setProperty(name, declaration.value, declaration.priority)
+  else style.removeProperty(name)
+}
+
+// The inline style has changed since the entry was recorded: restore each
+// declaration the entry changed only where it still holds the entry's
+// value, leaving declarations written by others in place.
+function undoStyleDeclarations(entry: AttributeState): void {
+  const element = entry.target as Element & ElementCSSInlineStyle
+  const current = declarations(
+    element.ownerDocument,
+    element.getAttribute("style")
+  )
+  for (const { name, before, after } of changedDeclarations(entry)) {
+    if (sameDeclaration(current.get(name), after))
+      writeDeclaration(element.style, name, before)
+  }
+  const originallyEmpty =
+    declarations(element.ownerDocument, entry.oldValue).size === 0
+  if (element.style.length === 0 && originallyEmpty) {
+    if (entry.oldValue === null) element.removeAttribute("style")
+    else element.setAttribute("style", entry.oldValue)
+  }
+}
+
+/**
+ * `skipped` was not undone because `later` (the next write to the same
+ * slot, still live) overwrote it. Rewrite `later` to restore what `skipped`
+ * found, so removing `later` does not bring back `skipped`'s value. For an
+ * inline style this is done per declaration `skipped` changed.
+ */
+export function inheritOldValue(later: ValueEntry, skipped: ValueEntry): void {
+  if (isInlineStyle(skipped) && later.kind === "attributes") {
+    const doc = skipped.target.ownerDocument
+    const scratch = doc.createElement("div")
+    if (later.oldValue !== null) scratch.setAttribute("style", later.oldValue)
+    const inherited = declarations(doc, later.oldValue)
+    for (const { name, before, after } of changedDeclarations(skipped)) {
+      if (sameDeclaration(inherited.get(name), after))
+        writeDeclaration(scratch.style, name, before)
+    }
+    later.oldValue =
+      scratch.style.length === 0 &&
+      declarations(doc, skipped.oldValue).size === 0
+        ? skipped.oldValue
+        : scratch.getAttribute("style")
+    return
+  }
+  if (later.oldValue === skipped.newValue) later.oldValue = skipped.oldValue
 }
 
 export type MutationJournalDiagnostics = {
@@ -428,7 +520,8 @@ export function restoreAttributeOrder(order: Map<Element, string[]>): void {
 /**
  * Invert entries newest-first, restoring the DOM they were recorded on.
  * An attribute or text entry whose value something else has since
- * overwritten is left alone and passed to `onSkip`.
+ * overwritten is left alone (an inline style is undone per declaration
+ * instead) and passed to `onSkip`.
  */
 export function undoMutations(
   entries: JournalEntry[],
@@ -450,6 +543,7 @@ export function undoMutations(
       const { target, name, namespace, oldValue, newValue } = entry
       const current = target.getAttributeNodeNS(namespace, name)?.value ?? null
       if (current !== newValue) {
+        if (isInlineStyle(entry)) undoStyleDeclarations(entry)
         onSkip?.(entry)
         continue
       }

@@ -15,10 +15,11 @@ import type { DOMChange } from "~src/types/dom-changes"
 import { sanitizeHTML } from "../utils/html-sanitizer"
 import { Logger } from "../utils/logger"
 import {
-  overwrites,
+  inheritOldValue,
   recordAttributeOrder,
   recordMutations,
   restoreAttributeOrder,
+  sameSlot,
   undoMutations,
   type JournalEntry,
   type ValueEntry
@@ -113,17 +114,13 @@ export class PreviewManager {
     for (const journal of this.journals.values()) {
       for (const entry of journal.entries) {
         const entrySeq = this.entrySeq.get(entry) ?? -1
-        if (
-          entrySeq > seq &&
-          entrySeq < ownerSeq &&
-          overwrites(entry, skipped)
-        ) {
+        if (entrySeq > seq && entrySeq < ownerSeq && sameSlot(entry, skipped)) {
           owner = entry
           ownerSeq = entrySeq
         }
       }
     }
-    if (owner && owner.kind !== "childList") owner.oldValue = skipped.oldValue
+    if (owner && owner.kind !== "childList") inheritOldValue(owner, skipped)
   }
 
   private getJournal(experimentName: string): PreviewJournal {

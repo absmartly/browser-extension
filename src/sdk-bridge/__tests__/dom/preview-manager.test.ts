@@ -681,6 +681,53 @@ describe("PreviewManager", () => {
     expect(byId("k")).toBe(child)
   })
 
+  it.each([
+    ['<div id="h">x</div>', null],
+    ['<div id="h" style="">x</div>', ""],
+    ['<div id="h" style="margin: 1px;">x</div>', "margin: 1px;"]
+  ])(
+    "undoes style declarations the page left alone in %s",
+    (markup, original) => {
+      document.body.innerHTML = markup
+      const element = byId("h")
+      manager.applyPreviewChange(
+        {
+          selector: "#h",
+          type: "style",
+          value: { color: "red", fontSize: "2px" }
+        },
+        "exp"
+      )
+      // Page code adds an unrelated declaration and overrides one of the
+      // preview's.
+      element.style.backgroundColor = "blue"
+      element.style.fontSize = "9px"
+      manager.removePreviewChanges("exp")
+
+      expect(element.style.color).toBe("")
+      expect(element.style.fontSize).toBe("9px")
+      expect(element.style.backgroundColor).toBe("blue")
+      expect(element.style.margin).toBe(original ? "1px" : "")
+
+      // The page removed one of the preview's declarations: undoing the
+      // other leaves no declarations, and the attribute returns to its
+      // original absent, empty or populated form.
+      document.body.innerHTML = markup
+      const fresh = byId("h")
+      manager.applyPreviewChange(
+        {
+          selector: "#h",
+          type: "style",
+          value: { color: "red", fontSize: "2px" }
+        },
+        "exp"
+      )
+      fresh.style.removeProperty("font-size")
+      manager.removePreviewChanges("exp")
+      expect(fresh.getAttribute("style")).toBe(original)
+    }
+  )
+
   it("does not overwrite page attribute or text mutations made after preview apply", () => {
     document.body.innerHTML = '<div id="h">Original</div>'
     const element = byId("h")
@@ -874,6 +921,44 @@ describe("PreviewManager", () => {
     expect(byId("h").getAttribute("title")).toBe("red")
     manager.removePreviewChanges("c")
     expect(byId("h").getAttribute("title")).toBe("x")
+  })
+
+  it.each([
+    ["the same declaration", { color: "blue" } as Record<string, string>],
+    ["a different declaration", { fontSize: "2px" } as Record<string, string>]
+  ])(
+    "restores the page style when an earlier experiment on %s is removed first",
+    (_name, laterStyle) => {
+      document.body.innerHTML = '<div id="h">x</div>'
+      manager.applyPreviewChange(
+        { selector: "#h", type: "style", value: { color: "red" } },
+        "a"
+      )
+      manager.applyPreviewChange(
+        { selector: "#h", type: "style", value: laterStyle },
+        "b"
+      )
+      manager.removePreviewChanges("a")
+      expect(byId("h").style.color).toBe(laterStyle.color ?? "")
+      manager.removePreviewChanges("b")
+      expect(byId("h").hasAttribute("style")).toBe(false)
+    }
+  )
+
+  it("keeps a page declaration added between two experiments on the same declaration", () => {
+    document.body.innerHTML = '<div id="h">x</div>'
+    manager.applyPreviewChange(
+      { selector: "#h", type: "style", value: { color: "red" } },
+      "a"
+    )
+    byId("h").style.margin = "1px"
+    manager.applyPreviewChange(
+      { selector: "#h", type: "style", value: { color: "blue" } },
+      "b"
+    )
+    manager.removePreviewChanges("a")
+    manager.removePreviewChanges("b")
+    expect(byId("h").getAttribute("style")).toBe("margin: 1px;")
   })
 
   it("keeps a page write made between two overlapping experiments", () => {
