@@ -51,4 +51,36 @@ describe("HtmlEditor", () => {
     expect(document.getElementById("absmartly-html-editor-host")).toBeNull()
     expect(() => editor.cleanup()).not.toThrow()
   })
+
+  it("leaves a newer session mounted when an earlier show() fails", async () => {
+    document.body.innerHTML = '<div id="d" class="a">x</div>'
+    const target = document.getElementById("d")
+    const failure = new Error("mount failed")
+    jest.spyOn(document.body, "appendChild").mockImplementationOnce(() => {
+      throw failure
+    })
+
+    const first = editor.show(target, "")
+    const second = editor.show(target, "")
+    let secondSettled = false
+    second.then(
+      () => (secondSettled = true),
+      () => (secondSettled = true)
+    )
+
+    await expect(first).rejects.toBe(failure)
+
+    const host = document.getElementById("absmartly-html-editor-host")
+    expect(host).not.toBeNull()
+    expect(host.isConnected).toBe(true)
+    expect(
+      document.getElementById("absmartly-html-editor-styles")
+    ).not.toBeNull()
+    expect(secondSettled).toBe(false)
+    document
+      .querySelector<HTMLButtonElement>("#html-editor-cancel-button")
+      .click()
+    await expect(second).resolves.toBeNull()
+    expect(document.getElementById("absmartly-html-editor-host")).toBeNull()
+  })
 })

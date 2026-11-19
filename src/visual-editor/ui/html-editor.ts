@@ -29,11 +29,22 @@ export class HtmlEditor {
   // Rejects, with the editor UI removed, if building the editor throws.
   async show(element: Element, currentHtml: string): Promise<string | null> {
     this.cleanup()
+    // open() stores the session's resolver and mounts synchronously, so
+    // these identify this session's state even if a newer show() replaces
+    // it before the rejection below is handled.
+    const opened = this.open(element, currentHtml)
+    const settle = this.settle
+    const host = this.editorHost
+    const style = document.getElementById("absmartly-html-editor-styles")
     try {
-      return await this.open(element, currentHtml)
+      return await opened
     } catch (error) {
-      // Settles the stored resolver and removes whatever was mounted.
-      this.cleanup()
+      if (this.settle === settle) {
+        this.cleanup()
+      } else {
+        host?.remove()
+        style?.remove()
+      }
       throw error
     }
   }
