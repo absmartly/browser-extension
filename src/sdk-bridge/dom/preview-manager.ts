@@ -204,8 +204,9 @@ export class PreviewManager {
       }
     }
 
-    // Delegate to SDK plugin's DOMManipulator
-    // It handles: styleRules, waitForElement, PendingChangeManager, all change types
+    // The session's SDK manipulator applies current matches and registers
+    // waitForElement/SPA selectors with its pending manager, whose late
+    // matches go through applyOwned (see getSession).
     const success = session.applyChange(change, experimentName)
 
     // Mark applied elements AFTER for undo tracking. Late SPA matches are
