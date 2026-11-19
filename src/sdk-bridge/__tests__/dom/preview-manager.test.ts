@@ -745,6 +745,34 @@ describe("PreviewManager", () => {
     expect(byId("h").innerHTML).toBe("<u>Current</u>")
   })
 
+  it("removes appended nodes still in place and leaves one the page moved", () => {
+    document.body.innerHTML =
+      '<div id="h"><b>Original</b></div><div id="o"></div>'
+    manager.applyPreviewChange(
+      {
+        selector: "#h",
+        type: "javascript",
+        value: `const fragment = document.createDocumentFragment()
+          for (const id of ["n1", "n2"]) {
+            const node = document.createElement("i")
+            node.id = id
+            fragment.append(node)
+          }
+          element.append(fragment)`
+      },
+      "exp"
+    )
+    const first = byId("n1")
+    expect(byId("n2")).not.toBeNull()
+    byId("o").append(first)
+
+    manager.removePreviewChanges("exp")
+
+    expect(byId("n2")).toBeNull()
+    expect(first.parentNode).toBe(byId("o"))
+    expect(byId("h").innerHTML).toBe("<b>Original</b>")
+  })
+
   it("restores html-preview content by identity while the preview's nodes are in place", () => {
     document.body.innerHTML = '<div id="h"><b id="k">Keep</b></div>'
     const child = byId("k")

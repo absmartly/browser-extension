@@ -410,6 +410,16 @@ function undoChildList(
 ): void {
   const { target, added, removed, previousSibling, nextSibling } = entry
 
+  // A pure addition owns only the added nodes still in `target`; one that
+  // page code moved elsewhere is the page's.
+  if (removed.length === 0) {
+    for (const node of added) {
+      if (node.parentNode === target && !reinsertedLater(node))
+        target.removeChild(node)
+    }
+    return
+  }
+
   // Once something else has taken any node this entry added out of
   // `target` (page code re-rendering the subtree), that code owns the
   // children: putting the removed nodes back would delete its content.
@@ -422,7 +432,6 @@ function undoChildList(
   for (const node of added) {
     if (!reinsertedLater(node)) target.removeChild(node)
   }
-  if (removed.length === 0) return
 
   const anchor = slotAnchor(target, previousSibling, nextSibling)
   for (const node of removed) {
