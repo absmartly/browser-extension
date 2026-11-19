@@ -69,6 +69,26 @@ describe("undoing a removal after the page moved its siblings", () => {
   })
 })
 
+describe("undoing a child-list replacement whose old child now contains the parent", () => {
+  it("skips that inverse without throwing and still undoes older entries", () => {
+    document.body.innerHTML =
+      '<div id="p" title="t"><section id="c"></section></div>'
+    const p = document.getElementById("p")
+    const c = document.getElementById("c")
+    const { entries } = recordMutations([document], () => {
+      p.setAttribute("title", "preview")
+      p.innerHTML = "<i>preview</i>"
+    })
+    // Page code moves the container into its former child.
+    c.appendChild(p)
+    p.innerHTML = "<u>page</u>"
+
+    expect(() => undoMutations(entries)).not.toThrow()
+    expect(p.parentElement).toBe(c)
+    expect(p.getAttribute("title")).toBe("t")
+  })
+})
+
 describe("mutation journal detached subtree retirement", () => {
   beforeEach(() => {
     document.body.innerHTML = ""

@@ -318,7 +318,8 @@ function isStructural(node: Node): boolean {
 }
 
 function undoChildList(
-  entry: Extract<JournalEntry, { kind: "childList" }>
+  entry: Extract<JournalEntry, { kind: "childList" }>,
+  reinsertedLater: (node: Node) => boolean
 ): void {
   const { target, added, removed, previousSibling, nextSibling } = entry
   const addedStillHere = added.every((node) => node.parentNode === target)
@@ -335,19 +336,30 @@ function undoChildList(
     previousSibling === null &&
     nextSibling === null &&
     target instanceof Element &&
-    !isStructural(target)
+    !isStructural(target) &&
+    removed.every((node) => !node.contains(target))
   ) {
     target.replaceChildren(...removed)
     return
   }
 
+  // A node that an older entry puts back (the source half of a move) is
+  // left in place here: the older insertBefore moves it in one step, and
+  // if that destination has become invalid the node stays attached where
+  // it is instead of being dropped.
   for (const node of added) {
-    if (node.parentNode === target) target.removeChild(node)
+    if (node.parentNode === target && !reinsertedLater(node))
+      target.removeChild(node)
   }
   if (removed.length === 0) return
 
   const anchor = slotAnchor(target, previousSibling, nextSibling)
-  for (const node of removed) target.insertBefore(node, anchor)
+  for (const node of removed) {
+    // Page code may since have put `target` inside `node`; inserting would
+    // throw HierarchyRequestError.
+    if (node.contains(target)) continue
+    target.insertBefore(node, anchor)
+  }
 }
 
 /**
@@ -397,8 +409,18 @@ export function restoreAttributeOrder(order: Map<Element, string[]>): void {
 
 /** Invert entries newest-first, restoring the DOM they were recorded on. */
 export function undoMutations(entries: JournalEntry[]): void {
+  // How many not-yet-undone entries put each node back.
+  const pendingReinserts = new Map<Node, number>()
+  const countReinserts = (entry: JournalEntry, delta: number) => {
+    if (entry.kind !== "childList") return
+    for (const node of entry.removed)
+      pendingReinserts.set(node, (pendingReinserts.get(node) ?? 0) + delta)
+  }
+  for (const entry of entries) countReinserts(entry, 1)
+
   for (let i = entries.length - 1; i >= 0; i--) {
     const entry = entries[i]
+    countReinserts(entry, -1)
     if (entry.kind === "attributes") {
       const { target, name, namespace, oldValue, newValue } = entry
       const current = target.getAttributeNodeNS(namespace, name)?.value ?? null
@@ -414,7 +436,7 @@ export function undoMutations(entries: JournalEntry[]): void {
       if (entry.target.data === entry.newValue)
         entry.target.data = entry.oldValue
     } else {
-      undoChildList(entry)
+      undoChildList(entry, (node) => (pendingReinserts.get(node) ?? 0) > 0)
     }
   }
 }

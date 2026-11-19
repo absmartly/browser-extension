@@ -320,6 +320,36 @@ describe("PreviewManager", () => {
     expect(moved.nextSibling).toBe(byId("z"))
   })
 
+  it("keeps a moved node attached when the page nested its old parent inside it", () => {
+    document.body.innerHTML =
+      '<div id="a"><span id="x">X</span></div><div id="b"></div><p id="s">S</p>'
+    const x = byId("x")
+    const a = byId("a")
+
+    manager.applyPreviewChange(
+      { selector: "#s", type: "style", value: { color: "red" } },
+      "exp"
+    )
+    manager.applyPreviewChange(
+      {
+        selector: "#x",
+        type: "move",
+        targetSelector: "#b",
+        position: "lastChild"
+      } as DOMChange,
+      "exp"
+    )
+    expect(x.parentElement).toBe(byId("b"))
+    // Page code puts the preview's source container inside the moved node.
+    x.appendChild(a)
+
+    expect(() => manager.removePreviewChanges("exp")).not.toThrow()
+    expect(x.parentElement).toBe(byId("b"))
+    expect(a.parentElement).toBe(x)
+    expect(x.isConnected).toBe(true)
+    expect(byId("s").hasAttribute("style")).toBe(false)
+  })
+
   it("restores a deleted element to the original position", () => {
     document.body.innerHTML =
       '<ul id="l"><li id="x">X</li><li id="y">Y</li></ul>'
