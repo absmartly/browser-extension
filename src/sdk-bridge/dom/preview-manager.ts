@@ -385,11 +385,16 @@ export class PreviewManager {
     // html on the outer one) before applying to it; observing each target
     // directly keeps those writes in the journal.
     for (const element of targets) journal.targets.add(element)
+    // The throw path still records what the apply wrote, so removal can
+    // undo it; the original error propagates.
     const { result, entries } = recordMutations(
       [document, ...targets],
       apply,
       undefined,
-      (partial) => journal.entries.push(...partial)
+      (partial) => {
+        journal.entries.push(...partial)
+        this.recordFormWrites(journal, formBefore)
+      }
     )
     journal.entries.push(...entries)
     this.recordFormWrites(journal, formBefore)

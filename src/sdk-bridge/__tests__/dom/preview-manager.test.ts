@@ -76,6 +76,39 @@ describe("PreviewManager", () => {
     expect(byId("p").getAttribute("title")).toBe("orig")
   })
 
+  it("undoes form properties and attributes a javascript apply set before throwing", () => {
+    document.body.innerHTML =
+      '<form id="f" title="orig"><input id="i" value="orig"></form>'
+    const original = document.body.innerHTML
+    const input = byId("i") as HTMLInputElement
+    const error = new Error("sdk failure")
+    // An escaping throw after partial writes, as in the test above.
+    const spy = jest
+      .spyOn(DOMManipulatorLite.prototype, "applyChange")
+      .mockImplementation(() => {
+        input.value = "js"
+        byId("f").setAttribute("title", "js")
+        throw error
+      })
+
+    let thrown: unknown
+    try {
+      manager.applyPreviewChange(
+        { selector: "#f", type: "javascript", value: "" },
+        "exp"
+      )
+    } catch (e) {
+      thrown = e
+    }
+    spy.mockRestore()
+    expect(thrown).toBe(error)
+    expect(input.value).toBe("js")
+
+    manager.removePreviewChanges("exp")
+    expect(input.value).toBe("orig")
+    expect(document.body.innerHTML).toBe(original)
+  })
+
   it("keeps host descendants by identity when a style preview is removed", () => {
     document.body.innerHTML =
       '<div id="h"><button id="b">Buy</button><input id="i"></div>'
