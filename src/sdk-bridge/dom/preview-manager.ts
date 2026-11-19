@@ -20,10 +20,7 @@ import {
   undoMutations,
   type JournalEntry
 } from "./mutation-journal"
-import {
-  PREVIEW_UNWIND_EVENT,
-  VISUAL_EDITOR_EXPERIMENT_NAME
-} from "./preview-events"
+import { PREVIEW_UNWIND_EVENT } from "./preview-events"
 
 // A live form property (value, checked, selectedness) that javascript can
 // change without writing an attribute, so no MutationRecord sees it.
@@ -266,7 +263,10 @@ export class PreviewManager {
   // cancelled before any DOM is inverted, so no late mount re-applies.
   private unwindFrom(index: number): Segment[] {
     const unwound = this.stack.splice(index)
-    if (unwound.some((s) => s.name === VISUAL_EDITOR_EXPERIMENT_NAME)) {
+    // An open visual-editor session may hold nodes of any unwound segment
+    // (its live writes, or the children it restores on cancel), so it is
+    // closed before anything is inverted.
+    if (unwound.length > 0) {
       window.dispatchEvent(
         new CustomEvent(PREVIEW_UNWIND_EVENT, {
           detail: {

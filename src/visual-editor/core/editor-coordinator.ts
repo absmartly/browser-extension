@@ -189,10 +189,11 @@ export class EditorCoordinator {
     window.addEventListener(PREVIEW_UNWIND_EVENT, this.handlePreviewUnwind)
   }
 
-  // The preview manager is about to undo the visual editor's preview to
-  // remove or replace an older one. An open session's live writes sit on
-  // top of that preview, so the session is closed and its writes undone
-  // first; otherwise the unwind would run against the typed DOM.
+  // The preview manager is about to unwind preview segments. An open
+  // session's live writes sit on top of them and its restore would put back
+  // children an unwound preview owned, so the session is closed and its
+  // writes undone first; otherwise the unwind would run against the typed
+  // DOM.
   private handlePreviewUnwind = (): void => {
     if (!this.pendingLiveEdit) return
     this.pendingLiveEdit()

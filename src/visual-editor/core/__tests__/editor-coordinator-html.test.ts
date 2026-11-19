@@ -713,7 +713,36 @@ describe("EditorCoordinator HTML Editor Integration", () => {
       expect(document.body.innerHTML).toBe(original)
     })
 
-    it("leaves a session open when only a preview above the visual editor's is removed", () => {
+    it("closes an HTML editor opened over a newer experiment's children before that experiment is removed", async () => {
+      document.body.innerHTML = '<div id="el"><span id="c0">page</span></div>'
+      const original = document.body.innerHTML
+      const c0 = document.getElementById("c0")
+      preview.applyPreviewChange(
+        { selector: "#el", type: "html", value: "<b id='bnode'>B</b>" },
+        "b"
+      )
+      const element = document.getElementById("el")!
+      const session = coordinator.handleEditHtmlAction(element, {})
+      element.innerHTML = "<i>typing</i>"
+
+      preview.removePreviewChanges("b")
+      document
+        .querySelector<HTMLButtonElement>("#html-editor-cancel-button")
+        ?.click()
+      await session
+
+      expect(document.getElementById("bnode")).toBeNull()
+      expect(element.firstChild).toBe(c0)
+      expect(document.getElementById("absmartly-html-editor-host")).toBeNull()
+      expect(document.body.innerHTML).toBe(original)
+      expect(notify).toHaveBeenCalledWith(
+        "Edit closed: another preview changed",
+        "",
+        "warning"
+      )
+    })
+
+    it("closes a session when a preview above the visual editor's is removed", () => {
       document.body.innerHTML = '<p id="a">A</p><div id="e">page</div>'
       const element = document.getElementById("e")!
       preview.applyPreviewChange(
@@ -728,12 +757,18 @@ describe("EditorCoordinator HTML Editor Integration", () => {
         textContent: "ve",
         innerHTML: "ve"
       })
+      ;(element.firstChild as Text).data = "vetyped"
 
       preview.removePreviewChanges("newer")
 
-      expect((element as HTMLElement).contentEditable).toBe("true")
-      expect(notify).not.toHaveBeenCalled()
-      coordinator.teardownAll(true)
+      expect((element as HTMLElement).contentEditable).toBe("false")
+      expect(element.textContent).toBe("ve")
+      expect(document.getElementById("a").textContent).toBe("A")
+      expect(notify).toHaveBeenCalledWith(
+        "Edit closed: another preview changed",
+        "",
+        "warning"
+      )
     })
   })
 })

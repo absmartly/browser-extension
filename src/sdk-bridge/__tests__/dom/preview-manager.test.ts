@@ -1830,7 +1830,7 @@ describe("PreviewManager", () => {
       expect(byId("h").getAttribute("title")).toBe("page")
     })
 
-    it("signals an unwind of the visual editor's preview before undoing it", () => {
+    it("signals every unwind before undoing any segment", () => {
       document.body.innerHTML = '<p id="a">A</p><div id="e">page</div>'
       const seen: Array<{ experiments: string[]; text: string }> = []
       const listener = (event: Event) =>
@@ -1858,6 +1858,7 @@ describe("PreviewManager", () => {
         window.removeEventListener("absmartly:preview-unwind", listener)
       }
       expect(seen).toEqual([
+        { experiments: ["older"], text: "page" },
         { experiments: ["older", "__visual_editor__"], text: "ve" }
       ])
       expect(byId("e").textContent).toBe("ve")
