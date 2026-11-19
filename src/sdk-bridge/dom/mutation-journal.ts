@@ -501,7 +501,10 @@ export function undoMutations(entries: JournalEntry[]): void {
       const { target, name, namespace, oldValue, newValue } = entry
       const current = target.getAttributeNodeNS(namespace, name)?.value ?? null
       if (current !== newValue) {
-        if (isInlineStyle(entry)) undoStyleDeclarations(entry)
+        // A style attribute the page removed outright is the page's; the
+        // per-declaration fallback would re-create it.
+        if (isInlineStyle(entry) && current !== null)
+          undoStyleDeclarations(entry)
         continue
       }
       if (oldValue === null) {

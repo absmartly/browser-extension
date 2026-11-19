@@ -833,6 +833,57 @@ describe("PreviewManager", () => {
     expect(element.textContent).toBe("Page")
   })
 
+  it.each([
+    [
+      "color: red",
+      { selector: "#h", type: "style", value: { "background-color": "blue" } }
+    ],
+    [
+      "",
+      { selector: "#h", type: "style", value: { "background-color": "blue" } }
+    ],
+    [
+      "color: red",
+      {
+        selector: "#h",
+        type: "javascript",
+        value:
+          "element.style.backgroundColor = 'blue'; element.style.removeProperty('color')"
+      }
+    ]
+  ] as Array<[string, DOMChange]>)(
+    "leaves a style attribute the page removed after a style preview absent (%j)",
+    (style, change) => {
+      document.body.innerHTML = `<div id="h" style="${style}">H</div>`
+      const element = byId("h")
+      manager.applyPreviewChange(change, "exp")
+      expect(element.style.backgroundColor).toBe("blue")
+
+      element.removeAttribute("style")
+      manager.removePreviewChanges("exp")
+
+      expect(element.hasAttribute("style")).toBe(false)
+    }
+  )
+
+  it("restores the exact original style when the preview removed the attribute", () => {
+    document.body.innerHTML = '<div id="h" style="color: red">H</div>'
+    const element = byId("h")
+    manager.applyPreviewChange(
+      {
+        selector: "#h",
+        type: "javascript",
+        value: "element.removeAttribute('style')"
+      },
+      "exp"
+    )
+    expect(element.hasAttribute("style")).toBe(false)
+
+    manager.removePreviewChanges("exp")
+
+    expect(element.getAttribute("style")).toBe("color: red")
+  })
+
   it("restores unchanged values and leaves a namespaced page mutation alone", () => {
     document.body.innerHTML =
       '<svg id="icon"><use id="use" /></svg><p id="p">Original</p>'
