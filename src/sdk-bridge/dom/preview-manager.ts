@@ -78,9 +78,11 @@ function inSameGroup(a: HTMLInputElement, b: HTMLInputElement): boolean {
 
 function checkedInGroup(radio: HTMLInputElement): HTMLInputElement | null {
   if (radio.name === "") return radio.checked ? radio : null
-  const scope = radio.form ?? radio.getRootNode()
+  // The tree root, not the form element: form="id" associates radios that
+  // sit outside the form; inSameGroup still requires the same form owner.
+  const scope = radio.getRootNode()
   if (!("querySelectorAll" in scope)) return radio.checked ? radio : null
-  const radios = (scope as ParentNode).querySelectorAll("input")
+  const radios = (scope as ParentNode).querySelectorAll("input[type=radio]")
   for (const other of radios)
     if (isRadio(other) && other.checked && inSameGroup(radio, other))
       return other

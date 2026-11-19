@@ -721,6 +721,44 @@ describe("PreviewManager", () => {
     }
   )
 
+  it.each([
+    ["the user selected another radio", true, "z"],
+    ["the preview's selection is still in place", false, "x"]
+  ])(
+    "restores a form-associated radio group outside its form only if %s",
+    (_case, userSelects, expected) => {
+      document.body.innerHTML = `<div id="wrap">
+        <form id="f"><input type="radio" name="g" id="x" form="f" checked></form>
+        <input type="radio" name="g" id="y" form="f">
+        <input type="radio" name="g" id="z" form="f">
+      </div>`
+      expect((byId("y") as HTMLInputElement).form).toBe(byId("f"))
+      // jsdom groups radios by their nearest <form> ancestor instead of by
+      // form owner, so the script also unchecks #x as a browser would.
+      manager.applyPreviewChange(
+        {
+          selector: "#wrap",
+          type: "javascript",
+          value:
+            "element.querySelector('#x').checked = false; element.querySelector('#y').checked = true"
+        },
+        "exp"
+      )
+      expect((byId("x") as HTMLInputElement).checked).toBe(false)
+      expect((byId("y") as HTMLInputElement).checked).toBe(true)
+      if (userSelects) (byId("z") as HTMLInputElement).checked = true
+
+      manager.removePreviewChanges("exp")
+
+      const checked = Array.from(
+        document.querySelectorAll<HTMLInputElement>("input[name=g]")
+      )
+        .filter((radio) => radio.checked)
+        .map((radio) => radio.id)
+      expect(checked).toEqual([expected])
+    }
+  )
+
   it("restores an extension host that an immediate change's selector also matched", () => {
     document.body.innerHTML =
       '<div id="absmartly-visual-editor-toolbar-host" class="box"></div><div id="page" class="box"></div>'
