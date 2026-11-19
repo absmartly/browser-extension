@@ -1379,6 +1379,51 @@ describe("PreviewManager", () => {
       }
     )
 
+    it.each([
+      ["remove", "before"],
+      ["remove", "after"],
+      ["replace", "before"],
+      ["replace", "after"]
+    ])(
+      "preserves separate pending sessions when %s B with mounting %s",
+      async (operation, timing) => {
+        document.body.innerHTML = '<p id="base">B</p>'
+        manager.applyPreviewChange(
+          { selector: "#late", type: "attribute", value: { title: "A" } },
+          "a"
+        )
+        manager.applyPreviewChange(
+          { selector: "#base", type: "text", value: "B preview" },
+          "b"
+        )
+        manager.applyPreviewChange(
+          { selector: "#late", type: "class", add: ["late-a"], remove: [] },
+          "a"
+        )
+        const late = document.createElement("span")
+        late.id = "late"
+        const state = () => [late.title, late.classList.contains("late-a")]
+        if (timing === "before") {
+          document.body.append(late)
+          await settle()
+          expect(state()).toEqual(["A", true])
+        }
+        if (operation === "remove") manager.removePreviewChanges("b")
+        else manager.replacePreviewChanges("b", [])
+        if (timing === "after") document.body.append(late)
+        await settle()
+        expect(state()).toEqual(["A", true])
+        expect(byId("base").textContent).toBe("B")
+        manager.clearAll()
+        await settle()
+        expect(state()).toEqual(["", false])
+        expect(document.body.innerHTML).toBe(
+          '<p id="base">B</p><span id="late"></span>'
+        )
+        expect(byId("late")).toBe(late)
+      }
+    )
+
     it("journals a later apply to an older experiment on top of the newer one", () => {
       document.body.innerHTML = '<div id="h" title="orig">x</div>'
       const title = () => byId("h").getAttribute("title")

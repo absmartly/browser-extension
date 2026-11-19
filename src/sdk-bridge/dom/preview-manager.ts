@@ -310,7 +310,9 @@ export class PreviewManager {
   // matches). A change that throws is logged; the rest still apply.
   private replay(segments: Segment[]): void {
     for (const { name, writes } of segments) {
-      const segment = this.topFor(name)
+      // Separate SDK sessions must retain their pending-selector dedup boundaries.
+      const segment = newSegment(name)
+      this.stack.push(segment)
       for (const { change, element, matchedLate } of writes) {
         if (matchedLate) continue
         try {
