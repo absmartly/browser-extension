@@ -1555,6 +1555,65 @@ describe("PreviewManager", () => {
       expect(byId("late").hasAttribute("style")).toBe(false)
     })
 
+    it("traverses an identical replay form root once and preserves live control properties", () => {
+      document.body.innerHTML =
+        '<form id="f"><input id="i" value="orig"><input id="c" type="checkbox"><textarea id="t">orig</textarea><select id="s"><option id="o1" selected>one</option><option id="o2">two</option></select></form>'
+      const original = document.body.innerHTML
+      const input = byId("i") as HTMLInputElement
+      const checkbox = byId("c") as HTMLInputElement
+      const textarea = byId("t") as HTMLTextAreaElement
+      const select = byId("s") as HTMLSelectElement
+      for (const name of ["a", "b", "a"]) {
+        manager.applyPreviewChange(
+          {
+            selector: "#f",
+            type: "javascript",
+            value: `element.querySelector('#i').value = '${name}';
+              element.querySelector('#c').checked = ${name !== "b"};
+              element.querySelector('#t').value = '${name}';
+              element.querySelector('#s').selectedIndex = ${name === "b" ? 0 : 1}`
+          },
+          name
+        )
+      }
+      input.value = "typed"
+      checkbox.checked = false
+      textarea.value = "typed textarea"
+      select.selectedIndex = 0
+      const state = () => [
+        input.value,
+        checkbox.checked,
+        textarea.value,
+        select.selectedIndex
+      ]
+      const internal = manager as any
+      const query = jest.spyOn(byId("f"), "querySelectorAll")
+      try {
+        const snapshot = internal.snapshotForm(internal.stack, internal.stack)
+        expect(query).toHaveBeenCalledTimes(1)
+        expect(
+          snapshot.map(({ control, property, value }) => [
+            control.id,
+            property,
+            value
+          ])
+        ).toEqual([
+          ["i", "value", "typed"],
+          ["c", "checked", false],
+          ["t", "value", "typed textarea"],
+          ["o1", "selected", true],
+          ["o2", "selected", false]
+        ])
+      } finally {
+        query.mockRestore()
+      }
+      manager.removePreviewChanges("b")
+      expect(state()).toEqual(["typed", false, "typed textarea", 0])
+      manager.clearAll()
+      expect(state()).toEqual(["typed", false, "typed textarea", 0])
+      expect(document.body.innerHTML).toBe(original)
+    })
+
     it("keeps a value the user typed after a newer javascript preview when an older one is removed", () => {
       document.body.innerHTML =
         '<p id="a">A</p><form id="f"><input id="i" value="orig"></form>'

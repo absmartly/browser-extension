@@ -279,11 +279,11 @@ export class PreviewManager {
         lastWrite.get(control).set(property, after)
       }
     }
-    const targets = replayed.flatMap(({ journal }) =>
-      Array.from(journal.targets)
-    )
+    const targets = new Set<Element>()
+    for (const { journal } of replayed)
+      for (const target of journal.targets) targets.add(target)
     const snapshot: FormSnapshot = []
-    for (const control of formControlsIn(targets)) {
+    for (const control of formControlsIn(Array.from(targets))) {
       const written = lastWrite.get(control)
       if (!written) continue
       const live = formProperties(control) as Record<string, string | boolean>
