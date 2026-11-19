@@ -29,6 +29,46 @@ describe("recordMutations when apply throws", () => {
   })
 })
 
+describe("undoing a removal after the page moved its siblings", () => {
+  // The preview removes one child of #r; the page then rearranges #r's other
+  // children outside the journal; undo must put the child back in its slot.
+  it.each([
+    [
+      "next sibling still present: insert before it",
+      "y",
+      (r: Element) =>
+        r.insertBefore(document.createElement("w"), r.children[1]),
+      ["x", "w", "y", "z"]
+    ],
+    [
+      "next sibling gone: insert after the previous sibling",
+      "y",
+      (r: Element) => {
+        document.body.append(r.querySelector("#z"))
+        r.append(document.createElement("w"))
+      },
+      ["x", "y", "w"]
+    ],
+    [
+      "first child whose next sibling is gone: insert at the front",
+      "x",
+      (r: Element) => document.body.append(r.querySelector("#y")),
+      ["x", "z"]
+    ]
+  ])("%s", (_name, removedId, pageEdit, expected) => {
+    document.body.innerHTML =
+      '<div id="r"><b id="x"></b><i id="y"></i><u id="z"></u></div>'
+    const r = document.getElementById("r")
+    const removed = document.getElementById(removedId)
+    const { entries } = recordMutations([document], () => removed.remove())
+    pageEdit(r)
+    undoMutations(entries)
+    expect(
+      Array.from(r.children, (child) => child.id || child.localName)
+    ).toEqual(expected)
+  })
+})
+
 describe("mutation journal detached subtree retirement", () => {
   beforeEach(() => {
     document.body.innerHTML = ""

@@ -449,9 +449,6 @@ export class VisualEditor {
             ...existing.value,
             ...change.value
           }
-        } else if (change.type === "move" && existing.type === "move") {
-          // For moves, replace with the latest change (final position)
-          changeMap.set(key, change)
         } else {
           // For other types, replace with the latest change
           changeMap.set(key, change)

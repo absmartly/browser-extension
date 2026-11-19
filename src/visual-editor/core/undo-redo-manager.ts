@@ -13,10 +13,15 @@
 import type { DOMChange } from "../types/visual-editor"
 
 // Changes of these types never collapse onto each other. A create adds a
-// distinct element each time; a delete's positional selector names whatever
-// element occupies that position when it is generated, so after one delete
-// the next sibling can produce the same selector, and both must replay.
-const UNSQUASHABLE_TYPES = new Set<DOMChange["type"]>(["create", "delete"])
+// distinct element each time. Delete and move selectors are positional and
+// name whatever element occupies that position when they are generated, so
+// after one delete or move another element can produce the same selector;
+// each must replay, in order.
+const UNSQUASHABLE_TYPES = new Set<DOMChange["type"]>([
+  "create",
+  "delete",
+  "move"
+])
 
 export function squashKey(change: DOMChange, index: number): string {
   return UNSQUASHABLE_TYPES.has(change.type)

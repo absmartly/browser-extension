@@ -346,15 +346,27 @@ function undoChildList(
   }
   if (removed.length === 0) return
 
-  let anchor: Node | null = null
-  if (nextSibling && nextSibling.parentNode === target) {
-    anchor = nextSibling
-  } else if (previousSibling && previousSibling.parentNode === target) {
-    anchor = previousSibling.nextSibling
-  } else if (previousSibling === null) {
-    anchor = target.firstChild
-  }
+  const anchor = slotAnchor(target, previousSibling, nextSibling)
   for (const node of removed) target.insertBefore(node, anchor)
+}
+
+/**
+ * The node to insert before so inserted nodes land between the recorded raw
+ * siblings: the next sibling if it is still in `parent`, else whatever
+ * follows the previous sibling, else the front when the slot was first.
+ * The visual editor reverts drops with the same rule, so its positional
+ * selectors describe the order the journal restores.
+ */
+export function slotAnchor(
+  parent: Node,
+  previousSibling: Node | null,
+  nextSibling: Node | null
+): Node | null {
+  if (nextSibling && nextSibling.parentNode === parent) return nextSibling
+  if (previousSibling && previousSibling.parentNode === parent)
+    return previousSibling.nextSibling
+  if (previousSibling === null) return parent.firstChild
+  return null
 }
 
 // Re-adding a removed attribute appends it, so the attribute list (and the

@@ -9,12 +9,11 @@ import type { DOMChange } from "../types/visual-editor"
 import { generateRobustSelector } from "../utils/selector-generator"
 import StateManager from "./state-manager"
 
-// First-seen neighbours as raw nodes, whitespace text included. An earlier
-// move may have taken one neighbour away; the other still pins the slot.
-// PreviewManager unwinds each move relative to these same raw siblings, so
+// Pre-drag neighbours as raw nodes, whitespace text included. PreviewManager
+// unwinds the drop relative to these same raw siblings, so
 // reverting anywhere else (appendChild lands after trailing whitespace)
-// leaves sibling order after removePreviewChanges different from the order
-// the positional selectors below were generated against.
+// leaves sibling order different from the order the positional selectors
+// are generated against.
 interface OriginalPosition {
   parent: Element
   previousSibling: Node | null
@@ -27,17 +26,9 @@ function revertToOriginalPosition(
 ): void {
   const { parent, previousSibling, nextSibling } = original
   let anchor: Node | null = null
-  if (
-    nextSibling &&
-    nextSibling !== element &&
-    nextSibling.parentNode === parent
-  ) {
+  if (nextSibling && nextSibling.parentNode === parent) {
     anchor = nextSibling
-  } else if (
-    previousSibling &&
-    previousSibling !== element &&
-    previousSibling.parentNode === parent
-  ) {
+  } else if (previousSibling && previousSibling.parentNode === parent) {
     anchor = previousSibling.nextSibling
   } else if (previousSibling === null) {
     anchor = parent.firstChild
@@ -49,17 +40,6 @@ function revertToOriginalPosition(
 export class EditModes {
   private stateManager: StateManager
   private addChange: ((change: DOMChange) => void) | null = null
-  // First-seen position per element, captured once per VE session. Subsequent
-  // drags of the same element revert to THIS position (not the live pre-drag
-  // state) so trackMoveChange generates selectors against the pre-VE DOM —
-  // i.e. the same base SDK replay sees after removePreviewChanges. Without
-  // it, repeat-moves of the same element record selectors against the
-  // intermediate post-previous-move DOM, and UndoRedoManager.squashChanges
-  // collapses the moves onto the last record whose targetSelector resolves
-  // to the wrong sibling when replayed from the original. (Symptom Pedro
-  // hit: drag #gamma before Alpha, then drag #gamma before Beta; save →
-  // SDK replays only the final, mis-anchored move → live order is wrong.)
-  private originalPositions = new WeakMap<Element, OriginalPosition>()
 
   constructor(stateManager: StateManager) {
     this.stateManager = stateManager
@@ -78,27 +58,19 @@ export class EditModes {
     this.stateManager.setRearranging(true)
     smartElement.classList.add("absmartly-draggable")
 
-    // Capture the FIRST-SEEN position of this element this VE session as the
-    // rollback anchor. trackMoveChange reverts the drop to that position
-    // before generating selectors so PreviewManager (which runs
-    // removePreviewChanges in replace mode at the start of every replay)
-    // sees the same DOM the selectors describe. Crucially, this is the
-    // pre-VE position, not the live pre-drag position — see the comment on
-    // `originalPositions` for why repeat-moves of the same element require
-    // it.
-    let cached = this.originalPositions.get(smartElement)
-    if (!cached) {
-      const parent = smartElement.parentElement
-      if (parent) {
-        cached = {
+    // Moves are recorded and replayed in order (never squashed), so each one
+    // is described against the DOM just before its own drag: the state the
+    // replay of all earlier changes reproduces. trackMoveChange reverts the
+    // drop to this slot before generating selectors. Capturing per drag
+    // (not once per session) keeps the slot valid across undo and redo.
+    const parent = smartElement.parentElement
+    const originalPosition: OriginalPosition | null = parent
+      ? {
           parent,
           previousSibling: smartElement.previousSibling,
           nextSibling: smartElement.nextSibling
         }
-        this.originalPositions.set(smartElement, cached)
-      }
-    }
-    const originalPosition: OriginalPosition | null = cached ?? null
+      : null
 
     // Make element draggable
     ;(smartElement as HTMLElement).draggable = true

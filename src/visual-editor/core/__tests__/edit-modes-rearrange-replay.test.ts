@@ -70,7 +70,15 @@ describe("EditModes rearrange replayed through PreviewManager", () => {
       (span) => span.firstChild?.textContent?.trim()
     )
 
-  it("replays only the final drop when one element is dragged twice", () => {
+  const replayOnCleanPage = () => {
+    const saved = undoRedo.squashChanges()
+    previewManager.removePreviewChanges(VISUAL_EDITOR_EXPERIMENT_NAME)
+    for (const change of saved)
+      previewManager.applyPreviewChange(change, "replay")
+    return saved
+  }
+
+  it("replays both drops in order when one element is dragged twice", () => {
     const gamma = topLevel("3")
     editModes.enableRearrangeMode(gamma)
     dispatchDrag(gamma, topLevel("1"), { altKey: true, before: true })
@@ -80,15 +88,60 @@ describe("EditModes rearrange replayed through PreviewManager", () => {
     dispatchDrag(gamma, topLevel("3"), { altKey: true, before: true })
     expect(topLevelLabels()).toEqual(["Alpha-i", "Gamma-i", "Beta-i"])
 
-    // Both drops carry gamma's positional selector from the unmodified
-    // page; replaying the first one too would shift which span the second
-    // selector names.
+    expect(replayOnCleanPage()).toHaveLength(2)
+    expect(topLevelLabels()).toEqual(["Alpha-i", "Gamma-i", "Beta-i"])
+  })
+
+  it("saves a move that replays correctly after earlier drops were undone", () => {
+    const container = document.getElementById("rearrange-inline")
+    const [a, b, g] = Array.from(container.children)
+    editModes.enableRearrangeMode(g)
+    dispatchDrag(g, a)
+    editModes.enableRearrangeMode(b)
+    dispatchDrag(b, topLevel("1"), { altKey: true, before: true })
+    expect(topLevelLabels()).toEqual(["Beta-i", "Alpha-i"])
+
+    // The visual editor's undo: pop, then replay the remainder.
+    for (let i = 0; i < 2; i++) {
+      undoRedo.undo()
+      previewManager.removePreviewChanges(VISUAL_EDITOR_EXPERIMENT_NAME)
+      for (const change of undoRedo.squashChanges())
+        previewManager.applyPreviewChange(change, VISUAL_EDITOR_EXPERIMENT_NAME)
+    }
+    expect(Array.from(container.children)).toEqual([a, b, g])
+
+    editModes.enableRearrangeMode(b)
+    dispatchDrag(b, topLevel("1"), { altKey: true, before: true })
+    expect(topLevelLabels()).toEqual(["Beta-i", "Alpha-i", "Gamma-i"])
+
+    replayOnCleanPage()
+    expect(topLevelLabels()).toEqual(["Beta-i", "Alpha-i", "Gamma-i"])
+    previewManager.removePreviewChanges("replay")
+    expect(Array.from(container.children)).toEqual([a, b, g])
+  })
+
+  it("keeps both moves of two elements that share a positional selector", () => {
+    const beta = topLevel("2")
+    editModes.enableRearrangeMode(beta)
+    dispatchDrag(beta, topLevel("3"), { altKey: true })
+    expect(topLevelLabels()).toEqual(["Alpha-i", "Gamma-i", "Beta-i"])
+
+    // Gamma now sits where Beta was, so its selector is Beta's selector.
+    const gamma = topLevel("2")
+    editModes.enableRearrangeMode(gamma)
+    dispatchDrag(gamma, topLevel("1"), { altKey: true, before: true })
+    expect(topLevelLabels()).toEqual(["Gamma-i", "Alpha-i", "Beta-i"])
+
     const saved = undoRedo.squashChanges()
-    expect(saved).toHaveLength(1)
+    expect(saved.map((change) => change.selector)).toEqual([
+      saved[0].selector,
+      saved[0].selector
+    ])
     previewManager.removePreviewChanges(VISUAL_EDITOR_EXPERIMENT_NAME)
+    expect(topLevelLabels()).toEqual(["Alpha-i", "Beta-i", "Gamma-i"])
     for (const change of saved)
       previewManager.applyPreviewChange(change, "replay")
-    expect(topLevelLabels()).toEqual(["Alpha-i", "Gamma-i", "Beta-i"])
+    expect(topLevelLabels()).toEqual(["Gamma-i", "Alpha-i", "Beta-i"])
   })
 
   it("keeps a positional move correct after an earlier move changed sibling positions", () => {
