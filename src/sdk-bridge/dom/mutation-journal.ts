@@ -75,46 +75,124 @@ function toEntry(record: MutationRecord): JournalEntry {
   }
 }
 
-function toEntries(records: MutationRecord[]): JournalEntry[] {
-  return records.map((record, index) => {
-    const entry = toEntry(record)
-    if (entry.kind === "attributes") {
-      let nextValue: string | null | undefined
-      for (let i = index + 1; i < records.length; i++) {
-        const candidate = records[i]
-        if (
-          candidate.type === "attributes" &&
-          candidate.target === record.target &&
-          candidate.attributeName === record.attributeName &&
-          candidate.attributeNamespace === record.attributeNamespace
-        ) {
-          nextValue = candidate.oldValue
-          break
+function attributeValue(
+  target: Element,
+  namespace: string | null,
+  name: string
+): string | null {
+  return target.getAttributeNodeNS(namespace, name)?.value ?? null
+}
+
+type AttributeState = Extract<JournalEntry, { kind: "attributes" }>
+type CharacterDataState = Extract<JournalEntry, { kind: "characterData" }>
+
+function markDetached(
+  node: Node,
+  attributes: Map<Element, Map<string, AttributeState>>,
+  characterData: Map<CharacterData, CharacterDataState>,
+  retiredAttributes: Map<Element, Map<string, AttributeState>>,
+  retiredCharacterData: Map<CharacterData, CharacterDataState>
+): void {
+  const visit = (current: Node) => {
+    if (current.nodeType === Node.ELEMENT_NODE) {
+      const element = current as Element
+      const states = attributes.get(element)
+      if (states) {
+        for (const state of states.values()) {
+          state.newValue = attributeValue(
+            state.target,
+            state.namespace,
+            state.name
+          )
         }
+        attributes.delete(element)
+        retiredAttributes.set(element, states)
       }
-      entry.newValue =
-        nextValue ??
-        (record.target as Element).getAttributeNodeNS(
-          record.attributeNamespace,
-          record.attributeName as string
-        )?.value ??
-        null
-    } else if (entry.kind === "characterData") {
-      let nextValue: string | undefined
-      for (let i = index + 1; i < records.length; i++) {
-        const candidate = records[i]
-        if (
-          candidate.type === "characterData" &&
-          candidate.target === record.target
-        ) {
-          nextValue = candidate.oldValue ?? ""
-          break
-        }
+    } else if (
+      current.nodeType === Node.TEXT_NODE ||
+      current.nodeType === Node.CDATA_SECTION_NODE
+    ) {
+      const character = current as CharacterData
+      const state = characterData.get(character)
+      if (state) {
+        state.newValue = character.data
+        characterData.delete(character)
+        retiredCharacterData.set(character, state)
       }
-      entry.newValue = nextValue ?? (record.target as CharacterData).data
     }
-    return entry
-  })
+    for (const child of current.childNodes) visit(child)
+  }
+  visit(node)
+}
+
+function toEntries(records: MutationRecord[]): JournalEntry[] {
+  const entries: JournalEntry[] = []
+  const attributes = new Map<Element, Map<string, AttributeState>>()
+  const characterData = new Map<CharacterData, CharacterDataState>()
+  const retiredAttributes = new Map<Element, Map<string, AttributeState>>()
+  const retiredCharacterData = new Map<CharacterData, CharacterDataState>()
+
+  for (const record of records) {
+    if (record.type === "childList") {
+      for (const removed of record.removedNodes)
+        markDetached(
+          removed,
+          attributes,
+          characterData,
+          retiredAttributes,
+          retiredCharacterData
+        )
+      entries.push(toEntry(record))
+      continue
+    }
+
+    if (record.type === "attributes") {
+      const entry = toEntry(record) as Extract<
+        JournalEntry,
+        { kind: "attributes" }
+      >
+      const key = `${record.attributeNamespace ?? ""}\u0000${record.attributeName ?? ""}`
+      let states = attributes.get(entry.target)
+      if (!states) {
+        states = new Map()
+        attributes.set(entry.target, states)
+      }
+      const previous = states.get(key)
+      if (previous) previous.newValue = entry.oldValue
+      const retired = retiredAttributes.get(entry.target)?.get(key)
+      if (retired) {
+        retired.newValue = entry.oldValue
+        retiredAttributes.get(entry.target)?.delete(key)
+      }
+      states.set(key, entry)
+      entries.push(entry)
+      continue
+    }
+
+    const entry = toEntry(record) as Extract<
+      JournalEntry,
+      { kind: "characterData" }
+    >
+    const previous = characterData.get(entry.target)
+    if (previous) previous.newValue = entry.oldValue
+    const retired = retiredCharacterData.get(entry.target)
+    if (retired) {
+      retired.newValue = entry.oldValue
+      retiredCharacterData.delete(entry.target)
+    }
+    characterData.set(entry.target, entry)
+    entries.push(entry)
+  }
+
+  for (const states of attributes.values()) {
+    for (const state of states.values()) {
+      state.newValue = attributeValue(state.target, state.namespace, state.name)
+    }
+  }
+  for (const state of characterData.values()) {
+    state.newValue = state.target.data
+  }
+  return entries
 }
 
 /**

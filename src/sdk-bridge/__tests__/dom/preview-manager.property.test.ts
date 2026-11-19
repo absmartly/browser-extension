@@ -180,21 +180,50 @@ function generateCase(rng: Rng): DOMChange[] {
 type OperationReport = {
   kind: DOMChange["type"]
   result: boolean
-  reachableTargets: number
+  sourceTargets: number
+  targetTargets: number
   expectedNoOp: boolean
 }
 
-function targetCount(change: DOMChange): number {
+function targetCounts(change: DOMChange): { source: number; target: number } {
   try {
     if (change.type === "create") {
-      return document.querySelectorAll(change.targetSelector).length
+      return {
+        source: 0,
+        target: document.querySelectorAll(change.targetSelector).length
+      }
     }
-    return document.querySelectorAll(change.selector).length
+    const source = document.querySelectorAll(change.selector).length
+    if (change.type === "move") {
+      return {
+        source,
+        target: document.querySelectorAll(change.targetSelector).length
+      }
+    }
+    return { source, target: source }
   } catch {
-    return 0
+    return { source: 0, target: 0 }
   }
 }
 
+function moveHasInvalidRelationship(
+  change: Extract<DOMChange, { type: "move" }>
+): boolean {
+  try {
+    const sources = Array.from(document.querySelectorAll(change.selector))
+    const targets = Array.from(document.querySelectorAll(change.targetSelector))
+    return sources.some((source) =>
+      targets.some(
+        (target) =>
+          source === target ||
+          source.contains(target) ||
+          target.contains(source)
+      )
+    )
+  } catch {
+    return true
+  }
+}
 const cases = Array.from({ length: CASES }, (_, i) => {
   const seed = BASE_SEED + i
   return { seed, changes: generateCase(prng(seed)) }
@@ -236,25 +265,47 @@ describe("PreviewManager restore property", () => {
       for (let cycle = 1; cycle <= CYCLES; cycle++) {
         const operations: OperationReport[] = []
         for (const change of changes) {
-          const reachableTargets = targetCount(change)
+          const counts = targetCounts(change)
           const result = manager.applyPreviewChange(change, "exp")
           const expectedNoOp =
             result === false &&
-            (change.type === "move" ||
-              (change.type === "delete" && reachableTargets === 0))
+            ((change.type === "move" &&
+              (counts.source === 0 ||
+                counts.target === 0 ||
+                moveHasInvalidRelationship(change))) ||
+              (change.type === "delete" && counts.source === 0) ||
+              (change.type === "create" && counts.target === 0))
           operations.push({
             kind: change.type,
             result,
-            reachableTargets,
+            sourceTargets: counts.source,
+            targetTargets: counts.target,
             expectedNoOp
           })
-          if (reachableTargets > 0 && !result && !expectedNoOp) {
+          if (!result && !expectedNoOp) {
             throw fail(
               cycle,
-              `reachable ${change.type} change was a no-op: ${JSON.stringify(operations)}`
+              `unexpected ${change.type} no-op: ${JSON.stringify(operations)}`
             )
           }
         }
+        const successfulKinds = new Set(
+          operations
+            .filter((operation) => operation.result)
+            .map((operation) => operation.kind)
+        )
+        if (
+          successfulKinds.size === 0 &&
+          operations.some((operation) => operation.expectedNoOp)
+        ) {
+          // This case exercised only a modeled no-op; keep it in coverage counts.
+        } else if (successfulKinds.size === 0) {
+          throw fail(
+            cycle,
+            `no successful operation coverage: ${JSON.stringify(operations)}`
+          )
+        }
+
         manager.removePreviewChanges("exp")
 
         if (document.body.innerHTML !== original) {

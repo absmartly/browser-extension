@@ -660,24 +660,73 @@ describe("PreviewManager", () => {
     const href = "http://www.w3.org/1999/xlink"
     use.setAttributeNS(href, "xlink:href", "#old")
 
-    manager.applyPreviewChange(
-      { selector: "#p", type: "text", value: "Preview" },
-      "exp"
-    )
-    manager.applyPreviewChange(
-      {
-        selector: "#use",
-        type: "attribute",
-        value: { "xlink:href": "#preview" }
-      },
-      "exp"
-    )
+    expect(
+      manager.applyPreviewChange(
+        { selector: "#p", type: "text", value: "Preview" },
+        "exp"
+      )
+    ).toBe(true)
+    expect(paragraph.textContent).toBe("Preview")
+    expect(
+      manager.applyPreviewChange(
+        {
+          selector: "#use",
+          type: "attribute",
+          value: { "xlink:href": "#preview" }
+        },
+        "exp"
+      )
+    ).toBe(true)
+    expect(use.getAttributeNS(href, "href")).toBe("#preview")
     use.setAttributeNS(href, "xlink:href", "#page")
     manager.removePreviewChanges("exp")
 
     expect(paragraph.textContent).toBe("Original")
     expect(text.data).toBe("Original")
     expect(use.getAttributeNS(href, "href")).toBe("#page")
+  })
+
+  it("does not re-add an originally absent attribute removed by page code", () => {
+    document.body.innerHTML = '<div id="h"></div>'
+    const element = byId("h")
+
+    expect(
+      manager.applyPreviewChange(
+        { selector: "#h", type: "attribute", value: { title: "Preview" } },
+        "exp"
+      )
+    ).toBe(true)
+    expect(element.getAttribute("title")).toBe("Preview")
+    element.removeAttribute("title")
+
+    manager.removePreviewChanges("exp")
+
+    expect(element.hasAttribute("title")).toBe(false)
+  })
+
+  it("restores a detached and reinserted javascript target without stale ownership", () => {
+    document.body.innerHTML =
+      '<div id="host"><span id="target" data-state="original">Original</span></div>'
+    const host = byId("host")
+    const target = byId("target")
+
+    expect(
+      manager.applyPreviewChange(
+        {
+          selector: "#host",
+          type: "javascript",
+          value:
+            "const node = document.getElementById('target'); const parent = node.parentNode; node.setAttribute('data-state', 'first'); parent.removeChild(node); parent.appendChild(node); node.setAttribute('data-state', 'second')"
+        },
+        "exp"
+      )
+    ).toBe(true)
+    expect(target.getAttribute("data-state")).toBe("second")
+
+    manager.removePreviewChanges("exp")
+
+    expect(host.firstElementChild).toBe(target)
+    expect(target.getAttribute("data-state")).toBe("original")
   })
 
   it("leaves a later overlapping experiment value owned by that experiment", () => {
