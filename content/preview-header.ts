@@ -152,14 +152,24 @@ export function createPreviewHeader(
       `[Content Script] Found ${markedElements.length} elements with preview markers`
     )
 
-    // The sidebar's preview toggle removes the preview through the
-    // journal; only the markers are stripped here. Replaying the selection
-    // sidecar would write its serialized (possibly previewed) content back.
+    // Replaying the selection sidecar would write its serialized (possibly
+    // previewed) content back, so markers are only stripped.
     markedElements.forEach((element) => {
       element.removeAttribute("data-absmartly-experiment")
       element.removeAttribute("data-absmartly-original")
       element.removeAttribute("data-absmartly-modified")
     })
+
+    // The page bridge undoes the experiment's journal; the sidebar may be
+    // closed and unable to relay PREVIEW_STATE_CHANGED as a removal.
+    window.postMessage(
+      {
+        source: "absmartly-extension",
+        type: "REMOVE_PREVIEW",
+        payload: { experimentName }
+      },
+      window.location.origin
+    )
 
     chrome.runtime.sendMessage({
       type: "PREVIEW_STATE_CHANGED",
