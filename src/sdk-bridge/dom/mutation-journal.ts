@@ -68,15 +68,17 @@ function toEntry(record: MutationRecord): JournalEntry {
 }
 
 /**
- * Run `apply` and return every mutation it made under `root`, in order.
+ * Run `apply` and return every mutation it made under `roots`, in order.
  * Records are taken synchronously, so other code cannot interleave.
+ * Observing a node directly keeps recording it after it is detached, which
+ * observing only an ancestor does not guarantee.
  */
 export function recordMutations<T>(
-  root: Node,
+  roots: Iterable<Node>,
   apply: () => T
 ): { result: T; entries: JournalEntry[] } {
   const observer = new MutationObserver(() => {})
-  observer.observe(root, OBSERVE_ALL)
+  for (const root of new Set(roots)) observer.observe(root, OBSERVE_ALL)
   let result: T
   let records: MutationRecord[] = []
   try {

@@ -234,6 +234,28 @@ describe("PreviewManager", () => {
     }
   )
 
+  it.each(["text", "html"] as const)(
+    "restores nested matches of one %s change when the outer match detaches the inner one",
+    (type) => {
+      document.body.innerHTML =
+        '<div id="outer" class="card"><span id="s">S</span><div id="inner" class="card"><b id="k">K</b></div></div>'
+      const original = document.body.innerHTML
+      const inner = byId("inner")
+      const kept = byId("k")
+
+      manager.applyPreviewChange(
+        { selector: ".card", type, value: "<i>P</i>" } as DOMChange,
+        "exp"
+      )
+      expect(inner.isConnected).toBe(false)
+      manager.removePreviewChanges("exp")
+
+      expect(document.body.innerHTML).toBe(original)
+      expect(byId("inner")).toBe(inner)
+      expect(byId("k")).toBe(kept)
+    }
+  )
+
   it("leaves no class attribute on an element that had none", () => {
     document.body.innerHTML = '<p id="p">P</p><p id="q" class="">Q</p>'
 
