@@ -177,6 +177,24 @@ function generateCase(rng: Rng): DOMChange[] {
   return changes
 }
 
+type OperationReport = {
+  kind: DOMChange["type"]
+  result: boolean
+  reachableTargets: number
+  expectedNoOp: boolean
+}
+
+function targetCount(change: DOMChange): number {
+  try {
+    if (change.type === "create") {
+      return document.querySelectorAll(change.targetSelector).length
+    }
+    return document.querySelectorAll(change.selector).length
+  } catch {
+    return 0
+  }
+}
+
 const cases = Array.from({ length: CASES }, (_, i) => {
   const seed = BASE_SEED + i
   return { seed, changes: generateCase(prng(seed)) }
@@ -216,7 +234,27 @@ describe("PreviewManager restore property", () => {
         )
 
       for (let cycle = 1; cycle <= CYCLES; cycle++) {
-        for (const change of changes) manager.applyPreviewChange(change, "exp")
+        const operations: OperationReport[] = []
+        for (const change of changes) {
+          const reachableTargets = targetCount(change)
+          const result = manager.applyPreviewChange(change, "exp")
+          const expectedNoOp =
+            result === false &&
+            (change.type === "move" ||
+              (change.type === "delete" && reachableTargets === 0))
+          operations.push({
+            kind: change.type,
+            result,
+            reachableTargets,
+            expectedNoOp
+          })
+          if (reachableTargets > 0 && !result && !expectedNoOp) {
+            throw fail(
+              cycle,
+              `reachable ${change.type} change was a no-op: ${JSON.stringify(operations)}`
+            )
+          }
+        }
         manager.removePreviewChanges("exp")
 
         if (document.body.innerHTML !== original) {

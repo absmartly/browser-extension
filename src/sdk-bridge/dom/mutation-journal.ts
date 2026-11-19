@@ -20,8 +20,14 @@ export type JournalEntry =
       name: string
       namespace: string | null
       oldValue: string | null
+      newValue: string | null
     }
-  | { kind: "characterData"; target: CharacterData; oldValue: string }
+  | {
+      kind: "characterData"
+      target: CharacterData
+      oldValue: string
+      newValue: string
+    }
   | {
       kind: "childList"
       target: Node
@@ -47,14 +53,16 @@ function toEntry(record: MutationRecord): JournalEntry {
       target: record.target as Element,
       name: record.attributeName as string,
       namespace: record.attributeNamespace,
-      oldValue: record.oldValue
+      oldValue: record.oldValue,
+      newValue: null
     }
   }
   if (record.type === "characterData") {
     return {
       kind: "characterData",
       target: record.target as CharacterData,
-      oldValue: record.oldValue ?? ""
+      oldValue: record.oldValue ?? "",
+      newValue: ""
     }
   }
   return {
@@ -65,6 +73,48 @@ function toEntry(record: MutationRecord): JournalEntry {
     previousSibling: record.previousSibling,
     nextSibling: record.nextSibling
   }
+}
+
+function toEntries(records: MutationRecord[]): JournalEntry[] {
+  return records.map((record, index) => {
+    const entry = toEntry(record)
+    if (entry.kind === "attributes") {
+      let nextValue: string | null | undefined
+      for (let i = index + 1; i < records.length; i++) {
+        const candidate = records[i]
+        if (
+          candidate.type === "attributes" &&
+          candidate.target === record.target &&
+          candidate.attributeName === record.attributeName &&
+          candidate.attributeNamespace === record.attributeNamespace
+        ) {
+          nextValue = candidate.oldValue
+          break
+        }
+      }
+      entry.newValue =
+        nextValue ??
+        (record.target as Element).getAttributeNodeNS(
+          record.attributeNamespace,
+          record.attributeName as string
+        )?.value ??
+        null
+    } else if (entry.kind === "characterData") {
+      let nextValue: string | undefined
+      for (let i = index + 1; i < records.length; i++) {
+        const candidate = records[i]
+        if (
+          candidate.type === "characterData" &&
+          candidate.target === record.target
+        ) {
+          nextValue = candidate.oldValue ?? ""
+          break
+        }
+      }
+      entry.newValue = nextValue ?? (record.target as CharacterData).data
+    }
+    return entry
+  })
 }
 
 /**
@@ -87,7 +137,7 @@ export function recordMutations<T>(
     records = observer.takeRecords()
     observer.disconnect()
   }
-  return { result, entries: records.map(toEntry) }
+  return { result, entries: toEntries(records) }
 }
 
 function isStructural(node: Node): boolean {
@@ -169,7 +219,9 @@ export function undoMutations(entries: JournalEntry[]): void {
   for (let i = entries.length - 1; i >= 0; i--) {
     const entry = entries[i]
     if (entry.kind === "attributes") {
-      const { target, name, namespace, oldValue } = entry
+      const { target, name, namespace, oldValue, newValue } = entry
+      const current = target.getAttributeNodeNS(namespace, name)?.value ?? null
+      if (current !== newValue) continue
       if (oldValue === null) {
         target.removeAttributeNS(namespace, name)
       } else {
@@ -178,7 +230,8 @@ export function undoMutations(entries: JournalEntry[]): void {
         else target.setAttributeNS(namespace, name, oldValue)
       }
     } else if (entry.kind === "characterData") {
-      entry.target.data = entry.oldValue
+      if (entry.target.data === entry.newValue)
+        entry.target.data = entry.oldValue
     } else {
       undoChildList(entry)
     }

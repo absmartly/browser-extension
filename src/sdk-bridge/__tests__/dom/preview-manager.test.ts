@@ -625,6 +625,78 @@ describe("PreviewManager", () => {
     expect(byId("k")).toBe(child)
   })
 
+  it("does not overwrite page attribute or text mutations made after preview apply", () => {
+    document.body.innerHTML = '<div id="h">Original</div>'
+    const element = byId("h")
+    const text = element.firstChild as Text
+
+    expect(
+      manager.applyPreviewChange(
+        { selector: "#h", type: "style", value: { color: "red" } },
+        "exp"
+      )
+    ).toBe(true)
+    expect(
+      manager.applyPreviewChange(
+        { selector: "#h", type: "text", value: "Preview" },
+        "exp"
+      )
+    ).toBe(true)
+
+    element.setAttribute("style", "color: blue")
+    text.data = "Page"
+    manager.removePreviewChanges("exp")
+
+    expect(element.getAttribute("style")).toBe("color: blue")
+    expect(element.textContent).toBe("Page")
+  })
+
+  it("restores unchanged values and leaves a namespaced page mutation alone", () => {
+    document.body.innerHTML =
+      '<svg id="icon"><use id="use" /></svg><p id="p">Original</p>'
+    const use = byId("use")
+    const paragraph = byId("p")
+    const text = paragraph.firstChild as Text
+    const href = "http://www.w3.org/1999/xlink"
+    use.setAttributeNS(href, "xlink:href", "#old")
+
+    manager.applyPreviewChange(
+      { selector: "#p", type: "text", value: "Preview" },
+      "exp"
+    )
+    manager.applyPreviewChange(
+      {
+        selector: "#use",
+        type: "attribute",
+        value: { "xlink:href": "#preview" }
+      },
+      "exp"
+    )
+    use.setAttributeNS(href, "xlink:href", "#page")
+    manager.removePreviewChanges("exp")
+
+    expect(paragraph.textContent).toBe("Original")
+    expect(text.data).toBe("Original")
+    expect(use.getAttributeNS(href, "href")).toBe("#page")
+  })
+
+  it("leaves a later overlapping experiment value owned by that experiment", () => {
+    document.body.innerHTML = '<div id="h">Original</div>'
+    manager.applyPreviewChange(
+      { selector: "#h", type: "style", value: { color: "red" } },
+      "a"
+    )
+    manager.applyPreviewChange(
+      { selector: "#h", type: "style", value: { color: "blue" } },
+      "b"
+    )
+
+    manager.removePreviewChanges("b")
+    expect(byId("h").style.color).toBe("red")
+    manager.removePreviewChanges("a")
+    expect(byId("h").style.color).toBe("")
+  })
+
   it("restores visual-editor marked elements from their serialized original", () => {
     document.body.innerHTML = '<div id="ve">Edited</div>'
     const element = byId("ve")
