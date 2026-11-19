@@ -1719,6 +1719,32 @@ describe("PreviewManager", () => {
       expect(input.value).toBe("user typed")
     })
 
+    it("keeps a value typed over a javascript assignment that changed nothing", () => {
+      document.body.innerHTML =
+        '<p id="a">A</p><form id="f"><input id="i" value="orig"></form>'
+      const input = byId("i") as HTMLInputElement
+      manager.applyPreviewChange(
+        { selector: "#a", type: "text", value: "AA" },
+        "a"
+      )
+      manager.applyPreviewChange(
+        {
+          selector: "#f",
+          type: "javascript",
+          value: "element.querySelector('input').value = 'orig'"
+        },
+        "b"
+      )
+      expect(input.value).toBe("orig")
+      input.value = "typed"
+
+      manager.removePreviewChanges("a")
+      expect(input.value).toBe("typed")
+      expect(byId("a").textContent).toBe("A")
+      manager.removePreviewChanges("b")
+      expect(input.value).toBe("typed")
+    })
+
     it("resets a page attribute written over a newer preview's value when an older one is removed", () => {
       document.body.innerHTML = '<p id="a">A</p><p id="h" title="orig">H</p>'
       manager.applyPreviewChange(

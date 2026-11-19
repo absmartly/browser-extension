@@ -72,6 +72,9 @@ interface PreviewJournal {
   // Every element a change was applied to, including ones it detached.
   targets: Set<Element>
   formWrites: FormPropertyWrite[]
+  // Every form property of a javascript change's targets as the apply left
+  // it, written or not; a later value differing from it is the user's.
+  formSeen: Array<Omit<FormPropertyWrite, "before">>
 }
 
 // One write in a segment: a change applied by selector, or a pending
@@ -169,7 +172,8 @@ function newSegment(name: string): Segment {
       attributeOrder: new Map(),
       marked: new Set(),
       targets: new Set(),
-      formWrites: []
+      formWrites: [],
+      formSeen: []
     }
   }
 }
@@ -266,17 +270,18 @@ export class PreviewManager {
     return 1
   }
 
-  // Values the user or page entered into form controls after the last
-  // preview write to them. `unwound` is every segment about to be unwound,
-  // oldest first; only controls inside `replayed` targets are considered,
-  // since replaying those segments is what would overwrite the value.
+  // Values the user or page entered into form controls after a preview's
+  // javascript last ran over them. `unwound` is every segment about to be
+  // unwound, oldest first; only controls inside `replayed` targets are
+  // considered, since replaying those segments is what would overwrite the
+  // value.
   private snapshotForm(unwound: Segment[], replayed: Segment[]): FormSnapshot {
-    const lastWrite = new Map<FormControl, Map<string, string | boolean>>()
+    const lastSeen = new Map<FormControl, Map<string, string | boolean>>()
     for (const { journal } of unwound) {
-      for (const { element, property, after } of journal.formWrites) {
+      for (const { element, property, after } of journal.formSeen) {
         const control = element as FormControl
-        if (!lastWrite.has(control)) lastWrite.set(control, new Map())
-        lastWrite.get(control).set(property, after)
+        if (!lastSeen.has(control)) lastSeen.set(control, new Map())
+        lastSeen.get(control).set(property, after)
       }
     }
     const targets = new Set<Element>()
@@ -284,10 +289,10 @@ export class PreviewManager {
       for (const target of journal.targets) targets.add(target)
     const snapshot: FormSnapshot = []
     for (const control of formControlsIn(Array.from(targets))) {
-      const written = lastWrite.get(control)
-      if (!written) continue
+      const seen = lastSeen.get(control)
+      if (!seen) continue
       const live = formProperties(control) as Record<string, string | boolean>
-      for (const [property, after] of written) {
+      for (const [property, after] of seen) {
         if (property in live && live[property] !== after)
           snapshot.push({ control, property, value: live[property] })
       }
@@ -406,6 +411,11 @@ export class PreviewManager {
     for (const [control, properties] of before) {
       const after = formProperties(control) as Record<string, string | boolean>
       for (const [property, value] of Object.entries(properties)) {
+        journal.formSeen.push({
+          element: control,
+          property: property as FormPropertyWrite["property"],
+          after: after[property]
+        })
         if (after[property] !== value)
           journal.formWrites.push({
             element: control,
