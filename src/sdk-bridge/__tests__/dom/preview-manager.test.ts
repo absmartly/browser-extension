@@ -21,6 +21,16 @@ const settle = async () => {
 
 const byId = (id: string) => document.getElementById(id)
 
+// Page markup without the experiment markers live previews write.
+const unmarked = () => {
+  const body = document.body.cloneNode(true) as HTMLElement
+  for (const element of body.querySelectorAll("*")) {
+    element.removeAttribute("data-absmartly-experiment")
+    element.removeAttribute("data-absmartly-modified")
+  }
+  return body.innerHTML
+}
+
 const mount = (html: string) => {
   const holder = document.createElement("div")
   holder.innerHTML = html
@@ -1035,6 +1045,7 @@ describe("PreviewManager", () => {
       document.body.innerHTML =
         '<div id="r"><b id="x"></b><i id="y"></i><u id="z"></u></div><div id="to"></div>'
       const original = byId("r").innerHTML
+      const deleted = byId("y")
       manager.applyPreviewChange({ selector: "#y", type: "delete" }, "a")
       for (const id of ["x", "z"])
         manager.applyPreviewChange(
@@ -1047,7 +1058,11 @@ describe("PreviewManager", () => {
           "b"
         )
       manager.removePreviewChanges("a")
-      expect(byId("y")).toBeNull()
+      // Only b's moves remain: a's deleted node is back in its slot.
+      expect(unmarked()).toBe(
+        '<div id="r"><i id="y"></i></div><div id="to"><b id="x"></b><u id="z"></u></div>'
+      )
+      expect(byId("y")).toBe(deleted)
       manager.removePreviewChanges("b")
       expect(byId("r").innerHTML).toBe(original)
     })
@@ -1070,7 +1085,10 @@ describe("PreviewManager", () => {
         "b"
       )
       manager.removePreviewChanges("a")
-      expect(byId("n").parentElement).toBe(byId("to"))
+      // b's move has no source without a's html: the page is the original.
+      expect(byId("n")).toBeNull()
+      expect(byId("h").firstChild).toBe(kept)
+      expect(byId("to").childNodes).toHaveLength(0)
       manager.removePreviewChanges("b")
       expect(byId("h").firstChild).toBe(kept)
       expect(document.body.innerHTML).toBe(
@@ -1098,6 +1116,204 @@ describe("PreviewManager", () => {
       expect(byId("m").parentElement).toBe(byId("a3"))
       manager.removePreviewChanges("b")
       expect(document.body.innerHTML).toBe(original)
+    })
+  })
+
+  describe("stacked previews unwound and re-applied", () => {
+    const move = (selector: string, target: string, position: string) =>
+      ({
+        selector,
+        type: "move",
+        targetSelector: target,
+        position
+      }) as DOMChange
+
+    it("removes a node an earlier preview created and moved when a later preview moved its old sibling", () => {
+      document.body.innerHTML =
+        '<div id="c1"><span>L1</span></div><ul id="l1"><li id="li1">A</li><li id="li2">B</li></ul>'
+      const original = document.body.innerHTML
+      const li1 = byId("li1")
+      manager.applyPreviewChange(
+        {
+          selector: "",
+          type: "create",
+          element: '<i id="na0">N</i>',
+          targetSelector: "#l1",
+          position: "firstChild"
+        },
+        "a"
+      )
+      manager.applyPreviewChange(move("#na0", "#c1", "firstChild"), "a")
+      manager.applyPreviewChange(move("#li1", "#c1", "after"), "b")
+
+      manager.removePreviewChanges("a")
+      expect(byId("na0")).toBeNull()
+      expect(byId("li1")).toBe(li1)
+      expect(unmarked()).toBe(
+        '<div id="c1"><span>L1</span></div><li id="li1">A</li><ul id="l1"><li id="li2">B</li></ul>'
+      )
+
+      manager.removePreviewChanges("b")
+      expect(document.body.innerHTML).toBe(original)
+      expect(byId("li1")).toBe(li1)
+    })
+
+    describe("a move under a later text change", () => {
+      const original =
+        '<div id="c"><span id="lab">L</span> loose <b id="btn">B</b></div><ul id="l"><li id="li">A</li></ul>'
+      const moveLab = move("#lab", "#li", "before")
+      const setup = () => {
+        document.body.innerHTML = original
+        manager.applyPreviewChange(moveLab, "a")
+        manager.applyPreviewChange(
+          { selector: "#c", type: "text", value: "TXT" },
+          "b"
+        )
+      }
+
+      it("takes the moved node out of the destination when the earlier preview is removed", () => {
+        setup()
+        const lab = byId("lab")
+        manager.removePreviewChanges("a")
+        expect(byId("l").innerHTML).toBe('<li id="li">A</li>')
+        expect(byId("c").textContent).toBe("TXT")
+        expect(lab.isConnected).toBe(false)
+        manager.removePreviewChanges("b")
+        expect(document.body.innerHTML).toBe(original)
+        expect(byId("lab")).toBe(lab)
+      })
+
+      it("ends at the original page after remove, re-apply, and removal of both", () => {
+        setup()
+        manager.removePreviewChanges("a")
+        manager.applyPreviewChange(moveLab, "a")
+        manager.removePreviewChanges("b")
+        manager.removePreviewChanges("a")
+        expect(document.body.innerHTML).toBe(original)
+      })
+
+      it("keeps its place in the stack when replaced", () => {
+        setup()
+        const lab = byId("lab")
+        const applied = unmarked()
+        expect(manager.replacePreviewChanges("a", [moveLab])).toBe(1)
+        // Re-applied under b, a's move lands before b's text change again.
+        expect(unmarked()).toBe(applied)
+        expect(byId("l").firstChild).toBe(lab)
+        manager.removePreviewChanges("b")
+        expect(byId("l").firstChild).toBe(lab)
+        expect(byId("c").innerHTML).toBe(' loose <b id="btn">B</b>')
+        manager.removePreviewChanges("a")
+        expect(document.body.innerHTML).toBe(original)
+        expect(byId("lab")).toBe(lab)
+      })
+    })
+
+    it.each([
+      [
+        ["a", "b", "c"],
+        ["green", "green", "orig"]
+      ],
+      [
+        ["a", "c", "b"],
+        ["green", "blue", "orig"]
+      ]
+    ])(
+      "gives an attribute three previews wrote the newest live value when removed in order %j",
+      (order, expected) => {
+        document.body.innerHTML = '<div id="h" title="orig">x</div>'
+        for (const [name, title] of [
+          ["a", "red"],
+          ["b", "blue"],
+          ["c", "green"]
+        ])
+          manager.applyPreviewChange(
+            { selector: "#h", type: "attribute", value: { title } },
+            name
+          )
+        const seen = order.map((name) => {
+          manager.removePreviewChanges(name)
+          return byId("h").getAttribute("title")
+        })
+        expect(seen).toEqual(expected)
+      }
+    )
+
+    it.each([
+      [
+        ["a", "b", "c"],
+        ["green", "green", ""]
+      ],
+      [
+        ["a", "c", "b"],
+        ["green", "blue", ""]
+      ]
+    ])(
+      "gives a declaration three previews wrote the newest live value when removed in order %j",
+      (order, expected) => {
+        document.body.innerHTML = '<div id="h">x</div>'
+        for (const [name, color] of [
+          ["a", "red"],
+          ["b", "blue"],
+          ["c", "green"]
+        ])
+          manager.applyPreviewChange(
+            { selector: "#h", type: "style", value: { color } },
+            name
+          )
+        const seen = order.map((name) => {
+          manager.removePreviewChanges(name)
+          return byId("h").style.color
+        })
+        expect(seen).toEqual(expected)
+        expect(byId("h").hasAttribute("style")).toBe(false)
+      }
+    )
+
+    it.each([[["a", "b"]], [["b", "a"]], [["clearAll"]]])(
+      "restores a form value two javascript previews wrote (%j)",
+      (order) => {
+        document.body.innerHTML =
+          '<form id="f"><input id="t" value="orig"></form>'
+        const input = byId("t") as HTMLInputElement
+        for (const name of ["a", "b"])
+          manager.applyPreviewChange(
+            {
+              selector: "#f",
+              type: "javascript",
+              value: `element.querySelector('#t').value = '${name}'`
+            },
+            name
+          )
+        expect(input.value).toBe("b")
+        if (order[0] === "clearAll") manager.clearAll()
+        else {
+          manager.removePreviewChanges(order[0])
+          expect(input.value).toBe(order[0] === "a" ? "b" : "a")
+          manager.removePreviewChanges(order[1])
+        }
+        expect(input.value).toBe("orig")
+      }
+    )
+
+    it("re-applies a later preview's pending SPA change after an earlier one is removed", async () => {
+      document.body.innerHTML = '<div id="now">N</div>'
+      manager.applyPreviewChange(
+        { selector: "#now", type: "style", value: { color: "red" } },
+        "a"
+      )
+      manager.applyPreviewChange(
+        { selector: "#late", type: "style", value: { color: "green" } },
+        "b"
+      )
+      manager.removePreviewChanges("a")
+      mount('<div id="late">L</div>')
+      await settle()
+
+      expect(byId("now").hasAttribute("style")).toBe(false)
+      expect(byId("late").style.color).toBe("green")
+      manager.removePreviewChanges("b")
+      expect(byId("late").hasAttribute("style")).toBe(false)
     })
   })
 

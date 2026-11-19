@@ -337,11 +337,12 @@ describe("PreviewManager restore property", () => {
 
 // Interleaved page writes and overlapping experiments.
 //
-// Two experiments ("a", "b") apply changes drawn from the same selector
+// Two or three experiments apply changes drawn from the same selector
 // pool, so their targets overlap. Between applies and removals "page code"
 // writes outside any journal: attributes, inline style declarations, text
-// data, and (in some cases) replaces an element's children. The previews
-// are then removed in random order (or by clearAll).
+// data, and (in some cases) replaces an element's children. One experiment
+// may be replaced in place (replace-mode update), then the previews are
+// removed in a given order or by clearAll.
 //
 // Invariant without child replacement: the page equals the original page
 // with only the page's writes applied (same element objects, in order;
@@ -349,10 +350,14 @@ describe("PreviewManager restore property", () => {
 // child replacement the page owns that subtree, so the check is weaker:
 // the page's node is still in the element it was put in, and every page
 // attribute, declaration and text write survives. Always: no errors and
-// no duplicate ids.
+// no duplicate ids. In runs without page writes, the page after each
+// removal must also equal a fresh application of the previews still live,
+// in their order, to the original page.
 
 const INTERLEAVED_BASE_SEED = 0x1a7e0000
-const INTERLEAVED_CASES = 400
+const INTERLEAVED_CASES = 3000
+const STACKED_BASE_SEED = 0x3e000000
+const STACKED_CASES = 500
 
 type PageWrite =
   | { kind: "attribute"; element: Element; name: string; value: string | null }
@@ -457,159 +462,300 @@ function allNodes(root: Node): Node[] {
   return nodes
 }
 
-const interleavedCases = Array.from({ length: INTERLEAVED_CASES }, (_, i) => {
-  const seed = INTERLEAVED_BASE_SEED + i
-  const rng = prng(seed)
-  return {
-    seed,
-    a: generateCase(rng, "a"),
-    b: generateCase(rng, "b"),
-    childReplacement: rng.next() < 0.25
+function slotValue(write: PageWrite): string | null {
+  switch (write.kind) {
+    case "attribute":
+      return write.element.getAttribute(write.name)
+    case "style":
+      return write.element.getAttribute("style")
+    case "text":
+      return write.node.data
+    case "children":
+      return null
   }
-})
+}
 
-describe("PreviewManager restore property with page writes and overlapping experiments", () => {
+function unmarkedCanonical(): string {
+  const body = document.body.cloneNode(true) as HTMLElement
+  for (const element of body.querySelectorAll("*")) {
+    element.removeAttribute("data-absmartly-experiment")
+    element.removeAttribute("data-absmartly-modified")
+  }
+  return canonical(body)
+}
+
+type Experiment = { name: string; changes: DOMChange[] }
+
+type StackRun = {
+  seed: number
+  experiments: Experiment[]
+  // Experiment index to replace and its new change list.
+  replace: { index: number; changes: DOMChange[] } | null
+  removal: string[] | "clearAll"
+  childReplacement: boolean
+}
+
+function runStack(manager: PreviewManager, run: StackRun): void {
+  const { seed, removal, childReplacement } = run
+  const experiments = run.experiments.map((e) => ({ ...e }))
+  const rng = prng(seed ^ 0x9e3779b9)
+  const expected = document.body.cloneNode(true)
+  const originalNodes = allNodes(document.body)
+  const cloneNodes = allNodes(expected)
+  const toClone = new Map<Node, Node>(
+    originalNodes.map((node, i) => [node, cloneNodes[i]])
+  )
+  const elements = originalNodes.filter(
+    (node): node is Element => node.nodeType === Node.ELEMENT_NODE
+  )
+  const texts = originalNodes.filter(
+    (node): node is Text => node.nodeType === Node.TEXT_NODE
+  )
+  const originalElements = Array.from(document.body.querySelectorAll("*"))
+
+  const writes: PageWrite[] = []
+  const log: string[] = []
+  const fail = (reason: string) =>
+    new Error(
+      `seed ${seed}: ${reason}\n` +
+        `steps: ${log.join(" | ")}\n` +
+        run.experiments
+          .map((e) => `${e.name}: ${JSON.stringify(e.changes)}`)
+          .join("\n") +
+        (run.replace
+          ? `\nreplacement: ${JSON.stringify(run.replace.changes)}`
+          : "") +
+        `\nbody: ${document.body.innerHTML}`
+    )
+  const step = (label: string, action: () => void) => {
+    log.push(label)
+    try {
+      action()
+    } catch (error) {
+      throw fail(`${label} threw ${(error as Error).stack}`)
+    }
+  }
+  const maybePage = (probability: number) => {
+    if (rng.next() >= probability) return
+    const write = pageWrite(
+      rng,
+      elements,
+      texts,
+      `${writes.length}`,
+      childReplacement
+    )
+    // A write that changes nothing (removing an attribute a preview already
+    // removed) produces no mutation, so no restorer can tell it happened.
+    // It is left out of the expected page.
+    const before = slotValue(write)
+    step(`page ${write.kind}`, () => runPageWrite(write, (node) => node))
+    if (write.kind === "children" || slotValue(write) !== before)
+      writes.push(write)
+    else log.push("(no-op)")
+  }
+
+  // Live previews after each removal, with the page they produced.
+  const checkpoints: Array<{ live: Experiment[]; page: string }> = []
+  const live = [...experiments]
+  const checkpoint = () => {
+    if (writes.length === 0)
+      checkpoints.push({ live: [...live], page: unmarkedCanonical() })
+  }
+
+  for (const { name, changes } of experiments) {
+    for (const change of changes) {
+      step(`apply ${name} ${change.type} ${change.selector}`, () =>
+        manager.applyPreviewChange(change, name)
+      )
+      maybePage(0.3)
+    }
+    for (let i = rng.int(3); i > 0; i--) maybePage(1)
+  }
+  if (run.replace) {
+    const target = experiments[run.replace.index]
+    const changes = run.replace.changes
+    step(`replace ${target.name}`, () =>
+      manager.replacePreviewChanges(target.name, changes)
+    )
+    const replaced = { name: target.name, changes }
+    live[run.replace.index] = replaced
+    checkpoint()
+    for (let i = rng.int(3); i > 0; i--) maybePage(1)
+  }
+  if (removal === "clearAll") {
+    step("clearAll", () => manager.clearAll())
+  } else {
+    for (const name of removal) {
+      step(`remove ${name}`, () => manager.removePreviewChanges(name))
+      live.splice(
+        live.findIndex((e) => e.name === name),
+        1
+      )
+      checkpoint()
+      for (let i = rng.int(3); i > 0; i--) maybePage(1)
+    }
+  }
+
+  const ids = Array.from(document.querySelectorAll("[id]"), (e) => e.id)
+  const duplicates = ids.filter((id, i) => ids.indexOf(id) !== i)
+  if (duplicates.length > 0)
+    throw fail(`duplicate ids ${duplicates.join(", ")}`)
+
+  const replaced = writes.some((write) => write.kind === "children")
+  if (!replaced) {
+    for (const write of writes) runPageWrite(write, (node) => toClone.get(node))
+    if (canonical(document.body) !== canonical(expected)) {
+      throw fail(
+        `page differs from the original plus page writes\n` +
+          `expected: ${canonical(expected)}\nactual:   ${canonical(document.body)}`
+      )
+    }
+    const nodes = Array.from(document.body.querySelectorAll("*"))
+    const index = originalElements.findIndex((node, i) => nodes[i] !== node)
+    if (nodes.length !== originalElements.length || index !== -1)
+      throw fail(`original element #${index} was replaced`)
+
+    // The page is the original again: rebuild each checkpoint's live set
+    // from scratch with a separate manager and compare. Only meaningful
+    // when no page write happened at all.
+    for (const { live: previews, page } of writes.length ? [] : checkpoints) {
+      const fresh = new PreviewManager()
+      for (const { name, changes } of previews)
+        for (const change of changes) fresh.applyPreviewChange(change, name)
+      const want = unmarkedCanonical()
+      fresh.clearAll()
+      if (want !== page) {
+        throw fail(
+          `page with [${previews.map((e) => e.name).join(",")}] live differs from applying them fresh\n` +
+            `expected: ${want}\nactual:   ${page}`
+        )
+      }
+    }
+    return
+  }
+
+  // Last write per slot wins; check each slot against it.
+  const last = new Map<string, PageWrite>()
+  const slotKey = new Map<Node, number>()
+  const keyOf = (node: Node) => {
+    if (!slotKey.has(node)) slotKey.set(node, slotKey.size)
+    return slotKey.get(node)
+  }
+  for (const write of writes) {
+    if (write.kind === "attribute")
+      last.set(`a${keyOf(write.element)}:${write.name}`, write)
+    else if (write.kind === "style")
+      last.set(`s${keyOf(write.element)}:${write.property}`, write)
+    else if (write.kind === "text") last.set(`t${keyOf(write.node)}`, write)
+    else last.set(`c${keyOf(write.element)}`, write)
+  }
+  for (const write of last.values()) {
+    if (write.kind === "attribute") {
+      const actual = write.element.getAttribute(write.name)
+      if (actual !== write.value)
+        throw fail(
+          `page ${write.name}=${write.value} became ${actual} on <${write.element.localName} id=${write.element.id}>`
+        )
+    } else if (write.kind === "style") {
+      const probe = document.createElement("i")
+      probe.style.setProperty(write.property, write.value)
+      const want = probe.style.getPropertyValue(write.property)
+      const actual = write.element.style.getPropertyValue(write.property)
+      if (actual !== want)
+        throw fail(
+          `page ${write.property}: ${want} became ${actual} on #${write.element.id}`
+        )
+    } else if (write.kind === "text") {
+      if (write.node.data !== write.value)
+        throw fail(`page text ${write.value} became ${write.node.data}`)
+    } else if (write.child.parentNode !== write.element) {
+      throw fail(`page child #${write.child.id} left its parent`)
+    }
+  }
+}
+
+function useFixture(): () => PreviewManager {
   let manager: PreviewManager
-
   beforeEach(() => {
     document.head.innerHTML = ""
     document.body.innerHTML = FIXTURE
     manager = new PreviewManager()
     jest.spyOn(console, "error").mockImplementation(() => {})
   })
-
   afterEach(() => {
     manager.clearAll()
     jest.restoreAllMocks()
   })
+  return () => manager
+}
+
+const interleavedCases = Array.from({ length: INTERLEAVED_CASES }, (_, i) => {
+  const seed = INTERLEAVED_BASE_SEED + i
+  const rng = prng(seed)
+  const experiments = [
+    { name: "a", changes: generateCase(rng, "a") },
+    { name: "b", changes: generateCase(rng, "b") }
+  ]
+  const childReplacement = rng.next() < 0.25
+  const removal: StackRun["removal"] =
+    rng.next() < 0.2 ? "clearAll" : rng.next() < 0.5 ? ["a", "b"] : ["b", "a"]
+  return { seed, experiments, childReplacement, removal, replace: null }
+})
+
+describe("PreviewManager restore property with page writes and overlapping experiments", () => {
+  const manager = useFixture()
 
   it.each(interleavedCases)(
     "seed $seed: page writes survive and only preview writes are undone",
-    ({ seed, a, b, childReplacement }) => {
-      const rng = prng(seed ^ 0x9e3779b9)
-      const expected = document.body.cloneNode(true)
-      const originalNodes = allNodes(document.body)
-      const cloneNodes = allNodes(expected)
-      const toClone = new Map<Node, Node>(
-        originalNodes.map((node, i) => [node, cloneNodes[i]])
-      )
-      const elements = originalNodes.filter(
-        (node): node is Element => node.nodeType === Node.ELEMENT_NODE
-      )
-      const texts = originalNodes.filter(
-        (node): node is Text => node.nodeType === Node.TEXT_NODE
-      )
-      const originalElements = Array.from(document.body.querySelectorAll("*"))
+    (run) => runStack(manager(), run)
+  )
+})
 
-      const writes: PageWrite[] = []
-      const log: string[] = []
-      const fail = (reason: string) =>
-        new Error(
-          `seed ${seed}: ${reason}\n` +
-            `steps: ${log.join(" | ")}\n` +
-            `a: ${JSON.stringify(a)}\nb: ${JSON.stringify(b)}\n` +
-            `body: ${document.body.innerHTML}`
-        )
-      const step = (label: string, run: () => void) => {
-        log.push(label)
+const REMOVALS: StackRun["removal"][] = [
+  ["a", "b", "c"],
+  ["a", "c", "b"],
+  ["b", "a", "c"],
+  ["b", "c", "a"],
+  ["c", "a", "b"],
+  ["c", "b", "a"],
+  "clearAll"
+]
+
+const stackedCases = Array.from({ length: STACKED_CASES }, (_, i) => {
+  const seed = STACKED_BASE_SEED + i
+  const rng = prng(seed)
+  const experiments = ["a", "b", "c"].map((name) => ({
+    name,
+    changes: generateCase(rng, name)
+  }))
+  const childReplacement = rng.next() < 0.25
+  let replace: StackRun["replace"] = null
+  if (rng.next() < 0.5) {
+    const index = rng.int(3)
+    const name = experiments[index].name
+    replace = {
+      index,
+      changes:
+        rng.next() < 0.5
+          ? experiments[index].changes
+          : generateCase(rng, `${name}r`)
+    }
+  }
+  return { seed, experiments, childReplacement, replace }
+})
+
+describe("PreviewManager restore property with three stacked experiments", () => {
+  const manager = useFixture()
+
+  it.each(stackedCases)(
+    "seed $seed: every removal order and clearAll restore the page",
+    (run) => {
+      for (const removal of REMOVALS) {
+        document.body.innerHTML = FIXTURE
         try {
-          run()
-        } catch (error) {
-          throw fail(`${label} threw ${(error as Error).stack}`)
-        }
-      }
-      const maybePage = (probability: number) => {
-        if (rng.next() >= probability) return
-        const write = pageWrite(
-          rng,
-          elements,
-          texts,
-          `${writes.length}`,
-          childReplacement
-        )
-        writes.push(write)
-        step(`page ${write.kind}`, () => runPageWrite(write, (node) => node))
-      }
-      const applyAll = (name: string, changes: DOMChange[]) => {
-        for (const change of changes) {
-          step(`apply ${name} ${change.type} ${change.selector}`, () =>
-            manager.applyPreviewChange(change, name)
-          )
-          maybePage(0.3)
-        }
-      }
-
-      applyAll("a", a)
-      for (let i = rng.int(3); i > 0; i--) maybePage(1)
-      applyAll("b", b)
-      for (let i = rng.int(3); i > 0; i--) maybePage(1)
-      if (rng.next() < 0.2) {
-        step("clearAll", () => manager.clearAll())
-      } else {
-        const [first, second] = rng.next() < 0.5 ? ["a", "b"] : ["b", "a"]
-        step(`remove ${first}`, () => manager.removePreviewChanges(first))
-        for (let i = rng.int(3); i > 0; i--) maybePage(1)
-        step(`remove ${second}`, () => manager.removePreviewChanges(second))
-      }
-
-      const ids = Array.from(document.querySelectorAll("[id]"), (e) => e.id)
-      const duplicates = ids.filter((id, i) => ids.indexOf(id) !== i)
-      if (duplicates.length > 0)
-        throw fail(`duplicate ids ${duplicates.join(", ")}`)
-
-      const replaced = writes.some((write) => write.kind === "children")
-      if (!replaced) {
-        for (const write of writes)
-          runPageWrite(write, (node) => toClone.get(node))
-        if (canonical(document.body) !== canonical(expected)) {
-          throw fail(
-            `page differs from the original plus page writes\n` +
-              `expected: ${canonical(expected)}\nactual:   ${canonical(document.body)}`
-          )
-        }
-        const nodes = Array.from(document.body.querySelectorAll("*"))
-        const index = originalElements.findIndex((node, i) => nodes[i] !== node)
-        if (nodes.length !== originalElements.length || index !== -1)
-          throw fail(`original element #${index} was replaced`)
-        return
-      }
-
-      // Last write per slot wins; check each slot against it.
-      const last = new Map<string, PageWrite>()
-      const slotKey = new Map<Node, number>()
-      const keyOf = (node: Node) => {
-        if (!slotKey.has(node)) slotKey.set(node, slotKey.size)
-        return slotKey.get(node)
-      }
-      for (const write of writes) {
-        if (write.kind === "attribute")
-          last.set(`a${keyOf(write.element)}:${write.name}`, write)
-        else if (write.kind === "style")
-          last.set(`s${keyOf(write.element)}:${write.property}`, write)
-        else if (write.kind === "text") last.set(`t${keyOf(write.node)}`, write)
-        else last.set(`c${keyOf(write.element)}`, write)
-      }
-      for (const write of last.values()) {
-        if (write.kind === "attribute") {
-          const actual = write.element.getAttribute(write.name)
-          if (actual !== write.value)
-            throw fail(
-              `page ${write.name}=${write.value} became ${actual} on <${write.element.localName} id=${write.element.id}>`
-            )
-        } else if (write.kind === "style") {
-          const probe = document.createElement("i")
-          probe.style.setProperty(write.property, write.value)
-          const want = probe.style.getPropertyValue(write.property)
-          const actual = write.element.style.getPropertyValue(write.property)
-          if (actual !== want)
-            throw fail(
-              `page ${write.property}: ${want} became ${actual} on #${write.element.id}`
-            )
-        } else if (write.kind === "text") {
-          if (write.node.data !== write.value)
-            throw fail(`page text ${write.value} became ${write.node.data}`)
-        } else if (write.child.parentNode !== write.element) {
-          throw fail(`page child #${write.child.id} left its parent`)
+          runStack(manager(), { ...run, removal })
+        } finally {
+          manager().clearAll()
         }
       }
     }

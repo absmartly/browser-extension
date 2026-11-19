@@ -85,15 +85,7 @@ function attributeValue(
 
 type AttributeState = Extract<JournalEntry, { kind: "attributes" }>
 type CharacterDataState = Extract<JournalEntry, { kind: "characterData" }>
-export type ValueEntry = AttributeState | CharacterDataState
-
-/** Whether both entries record writes to the same attribute or text node. */
-export function sameSlot(a: JournalEntry, b: ValueEntry): boolean {
-  if (a.kind !== b.kind || a.target !== b.target) return false
-  if (a.kind === "attributes" && b.kind === "attributes")
-    return a.name === b.name && a.namespace === b.namespace
-  return true
-}
+type ValueEntry = AttributeState | CharacterDataState
 
 type Declaration = { value: string; priority: string }
 
@@ -168,32 +160,6 @@ function undoStyleDeclarations(entry: AttributeState): void {
     if (entry.oldValue === null) element.removeAttribute("style")
     else element.setAttribute("style", entry.oldValue)
   }
-}
-
-/**
- * `skipped` was not undone because `later` (the next write to the same
- * slot, still live) overwrote it. Rewrite `later` to restore what `skipped`
- * found, so removing `later` does not bring back `skipped`'s value. For an
- * inline style this is done per declaration `skipped` changed.
- */
-export function inheritOldValue(later: ValueEntry, skipped: ValueEntry): void {
-  if (isInlineStyle(skipped) && later.kind === "attributes") {
-    const doc = skipped.target.ownerDocument
-    const scratch = doc.createElement("div")
-    if (later.oldValue !== null) scratch.setAttribute("style", later.oldValue)
-    const inherited = declarations(doc, later.oldValue)
-    for (const { name, before, after } of changedDeclarations(skipped)) {
-      if (sameDeclaration(inherited.get(name), after))
-        writeDeclaration(scratch.style, name, before)
-    }
-    later.oldValue =
-      scratch.style.length === 0 &&
-      declarations(doc, skipped.oldValue).size === 0
-        ? skipped.oldValue
-        : scratch.getAttribute("style")
-    return
-  }
-  if (later.oldValue === skipped.newValue) later.oldValue = skipped.oldValue
 }
 
 export type MutationJournalDiagnostics = {
@@ -438,69 +404,33 @@ export function watchMutations(root: Node): () => JournalEntry[] {
 
 type ChildListEntry = Extract<JournalEntry, { kind: "childList" }>
 
-export type UndoHooks = {
-  // An entry whose result something else has since overwritten (attribute
-  // or text value, or a node it added) is left alone and reported here.
-  onSkip?: (entry: JournalEntry) => void
-  // Neither recorded sibling of a reinsert is in the parent any more.
-  // Return true to take over the reinsert instead of appending.
-  adoptUnanchored?: (entry: ChildListEntry) => boolean
-  // `taken` (nodes `entry` added) were moved out by a later live entry.
-  // Return true if that entry now restores `entry.removed` in their place.
-  handOver?: (entry: ChildListEntry, taken: Node[]) => boolean
-  // `entry`'s undo is about to take `node` out of its current parent.
-  beforeDetach?: (entry: ChildListEntry, node: Node) => void
-}
-
 function undoChildList(
   entry: ChildListEntry,
-  reinsertedLater: (node: Node) => boolean,
-  hooks: UndoHooks
-): boolean {
+  reinsertedLater: (node: Node) => boolean
+): void {
   const { target, added, removed, previousSibling, nextSibling } = entry
 
-  // Once something else has taken a node this entry added out of `target`,
-  // the taker owns the children. Page code re-rendering the subtree keeps
-  // them: putting the removed nodes back would delete its content. A later
-  // live preview can instead take over the removed nodes (`handOver`); the
-  // added nodes still here are then removed as usual.
-  const taken = added.filter((node) => node.parentNode !== target)
-  if (taken.length > 0) {
-    if (!hooks.handOver?.(entry, taken)) return false
-    for (const node of added) {
-      if (node.parentNode !== target || reinsertedLater(node)) continue
-      hooks.beforeDetach?.(entry, node)
-      target.removeChild(node)
-    }
-    return true
-  }
+  // Once something else has taken any node this entry added out of
+  // `target` (page code re-rendering the subtree), that code owns the
+  // children: putting the removed nodes back would delete its content.
+  if (!added.every((node) => node.parentNode === target)) return
 
   // A node that an older entry puts back (the source half of a move) is
   // left in place here: the older insertBefore moves it in one step, and
   // if that destination has become invalid the node stays attached where
   // it is instead of being dropped.
   for (const node of added) {
-    if (reinsertedLater(node)) continue
-    hooks.beforeDetach?.(entry, node)
-    target.removeChild(node)
+    if (!reinsertedLater(node)) target.removeChild(node)
   }
-  if (removed.length === 0) return true
-
-  const anchored =
-    (nextSibling !== null && nextSibling.parentNode === target) ||
-    (previousSibling !== null && previousSibling.parentNode === target) ||
-    (previousSibling === null && nextSibling === null)
-  if (!anchored && hooks.adoptUnanchored?.(entry)) return true
+  if (removed.length === 0) return
 
   const anchor = slotAnchor(target, previousSibling, nextSibling)
   for (const node of removed) {
     // Page code may since have put `target` inside `node`; inserting would
     // throw HierarchyRequestError.
     if (node.contains(target)) continue
-    if (node.parentNode) hooks.beforeDetach?.(entry, node)
     target.insertBefore(node, anchor)
   }
-  return true
 }
 
 /**
@@ -550,15 +480,11 @@ export function restoreAttributeOrder(order: Map<Element, string[]>): void {
 
 /**
  * Invert entries newest-first, restoring the DOM they were recorded on.
- * An entry whose result something else has since overwritten is left
- * alone and passed to `hooks.onSkip`; an inline style is first undone per
- * declaration the page left alone.
+ * An entry whose result something else has since overwritten (attribute
+ * or text value, or a node it added) is left alone; an inline style is
+ * then undone per declaration the page left alone.
  */
-export function undoMutations(
-  entries: JournalEntry[],
-  hooks: UndoHooks = {}
-): void {
-  const { onSkip } = hooks
+export function undoMutations(entries: JournalEntry[]): void {
   // How many not-yet-undone entries put each node back.
   const pendingReinserts = new Map<Node, number>()
   const countReinserts = (entry: JournalEntry, delta: number) => {
@@ -576,7 +502,6 @@ export function undoMutations(
       const current = target.getAttributeNodeNS(namespace, name)?.value ?? null
       if (current !== newValue) {
         if (isInlineStyle(entry)) undoStyleDeclarations(entry)
-        onSkip?.(entry)
         continue
       }
       if (oldValue === null) {
@@ -589,14 +514,8 @@ export function undoMutations(
     } else if (entry.kind === "characterData") {
       if (entry.target.data === entry.newValue)
         entry.target.data = entry.oldValue
-      else onSkip?.(entry)
     } else {
-      const undone = undoChildList(
-        entry,
-        (node) => (pendingReinserts.get(node) ?? 0) > 0,
-        hooks
-      )
-      if (!undone) onSkip?.(entry)
+      undoChildList(entry, (node) => (pendingReinserts.get(node) ?? 0) > 0)
     }
   }
 }

@@ -14,11 +14,9 @@ import type { DOMChange } from "~src/types/dom-changes"
 
 import { Logger } from "../utils/logger"
 import {
-  inheritOldValue,
   recordAttributeOrder,
   recordMutations,
   restoreAttributeOrder,
-  sameSlot,
   undoMutations,
   type JournalEntry
 } from "./mutation-journal"
@@ -62,8 +60,6 @@ function formProperties(control: FormControl) {
   return { value: control.value }
 }
 
-type ChildListEntry = Extract<JournalEntry, { kind: "childList" }>
-
 // Everything one experiment's preview did to the page, in application order.
 interface PreviewJournal {
   entries: JournalEntry[]
@@ -72,6 +68,14 @@ interface PreviewJournal {
   // Every element a change was applied to, including ones it detached.
   targets: Set<Element>
   formWrites: FormPropertyWrite[]
+}
+
+// One live preview: the changes it was given, so it can be re-applied, and
+// the journal of what applying them did.
+interface PreviewLayer {
+  name: string
+  changes: DOMChange[]
+  journal: PreviewJournal
 }
 
 type OwnedApplication = (
@@ -128,166 +132,125 @@ class PreviewDOMManipulator extends DOMManipulatorLite {
   }
 }
 
+function newLayer(name: string, changes: DOMChange[]): PreviewLayer {
+  return {
+    name,
+    changes,
+    journal: {
+      entries: [],
+      attributeOrder: new Map(),
+      marked: new Set(),
+      targets: new Set(),
+      formWrites: []
+    }
+  }
+}
+
+const isDisabled = (change: DOMChange) =>
+  ("disabled" in change && change.disabled) ||
+  ("enabled" in change && change.enabled === false)
+
 export class PreviewManager {
-  private journals: Map<string, PreviewJournal> = new Map()
+  // Live previews in application order, oldest first. A journal is only
+  // ever inverted against the DOM its own records produced: removing or
+  // changing a layer first unwinds every layer above it, newest first, and
+  // re-applies those layers from their change lists afterwards.
+  private stack: PreviewLayer[] = []
   private sessions: Map<string, PreviewDOMManipulator> = new Map()
   private styleManagers: Map<string, StyleSheetManager> = new Map()
-  // Global application order of every journaled entry, across experiments.
-  private entrySeq = new WeakMap<JournalEntry, number>()
-  private nextSeq = 0
 
-  private append(journal: PreviewJournal, entries: JournalEntry[]): void {
-    for (const entry of entries) {
-      this.entrySeq.set(entry, this.nextSeq++)
-      journal.entries.push(entry)
+  private layer(experimentName: string): PreviewLayer | undefined {
+    return this.stack.find((layer) => layer.name === experimentName)
+  }
+
+  private getLayer(experimentName: string): PreviewLayer {
+    let layer = this.layer(experimentName)
+    if (!layer) {
+      layer = newLayer(experimentName, [])
+      this.stack.push(layer)
+    }
+    return layer
+  }
+
+  // Takes `experimentName`'s layer and every newer one off the stack and
+  // unwinds them newest first. Returns the newer layers, oldest first, for
+  // replay, and how much of `experimentName`'s preview was undone.
+  private unwindFrom(experimentName: string): {
+    removed?: PreviewLayer
+    above: PreviewLayer[]
+    undone: number
+  } {
+    const index = this.stack.findIndex((l) => l.name === experimentName)
+    if (index === -1) return { above: [], undone: this.release(experimentName) }
+    const [removed, ...above] = this.stack.splice(index)
+    for (let i = above.length - 1; i >= 0; i--) this.unwind(above[i])
+    return { removed, above, undone: this.unwind(removed) }
+  }
+
+  // Runs `run` while `experimentName` is the newest layer.
+  private onTop<T>(experimentName: string, run: () => T): T {
+    const index = this.stack.findIndex((l) => l.name === experimentName)
+    if (index === -1 || index === this.stack.length - 1) return run()
+    const above = this.stack.splice(index + 1)
+    for (let i = above.length - 1; i >= 0; i--) this.unwind(above[i])
+    try {
+      return run()
+    } finally {
+      this.replay(above)
     }
   }
 
-  // The earliest entry of a live preview applied after `entry` that
-  // matches `test`, with the journal holding it.
-  private laterLiveEntry<T extends JournalEntry>(
-    entry: JournalEntry,
-    test: (candidate: JournalEntry) => candidate is T
-  ): { entry: T; journal: PreviewJournal } | null {
-    const seq = this.entrySeq.get(entry) ?? -1
-    let found: { entry: T; journal: PreviewJournal } | null = null
-    let foundSeq = Infinity
-    for (const journal of this.journals.values()) {
-      for (const candidate of journal.entries) {
-        const candidateSeq = this.entrySeq.get(candidate) ?? -1
-        if (candidateSeq > seq && candidateSeq < foundSeq && test(candidate)) {
-          found = { entry: candidate, journal }
-          foundSeq = candidateSeq
+  // Inverts everything `layer` did, cancels its pending SPA work and drops
+  // its stylesheet. Returns the number of entries and stylesheets undone.
+  private unwind(layer: PreviewLayer): number {
+    const count = this.release(layer.name)
+    const { journal } = layer
+    undoMutations(journal.entries)
+    restoreAttributeOrder(journal.attributeOrder)
+    this.undoFormWrites(journal.formWrites)
+    for (const element of journal.marked) {
+      if (element.getAttribute("data-absmartly-experiment") !== layer.name)
+        continue
+      element.removeAttribute("data-absmartly-experiment")
+      element.removeAttribute("data-absmartly-modified")
+    }
+    return count + journal.entries.length
+  }
+
+  private release(experimentName: string): number {
+    // Cancel pending SPA work first, so no late mount re-applies.
+    const session = this.sessions.get(experimentName)
+    if (session) {
+      this.sessions.delete(experimentName)
+      session.destroy()
+    }
+    const styleManager = this.styleManagers.get(experimentName)
+    if (styleManager) {
+      styleManager.destroy()
+      this.styleManagers.delete(experimentName)
+    }
+    // Same id format as the SDK plugin's stylesheet.
+    const styleElement = document.getElementById(
+      `absmartly-styles-${experimentName}`
+    )
+    if (!styleElement) return 0
+    styleElement.remove()
+    return 1
+  }
+
+  // Re-applies unwound layers in their original order with fresh journals
+  // and sessions. A change that throws is logged; the rest still apply.
+  private replay(layers: PreviewLayer[]): void {
+    for (const { name, changes } of layers) {
+      this.stack.push(newLayer(name, changes))
+      for (const change of changes) {
+        try {
+          this.applyChange(change, name)
+        } catch (error) {
+          Logger.error("[PreviewManager] Re-applying preview failed:", error)
         }
       }
     }
-    return found
-  }
-
-  // Removing a preview whose write a later live preview overwrote leaves
-  // that write's result in place, but the later entry still records it as
-  // the state to restore. Hand the later entry this preview's own prior
-  // state instead, so removing the later preview restores the page.
-  private spliceIntoLaterOwner(skipped: JournalEntry): void {
-    if (skipped.kind === "childList") return
-    const found = this.laterLiveEntry(
-      skipped,
-      (candidate): candidate is typeof skipped => sameSlot(candidate, skipped)
-    )
-    if (found) inheritOldValue(found.entry, skipped)
-  }
-
-  // `taken` are nodes `skipped` added that a later live preview moved out
-  // of the parent. That preview's undo must put back what `skipped`
-  // removed in their place, so it becomes responsible for those nodes.
-  private handOver(
-    skipped: ChildListEntry,
-    removedEntries: JournalEntry[],
-    takenNodes: Node[]
-  ): boolean {
-    const added = new Set(takenNodes)
-    const found = this.laterLiveEntry(
-      skipped,
-      (candidate): candidate is ChildListEntry =>
-        candidate.kind === "childList" &&
-        candidate.target === skipped.target &&
-        takenNodes.every((node) => candidate.removed.includes(node))
-    )
-    if (!found) return false
-    const owner = found.entry
-    const taken = owner.removed.filter((node) => added.has(node))
-    const at = owner.removed.findIndex((node) => added.has(node))
-    const kept = owner.removed.filter((node) => !added.has(node))
-    const before = owner.removed.slice(0, at).filter((node) => !added.has(node))
-    owner.removed = [
-      ...before,
-      ...skipped.removed,
-      ...kept.slice(before.length)
-    ]
-    // A node this preview moved here and the later one moved on: the later
-    // preview's undo now returns it to where this preview found it, and
-    // this preview's own reinsert there is dropped.
-    const index = removedEntries.indexOf(skipped)
-    for (const node of taken) {
-      for (let i = index - 1; i >= 0; i--) {
-        const source = removedEntries[i]
-        if (source.kind !== "childList" || !source.removed.includes(node))
-          continue
-        source.removed = source.removed.filter((other) => other !== node)
-        const moved: ChildListEntry = {
-          kind: "childList",
-          target: source.target,
-          added: [],
-          removed: [node],
-          previousSibling: source.previousSibling,
-          nextSibling: source.nextSibling
-        }
-        this.entrySeq.set(moved, this.entrySeq.get(owner) ?? -1)
-        const entries = found.journal.entries
-        entries.splice(entries.indexOf(owner), 0, moved)
-        break
-      }
-    }
-    return true
-  }
-
-  // Undoing `entry` moves `node` away from where a later live preview saw
-  // it. That preview's entries that use `node` as a sibling anchor are
-  // re-anchored on the node's current neighbour, which names the same slot
-  // once `node` has gone.
-  private rebaseAnchors(entry: JournalEntry, node: Node): void {
-    const seq = this.entrySeq.get(entry) ?? -1
-    for (const journal of this.journals.values()) {
-      for (const later of journal.entries) {
-        if (later.kind !== "childList") continue
-        if ((this.entrySeq.get(later) ?? -1) <= seq) continue
-        if (later.target !== node.parentNode) continue
-        if (later.nextSibling === node) later.nextSibling = node.nextSibling
-        if (later.previousSibling === node)
-          later.previousSibling = node.previousSibling
-      }
-    }
-  }
-
-  // A reinsert whose siblings a later live entry removed belongs next to
-  // them in that entry's removed list: they come back together when the
-  // later preview is removed, and stay out while it is applied.
-  private adoptUnanchored(entry: ChildListEntry): boolean {
-    const { previousSibling, nextSibling } = entry
-    const owner = this.laterLiveEntry(
-      entry,
-      (candidate): candidate is ChildListEntry =>
-        candidate.kind === "childList" &&
-        candidate.target === entry.target &&
-        candidate.removed.some(
-          (node) => node === previousSibling || node === nextSibling
-        )
-    )
-    if (!owner) return false
-    const { removed } = owner.entry
-    const afterPrevious =
-      previousSibling !== null ? removed.indexOf(previousSibling) : -1
-    const at =
-      afterPrevious !== -1
-        ? afterPrevious + 1
-        : removed.indexOf(nextSibling as Node)
-    removed.splice(at, 0, ...entry.removed)
-    return true
-  }
-
-  private getJournal(experimentName: string): PreviewJournal {
-    let journal = this.journals.get(experimentName)
-    if (!journal) {
-      journal = {
-        entries: [],
-        attributeOrder: new Map(),
-        marked: new Set(),
-        targets: new Set(),
-        formWrites: []
-      }
-      this.journals.set(experimentName, journal)
-    }
-    return journal
   }
 
   // Applies one change to `targets` and journals every DOM mutation it
@@ -301,7 +264,7 @@ export class PreviewManager {
     targets: Element[],
     apply: () => boolean
   ): boolean {
-    const journal = this.getJournal(experimentName)
+    const { journal } = this.getLayer(experimentName)
     recordAttributeOrder(journal.attributeOrder, targets)
     let formBefore: Array<[FormControl, Record<string, string | boolean>]> = []
     if (change.type === "javascript") {
@@ -324,9 +287,9 @@ export class PreviewManager {
       [document, ...targets],
       apply,
       undefined,
-      (partial) => this.append(journal, partial)
+      (partial) => journal.entries.push(...partial)
     )
-    this.append(journal, entries)
+    journal.entries.push(...entries)
     this.recordFormWrites(journal, formBefore)
     if (result) {
       for (const element of targets) {
@@ -395,7 +358,15 @@ export class PreviewManager {
         ) {
           return false
         }
-        return this.applyJournaled(experimentName, change, [element], apply)
+        // A late match is journaled with this preview as the newest layer,
+        // so newer previews are unwound around it and re-applied on top. If
+        // unwinding them detached the match, it stays pending instead.
+        const connected = element.isConnected
+        return this.onTop(experimentName, () =>
+          connected && !element.isConnected
+            ? false
+            : this.applyJournaled(experimentName, change, [element], apply)
+        )
       }
     )
     this.sessions.set(experimentName, session)
@@ -444,15 +415,17 @@ export class PreviewManager {
    * Apply a single preview change and track it for reversion
    */
   applyPreviewChange(change: DOMChange, experimentName: string): boolean {
-    // Skip disabled changes
-    if (
-      ("disabled" in change && change.disabled) ||
-      ("enabled" in change && change.enabled === false)
-    ) {
+    if (isDisabled(change)) {
       Logger.log("Skipping disabled change:", change.selector)
       return false
     }
+    this.getLayer(experimentName).changes.push(change)
+    return this.onTop(experimentName, () =>
+      this.applyChange(change, experimentName)
+    )
+  }
 
+  private applyChange(change: DOMChange, experimentName: string): boolean {
     const session = this.getSession(experimentName)
     // styleRules only write the experiment's stylesheet, which removal
     // destroys as a whole.
@@ -497,49 +470,19 @@ export class PreviewManager {
     for (const element of targets) {
       element.removeAttribute("data-absmartly-original")
       const owner = element.getAttribute("data-absmartly-experiment")
-      if (owner !== null && !this.journals.has(owner)) {
+      if (owner !== null && !this.layer(owner)) {
         element.removeAttribute("data-absmartly-experiment")
         element.removeAttribute("data-absmartly-modified")
       }
     }
   }
 
-  /**
-   * Remove all preview changes for an experiment
-   */
-  removePreviewChanges(experimentName: string): boolean {
-    Logger.log("Removing preview changes for experiment:", experimentName)
-
-    // Cancel pending SPA work before restoring, so no late mount re-applies.
-    const session = this.sessions.get(experimentName)
-    if (session) {
-      this.sessions.delete(experimentName)
-      session.destroy()
-    }
-
-    let restoredCount = 0
-
-    const journal = this.journals.get(experimentName)
-    if (journal) {
-      this.journals.delete(experimentName)
-      undoMutations(journal.entries, {
-        onSkip: (skipped) => this.spliceIntoLaterOwner(skipped),
-        handOver: (entry, taken) =>
-          this.handOver(entry, journal.entries, taken),
-        adoptUnanchored: (entry) => this.adoptUnanchored(entry),
-        beforeDetach: (entry, node) => this.rebaseAnchors(entry, node)
-      })
-      restoreAttributeOrder(journal.attributeOrder)
-      this.undoFormWrites(journal.formWrites)
-      restoredCount += journal.entries.length
-      this.clearEditorMarkers(journal.targets)
-    }
-
-    // Markers written outside the journal (visual-editor selection, or
-    // targets of an earlier session) are stripped by name. The selection
-    // sidecar is never replayed: it serializes whatever was on the page when
-    // the element was selected, previewed content included, and the journal
-    // has already restored everything a preview wrote.
+  // Markers written outside the journal (visual-editor selection, or
+  // targets of an earlier session) are stripped by name. The selection
+  // sidecar is never replayed: it serializes whatever was on the page when
+  // the element was selected, previewed content included, and the journal
+  // has already restored everything a preview wrote.
+  private sweepMarkers(experimentName: string): number {
     const markedElements = document.querySelectorAll(
       `[data-absmartly-experiment="${experimentName}"], [data-absmartly-experiment="__preview__"]`
     )
@@ -547,46 +490,64 @@ export class PreviewManager {
       element.removeAttribute("data-absmartly-original")
       element.removeAttribute("data-absmartly-experiment")
       element.removeAttribute("data-absmartly-modified")
-      restoredCount++
     }
+    return markedElements.length
+  }
 
-    // Remove styleRules for this experiment via StyleSheetManager
-    const styleManager = this.styleManagers.get(experimentName)
-    if (styleManager) {
-      styleManager.destroy()
-      this.styleManagers.delete(experimentName)
-      Logger.log(
-        `[PreviewManager] Destroyed stylesheet for experiment:`,
-        experimentName
-      )
-    }
-
-    // Remove the style element for this experiment (same ID format as SDK plugin)
-    const styleId = `absmartly-styles-${experimentName}`
-    const styleElement = document.getElementById(styleId)
-    if (styleElement) {
-      styleElement.remove()
-      Logger.log("[PreviewManager] Destroyed stylesheet:", styleId)
-      restoredCount++
-    }
-
+  /**
+   * Remove all preview changes for an experiment
+   */
+  removePreviewChanges(experimentName: string): boolean {
+    Logger.log("Removing preview changes for experiment:", experimentName)
+    const { removed, above, undone } = this.unwindFrom(experimentName)
+    const restoredCount = undone + this.sweepMarkers(experimentName)
+    this.replay(above)
+    if (removed) this.clearEditorMarkers(removed.journal.targets)
     Logger.log(`Removed preview changes, cleaned ${restoredCount} elements`)
     return restoredCount > 0
+  }
+
+  /**
+   * Replace an experiment's preview with `changes`, keeping its place among
+   * the other live previews. Returns how many changes applied.
+   * `beforeApply` runs before each change, against the page it will see.
+   */
+  replacePreviewChanges(
+    experimentName: string,
+    changes: DOMChange[],
+    beforeApply?: (change: DOMChange) => void
+  ): number {
+    const { removed: replaced, above } = this.unwindFrom(experimentName)
+    this.sweepMarkers(experimentName)
+    let applied = 0
+    try {
+      for (const change of changes) {
+        beforeApply?.(change)
+        if (this.applyPreviewChange(change, experimentName)) applied++
+      }
+    } finally {
+      this.replay(above)
+      if (replaced) this.clearEditorMarkers(replaced.journal.targets)
+    }
+    return applied
   }
 
   /**
    * Clear all preview changes
    */
   clearAll(): void {
+    const layers = this.stack.splice(0)
+    for (let i = layers.length - 1; i >= 0; i--) this.unwind(layers[i])
     const experimentNames = new Set<string>([
+      ...layers.map((layer) => layer.name),
       ...this.sessions.keys(),
-      ...this.journals.keys(),
       ...this.styleManagers.keys()
     ])
-
     for (const name of experimentNames) {
-      this.removePreviewChanges(name)
+      this.release(name)
+      this.sweepMarkers(name)
     }
+    for (const layer of layers) this.clearEditorMarkers(layer.journal.targets)
   }
 
   /**
@@ -594,7 +555,7 @@ export class PreviewManager {
    */
   getPreviewCount(): number {
     let count = 0
-    for (const journal of this.journals.values()) count += journal.marked.size
+    for (const { journal } of this.stack) count += journal.marked.size
     return count
   }
 
