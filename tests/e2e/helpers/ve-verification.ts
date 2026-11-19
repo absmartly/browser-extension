@@ -192,7 +192,7 @@ export async function verifyPreviewToggle(
  */
 export async function verifyChangesAfterVEExit(page: Page): Promise<void> {
   // After the VE stops it tears down its dedicated `__visual_editor__`
-  // preview (PreviewManager.removePreviewChanges + createdElementsMap removal)
+  // preview (PreviewManager.removePreviewChanges inverts its mutation journal)
   // so the page returns to its untouched state. If production preview was
   // active when the VE started it gets re-established on exit; otherwise
   // (the case for this test, where preview is enabled later via the toggle

@@ -373,6 +373,30 @@ describe("generateRobustSelector", () => {
         /disconnected <button>/
       )
     })
+
+    it("skips an identifier that matches another element on the page", () => {
+      document.body.innerHTML = `<div id="p"><button class="btn" data-role="buy">A</button></div><button class="btn">B</button>`
+      const target = document.querySelector("#p button")!
+      target.remove()
+
+      const selector = generateRobustSelector(target, {
+        ...veOptions,
+        preferDataAttributes: true
+      })
+
+      expect(selector).toBe('[data-role="buy"]')
+      expect(document.querySelectorAll(selector)).toHaveLength(0)
+    })
+
+    it("throws when every identifier of a detached element matches another element", () => {
+      document.body.innerHTML = `<div id="p"><button class="btn">A</button></div><button class="btn">B</button>`
+      const target = document.querySelector("#p button")!
+      target.remove()
+
+      expect(() => generateRobustSelector(target, veOptions)).toThrow(
+        /disconnected <button>/
+      )
+    })
   })
 
   describe("elements inside an open shadow root", () => {

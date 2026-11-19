@@ -540,9 +540,8 @@ export class VisualEditor {
 
     // With every commit going through the SDK in replace mode, undo is
     // simply: pop the change list, replay the remainder. PreviewManager
-    // does the heavy lifting of reverting any element it touched (including
-    // re-attaching deleted elements via the captured parent/nextSibling and
-    // removing 'create'-inserted nodes from createdElementsMap).
+    // reverts every DOM mutation the previous replay journaled (including
+    // re-attaching deleted elements and removing 'create'-inserted nodes).
     const variantName = this.options.variantName
     const remaining = this.undoRedoManager.squashChanges()
     applyChangesViaSDK(remaining, VISUAL_EDITOR_EXPERIMENT_NAME, variantName)
