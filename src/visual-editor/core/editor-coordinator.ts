@@ -56,6 +56,9 @@ export class EditorCoordinator {
   private cleanup: Cleanup
   private notifications: Notifications
   private htmlEditor: HtmlEditor
+  // Puts back an element an open contenteditable or HTML-editor session is
+  // writing to live; teardown runs it if the session never closed.
+  private pendingLiveEdit: (() => void) | null = null
   private imageSourceDialog: ImageSourceDialog
   private callbacks: EditorCoordinatorCallbacks
 
@@ -428,15 +431,23 @@ export class EditorCoordinator {
     this.eventHandlers.setEditing(true)
     const stopWatching = watchMutations(element)
 
-    const handleBlur = () => {
+    const endSession = () => {
+      if (this.pendingLiveEdit === discard) this.pendingLiveEdit = null
       const typed = stopWatching()
       ;(element as HTMLElement).contentEditable = "false"
-      element.classList.remove("absmartly-editing")
-      element.classList.add("absmartly-selected")
-      this.eventHandlers.setEditing(false)
       element.removeEventListener("blur", handleBlur)
       element.removeEventListener("keydown", handleKeyPress)
       element.removeEventListener("click", preventDefault, true)
+      return typed
+    }
+    const discard = () => undoMutations(endSession())
+    this.pendingLiveEdit = discard
+
+    const handleBlur = () => {
+      const typed = endSession()
+      element.classList.remove("absmartly-editing")
+      element.classList.add("absmartly-selected")
+      this.eventHandlers.setEditing(false)
 
       // Check if element has child elements (not just text nodes)
       // If it has HTML children, save as HTML to preserve structure
@@ -517,12 +528,23 @@ export class EditorCoordinator {
     this.eventHandlers.setHoverEnabled(false)
 
     const currentHtml = element.innerHTML
-    const stopWatching = watchMutations(element)
-    const newHtml = await this.htmlEditor.show(element, currentHtml)
-    // The HTML editor writes innerHTML directly for live preview while
-    // typing. Discard those writes by node identity; the SDK repaints via
-    // PreviewManager when the change lands.
-    undoMutations(stopWatching())
+    // The HTML editor replaces the element's children on every keystroke
+    // for live preview. Putting the original child nodes back discards all
+    // of it by identity, so a preview journal still matches the DOM; the
+    // SDK repaints via PreviewManager when the change lands.
+    const originalChildren = Array.from(element.childNodes)
+    const restore = () => {
+      if (this.pendingLiveEdit === restore) this.pendingLiveEdit = null
+      element.replaceChildren(...originalChildren)
+    }
+    this.pendingLiveEdit = restore
+    let newHtml: string | null
+    try {
+      newHtml = await this.htmlEditor.show(element, currentHtml)
+    } finally {
+      // Already run if the visual editor was torn down meanwhile.
+      if (this.pendingLiveEdit === restore) restore()
+    }
 
     try {
       if (newHtml !== null && newHtml !== currentHtml) {
@@ -1115,6 +1137,11 @@ export class EditorCoordinator {
     debugLog("[EditorCoordinator] Starting teardownAll", {
       restoreOriginalValues
     })
+
+    // An open edit session writes outside every preview journal: undo it
+    // and close the HTML editor before its host is removed.
+    this.pendingLiveEdit?.()
+    this.htmlEditor.cleanup()
 
     // Call all registered cleanup handlers (includes removeBanner)
     this.cleanup.cleanupVisualEditor(restoreOriginalValues)

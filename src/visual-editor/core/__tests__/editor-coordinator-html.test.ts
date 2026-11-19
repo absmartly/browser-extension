@@ -474,6 +474,115 @@ describe("EditorCoordinator HTML Editor Integration", () => {
     })
   })
 
+  describe("visual-editor teardown during an open edit session", () => {
+    // Records every MutationObserver created while installed, with what it
+    // observes and whether it was disconnected.
+    const trackObservers = () => {
+      const Native = window.MutationObserver
+      const observers: Array<{ targets: Node[]; disconnected: boolean }> = []
+      class Tracked extends Native {
+        private entry = { targets: [] as Node[], disconnected: false }
+        constructor(callback: MutationCallback) {
+          super(callback)
+          observers.push(this.entry)
+        }
+        observe(target: Node, options?: MutationObserverInit) {
+          this.entry.targets.push(target)
+          super.observe(target, options)
+        }
+        disconnect() {
+          this.entry.disconnected = true
+          super.disconnect()
+        }
+      }
+      window.MutationObserver = Tracked
+      return {
+        watching: (node: Node) =>
+          observers.filter(
+            (o) => !o.disconnected && o.targets.some((t) => t.contains(node))
+          ).length,
+        created: (node: Node) =>
+          observers.filter((o) => o.targets.some((t) => t.contains(node)))
+            .length,
+        restore: () => {
+          window.MutationObserver = Native
+        }
+      }
+    }
+
+    let observers: ReturnType<typeof trackObservers>
+
+    beforeEach(() => {
+      document.body.innerHTML = '<div id="test-element">Original</div>'
+      mockHtmlEditor.mockRestore()
+      observers = trackObservers()
+    })
+
+    afterEach(() => observers.restore())
+
+    it("restores the original children by identity when the HTML editor is open", async () => {
+      const element = document.getElementById("test-element")!
+      const text = element.firstChild
+      const session = coordinator.handleEditHtmlAction(element, {})
+      expect(
+        document.getElementById("absmartly-html-editor-host")
+      ).not.toBeNull()
+      // The editor's live preview writes innerHTML on every keystroke.
+      element.innerHTML = "<i>live typing</i>"
+
+      coordinator.teardownAll(true)
+      await session
+
+      expect(element.innerHTML).toBe("Original")
+      expect(element.firstChild).toBe(text)
+      expect(document.getElementById("absmartly-html-editor-host")).toBeNull()
+      expect(undoRedoManager.canUndo()).toBe(false)
+      expect(observers.watching(element)).toBe(0)
+    })
+
+    it("undoes un-blurred contenteditable typing and stops watching", () => {
+      const element = document.getElementById("test-element")!
+      const text = element.firstChild as Text
+      coordinator.handleEditAction(element, {
+        textContent: "Original",
+        innerHTML: "Original"
+      })
+      text.data = "typed"
+      element.append(document.createElement("br"))
+      expect(observers.watching(element)).toBe(1)
+
+      coordinator.teardownAll(true)
+
+      expect(element.innerHTML).toBe("Original")
+      expect(element.firstChild).toBe(text)
+      expect((element as HTMLElement).contentEditable).toBe("false")
+      expect(undoRedoManager.canUndo()).toBe(false)
+      expect(observers.watching(element)).toBe(0)
+    })
+
+    it("keeps no per-write record of HTML-editor live writes", async () => {
+      const element = document.getElementById("test-element")!
+      element.innerHTML = "<ul><li>a</li><li>b</li></ul>"
+      const list = element.firstChild
+      const session = coordinator.handleEditHtmlAction(element, {})
+      for (let i = 0; i < 500; i++)
+        element.innerHTML = `<ul><li>${i}</li><li>b</li></ul>`
+
+      // Nothing observes the element, so none of the 500 child-list
+      // replacements is retained; the session holds the original child
+      // array only.
+      expect(observers.created(element)).toBe(0)
+      document
+        .querySelector<HTMLButtonElement>("#html-editor-cancel-button")!
+        .click()
+      await session
+
+      expect(element.childNodes).toHaveLength(1)
+      expect(element.firstChild).toBe(list)
+      expect(element.innerHTML).toBe("<ul><li>a</li><li>b</li></ul>")
+    })
+  })
+
   describe("live edits over an applied preview", () => {
     let preview: PreviewManager
 
