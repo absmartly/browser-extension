@@ -185,10 +185,15 @@ export class ElementActions {
   public deleteElement(): void {
     if (!this.selectedElement) return
 
-    const selector = this.getSelector(this.selectedElement)
-    const change: DOMChange = { selector, type: "delete" }
-    this.undoRedoManager.addChange(change, null)
-    this.deselectElement()
+    try {
+      const selector = this.getSelector(this.selectedElement)
+      const change: DOMChange = { selector, type: "delete" }
+      this.undoRedoManager.addChange(change, null)
+      this.deselectElement()
+    } catch (error) {
+      console.error("Failed to delete element:", error)
+      this.notifications.show("Failed to delete element", "", "error")
+    }
   }
 
   public copyElement(): void {

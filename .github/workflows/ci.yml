@@ -13,7 +13,7 @@ jobs:
   deterministic-repeats:
     # Formerly live-flaky paths, now against the local contract-validated
     # management API and scripted AI: repeated without retries to catch races.
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
       contents: read
@@ -42,7 +42,7 @@ jobs:
           retention-days: 7
 
   launchpad-regressions:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     steps:
@@ -65,7 +65,7 @@ jobs:
           retention-days: 7
 
   typecheck:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
@@ -76,7 +76,7 @@ jobs:
       - run: bun run typecheck
 
   unit-tests:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
@@ -88,7 +88,7 @@ jobs:
       - run: bun run test:unit
 
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
@@ -104,7 +104,7 @@ jobs:
           retention-days: 7
 
   e2e-tests:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       # Each test owns a fresh local management API and scripted AI provider,

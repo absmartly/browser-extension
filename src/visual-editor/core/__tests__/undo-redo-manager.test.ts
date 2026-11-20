@@ -1,3 +1,5 @@
+import { PreviewManager } from "~src/sdk-bridge/dom/preview-manager"
+
 import type { DOMChange } from "../../types/visual-editor"
 import UndoRedoManager from "../undo-redo-manager"
 import type { ChangeRecord } from "../undo-redo-manager"
@@ -234,6 +236,32 @@ describe("UndoRedoManager", () => {
   })
 
   describe("squashChanges() method", () => {
+    it("keeps both deletes that share a positional selector and replays them", () => {
+      document.body.innerHTML =
+        '<div id="list"><div id="a"></div><div id="b"></div><div id="c"></div></div>'
+      const preview = new PreviewManager()
+      // Deleting B, then C (which now occupies B's position), generates the
+      // same positional selector twice.
+      const selector = "#list > div:nth-of-type(2)"
+      manager.setOnChangeAdded(() => {
+        preview.removePreviewChanges("ve")
+        for (const change of manager.squashChanges())
+          preview.applyPreviewChange(change, "ve")
+      })
+      manager.addChange({ selector, type: "delete" }, null)
+      expect(document.querySelector(selector).id).toBe("c")
+      manager.addChange({ selector, type: "delete" }, null)
+
+      expect(manager.squashChanges()).toHaveLength(2)
+      expect(
+        Array.from(document.querySelectorAll("#list > div"), (e) => e.id)
+      ).toEqual(["a"])
+      preview.clearAll()
+      expect(
+        Array.from(document.querySelectorAll("#list > div"), (e) => e.id)
+      ).toEqual(["a", "b", "c"])
+    })
+
     it("should squash multiple changes to same element", () => {
       // Add 3 changes to same element
       manager.addChange(

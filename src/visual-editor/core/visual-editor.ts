@@ -20,7 +20,7 @@ import {
 } from "./sdk-applier"
 import StateManager from "./state-manager"
 import type { VisualEditorConfig } from "./state-manager"
-import UndoRedoManager from "./undo-redo-manager"
+import UndoRedoManager, { squashKey } from "./undo-redo-manager"
 
 export interface VisualEditorOptions {
   variantName: string
@@ -438,12 +438,7 @@ export class VisualEditor {
     const changeMap = new Map<string, DOMChange>()
 
     changes.forEach((change, i) => {
-      // Each 'create' adds a distinct new element, so they must not collapse
-      // onto each other — give every one a unique key.
-      const key =
-        change.type === "create"
-          ? `create-${i}`
-          : `${change.selector}-${change.type}`
+      const key = squashKey(change, i)
       const existing = changeMap.get(key)
 
       if (existing) {
@@ -454,9 +449,6 @@ export class VisualEditor {
             ...existing.value,
             ...change.value
           }
-        } else if (change.type === "move" && existing.type === "move") {
-          // For moves, replace with the latest change (final position)
-          changeMap.set(key, change)
         } else {
           // For other types, replace with the latest change
           changeMap.set(key, change)
@@ -492,8 +484,8 @@ export class VisualEditor {
     const squashedChanges = this.squashChanges(currentChanges)
     debugLog("[ABSmartly] Squashed changes count:", squashedChanges.length)
 
-    // Original element state is captured by PreviewManager.previewStateMap
-    // when changes are applied via the SDK path; no need for the legacy
+    // PreviewManager journals the original DOM when changes are applied via
+    // the SDK path; no need for the legacy
     // data-absmartly-original sidecar.
 
     // Log what we're sending to sidebar
@@ -540,9 +532,8 @@ export class VisualEditor {
 
     // With every commit going through the SDK in replace mode, undo is
     // simply: pop the change list, replay the remainder. PreviewManager
-    // does the heavy lifting of reverting any element it touched (including
-    // re-attaching deleted elements via the captured parent/nextSibling and
-    // removing 'create'-inserted nodes from createdElementsMap).
+    // reverts every DOM mutation the previous replay journaled (including
+    // re-attaching deleted elements and removing 'create'-inserted nodes).
     const variantName = this.options.variantName
     const remaining = this.undoRedoManager.squashChanges()
     applyChangesViaSDK(remaining, VISUAL_EDITOR_EXPERIMENT_NAME, variantName)

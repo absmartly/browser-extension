@@ -12,6 +12,23 @@
 
 import type { DOMChange } from "../types/visual-editor"
 
+// Changes of these types never collapse onto each other. A create adds a
+// distinct element each time. Delete and move selectors are positional and
+// name whatever element occupies that position when they are generated, so
+// after one delete or move another element can produce the same selector;
+// each must replay, in order.
+const UNSQUASHABLE_TYPES = new Set<DOMChange["type"]>([
+  "create",
+  "delete",
+  "move"
+])
+
+export function squashKey(change: DOMChange, index: number): string {
+  return UNSQUASHABLE_TYPES.has(change.type)
+    ? `${change.type}-${index}`
+    : `${change.selector}-${change.type}`
+}
+
 export interface ChangeRecord {
   change: DOMChange // The DOM change with the new value
   oldValue: any // The previous value before this change
@@ -152,12 +169,7 @@ export class UndoRedoManager {
     // Process only the active changes (up to currentIndex)
     for (let i = 0; i <= this.currentIndex; i++) {
       const record = this.changes[i]
-      // 'create' changes each add a distinct new element, so they must not
-      // collapse onto each other — give every one a unique key.
-      const key =
-        record.change.type === "create"
-          ? `create-${i}`
-          : `${record.change.selector}-${record.change.type}`
+      const key = squashKey(record.change, i)
 
       if (changeMap.has(key)) {
         // Update to latest change value, but keep original oldValue

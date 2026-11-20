@@ -30,9 +30,11 @@ jest.mock("../../utils/selector-generator", () => ({
 }))
 
 // Mock DOM APIs
+const realMutationObserver = global.MutationObserver
 const mockMutationObserver = jest.fn()
 mockMutationObserver.prototype.observe = jest.fn()
 mockMutationObserver.prototype.disconnect = jest.fn()
+mockMutationObserver.prototype.takeRecords = jest.fn(() => [])
 global.MutationObserver = mockMutationObserver
 
 // Mock navigator.clipboard
@@ -600,13 +602,11 @@ describe("EditorCoordinator", () => {
       const keydownHandler = addEventListenerSpy.mock.calls[0][1]
       const event = new KeyboardEvent("keydown", { key: "Delete" })
       const preventDefaultSpy = jest.spyOn(event, "preventDefault")
-      const removeSpy = jest.spyOn(mockSelectedElement, "remove")
 
       keydownHandler(event)
 
       expect(preventDefaultSpy).toHaveBeenCalled()
-      expect(removeSpy).toHaveBeenCalled()
-      expect(mockUndoRedoManager.addChange).toHaveBeenCalled()
+      expect(mockCallbacks.deleteElement).toHaveBeenCalledTimes(1)
     })
 
     it("should not handle Delete key when in editing mode", () => {
@@ -624,6 +624,7 @@ describe("EditorCoordinator", () => {
 
       expect(preventDefaultSpy).not.toHaveBeenCalled()
       expect(mockUndoRedoManager.addChange).not.toHaveBeenCalled()
+      expect(mockCallbacks.deleteElement).not.toHaveBeenCalled()
     })
 
     it("should not handle shortcuts when no element is selected", () => {
@@ -880,6 +881,51 @@ describe("EditorCoordinator", () => {
       expect(mockElement.classList.contains("absmartly-selected")).toBe(false)
       expect(mockElement.contentEditable).toBe("true")
       expect(mockEventHandlers.setEditing).toHaveBeenCalledWith(true)
+    })
+
+    it("should clear editing state when discarding live edits throws", () => {
+      const RealEventHandlers =
+        jest.requireActual<typeof import("../event-handlers")>(
+          "../event-handlers"
+        ).default
+      const eventHandlers = new RealEventHandlers(mockStateManager)
+      coordinator["eventHandlers"] = eventHandlers
+      global.MutationObserver = realMutationObserver
+      const originalError = new Error("Cannot undo live edit")
+      let removeChildSpy: jest.SpyInstance | undefined
+
+      try {
+        coordinator.handleEditAction(mockElement, {
+          textContent: mockElement.textContent
+        })
+        mockElement.appendChild(document.createTextNode("Typed content"))
+        expect(mockElement.classList.contains("absmartly-editing")).toBe(true)
+        expect(eventHandlers.isEditingMode).toBe(true)
+
+        removeChildSpy = jest
+          .spyOn(mockElement, "removeChild")
+          .mockImplementation(() => {
+            throw originalError
+          })
+
+        let thrownError: unknown
+        try {
+          coordinator.teardownAll()
+        } catch (error) {
+          thrownError = error
+        }
+        expect(thrownError).toBe(originalError)
+        expect(removeChildSpy).toHaveBeenCalledTimes(1)
+        expect({
+          editingClass: mockElement.classList.contains("absmartly-editing"),
+          editingMode: eventHandlers.isEditingMode
+        }).toEqual({ editingClass: false, editingMode: false })
+        expect(mockElement.contentEditable).toBe("false")
+        expect(mockUndoRedoManager.addChange).not.toHaveBeenCalled()
+      } finally {
+        removeChildSpy?.mockRestore()
+        global.MutationObserver = mockMutationObserver
+      }
     })
 
     it("should handle blur event and create change", () => {

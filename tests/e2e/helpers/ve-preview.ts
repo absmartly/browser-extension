@@ -189,7 +189,7 @@ export async function testPreviewToggle(sidebar: FrameLocator, page: Page): Prom
   expect(disabledStates.modifiedCount).toBe(0)
   expect(disabledStates.experimentMarkersCount).toBe(0)
   // Round-trip guard: created elements must be torn down when preview is
-  // disabled. Without PreviewManager.createdElementsMap they would linger.
+  // disabled. PreviewManager's mutation journal records their insertion.
   expect(disabledStates.insertedAfterPresent).toBe(false)
   expect(disabledStates.insertedBeforePresent).toBe(false)
 

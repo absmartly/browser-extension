@@ -5,6 +5,11 @@
 
 import DOMPurify from "dompurify"
 
+import {
+  undoMutations,
+  watchMutations
+} from "~src/sdk-bridge/dom/mutation-journal"
+import { PREVIEW_UNWIND_EVENT } from "~src/sdk-bridge/dom/preview-events"
 import { debugLog, debugWarn } from "~src/utils/debug"
 
 import type { DOMChange } from "../types/visual-editor"
@@ -52,6 +57,9 @@ export class EditorCoordinator {
   private cleanup: Cleanup
   private notifications: Notifications
   private htmlEditor: HtmlEditor
+  // Puts back an element an open contenteditable or HTML-editor session is
+  // writing to live; teardown runs it if the session never closed.
+  private pendingLiveEdit: (() => void) | null = null
   private imageSourceDialog: ImageSourceDialog
   private callbacks: EditorCoordinatorCallbacks
 
@@ -178,6 +186,23 @@ export class EditorCoordinator {
     // Add coordinator-specific event listeners
     document.addEventListener("mousedown", this.handleMouseDown, true)
     document.addEventListener("mouseup", this.handleMouseUp, true)
+    window.addEventListener(PREVIEW_UNWIND_EVENT, this.handlePreviewUnwind)
+  }
+
+  // The preview manager is about to unwind preview segments. An open
+  // session's live writes sit on top of them and its restore would put back
+  // children an unwound preview owned, so the session is closed and its
+  // writes undone first; otherwise the unwind would run against the typed
+  // DOM.
+  private handlePreviewUnwind = (): void => {
+    if (!this.pendingLiveEdit) return
+    this.pendingLiveEdit()
+    this.htmlEditor.cleanup()
+    this.notifications.show(
+      "Edit closed: another preview changed",
+      "",
+      "warning"
+    )
   }
 
   removeEventListeners(): void {
@@ -188,6 +213,7 @@ export class EditorCoordinator {
     // Remove coordinator-specific event listeners
     document.removeEventListener("mousedown", this.handleMouseDown, true)
     document.removeEventListener("mouseup", this.handleMouseUp, true)
+    window.removeEventListener(PREVIEW_UNWIND_EVENT, this.handlePreviewUnwind)
     this.removeHoverTooltip()
   }
 
@@ -246,23 +272,14 @@ export class EditorCoordinator {
         return
       }
 
-      // Delete: Delete key
+      // Delete: Delete key. Same path as the context-menu Delete: the selector
+      // is generated while the element is still attached, and the removal is
+      // applied by the SDK replay so undo restores it.
       if (e.key === "Delete") {
         const selectedElement = this.stateManager.getState().selectedElement
         if (selectedElement && !this.eventHandlers.isEditingMode) {
           e.preventDefault()
-          selectedElement.remove()
-          const selector = this.callbacks.getSelector(
-            selectedElement as HTMLElement
-          )
-          const oldValue = selectedElement.outerHTML
-          this.undoRedoManager.addChange(
-            {
-              selector,
-              type: "delete"
-            },
-            oldValue
-          )
+          this.callbacks.deleteElement()
         }
       }
     }
@@ -431,24 +448,46 @@ export class EditorCoordinator {
     selection?.addRange(range)
 
     this.eventHandlers.setEditing(true)
+    const stopWatching = watchMutations(element)
 
-    const handleBlur = () => {
+    const endSession = () => {
+      if (this.pendingLiveEdit === discard) this.pendingLiveEdit = null
+      const typed = stopWatching()
       ;(element as HTMLElement).contentEditable = "false"
-      element.classList.remove("absmartly-editing")
-      element.classList.add("absmartly-selected")
-      this.eventHandlers.setEditing(false)
       element.removeEventListener("blur", handleBlur)
       element.removeEventListener("keydown", handleKeyPress)
       element.removeEventListener("click", preventDefault, true)
+      return typed
+    }
+    const discard = () => {
+      try {
+        undoMutations(endSession())
+      } finally {
+        element.classList.remove("absmartly-editing")
+        this.eventHandlers.setEditing(false)
+      }
+    }
+    this.pendingLiveEdit = discard
+
+    const handleBlur = () => {
+      const typed = endSession()
+      element.classList.remove("absmartly-editing")
+      element.classList.add("absmartly-selected")
+      this.eventHandlers.setEditing(false)
 
       // Check if element has child elements (not just text nodes)
       // If it has HTML children, save as HTML to preserve structure
       const hasHtmlChildren = Array.from(element.children).length > 0
 
       // Capture the user's edits, then DISCARD the live contenteditable
-      // mutations and let the SDK reapply via PreviewManager. That way the
-      // production codepath is what actually paints the final state, and
-      // PreviewManager captures the pre-edit state as the canonical original.
+      // mutations (undone by node identity, so a live preview's journal
+      // still matches the DOM) and let the SDK reapply via PreviewManager.
+      // That way the production codepath is what actually paints the final
+      // state, and PreviewManager captures the pre-edit state as the
+      // canonical original.
+      const newHtml = element.innerHTML
+      const newText = element.textContent || ""
+      undoMutations(typed)
       const selector = this.callbacks.getSelector(element as HTMLElement)
       if (hasHtmlChildren) {
         // Sanitize before persisting — the value is replayed verbatim into
@@ -456,8 +495,7 @@ export class EditorCoordinator {
         // (preview, save, undo/redo). DOMPurify strips <script>, inline
         // event handlers, javascript: URLs, etc, so a malicious edit
         // can't escape into the host page on later replays.
-        const newValue = DOMPurify.sanitize(element.innerHTML)
-        element.innerHTML = originalState.innerHTML
+        const newValue = DOMPurify.sanitize(newHtml)
         this.undoRedoManager.addChange(
           {
             selector,
@@ -467,8 +505,7 @@ export class EditorCoordinator {
           null
         )
       } else {
-        const newValue = element.textContent || ""
-        element.textContent = originalState.textContent
+        const newValue = newText
         this.undoRedoManager.addChange(
           {
             selector,
@@ -517,31 +554,54 @@ export class EditorCoordinator {
     this.eventHandlers.setHoverEnabled(false)
 
     const currentHtml = element.innerHTML
-    const newHtml = await this.htmlEditor.show(element, currentHtml)
-
-    if (newHtml !== null && newHtml !== currentHtml) {
-      // The HTML editor used direct innerHTML writes for live preview during
-      // typing. Discard those by restoring the pre-edit innerHTML; the SDK
-      // will repaint via PreviewManager when the change lands. Sanitize
-      // the persisted value — same reasoning as in handleEditAction:
-      // type: "html" payloads are replayed into innerHTML on every apply.
-      element.innerHTML = currentHtml
-      const selector = this.callbacks.getSelector(element as HTMLElement)
-      this.undoRedoManager.addChange(
-        {
-          selector,
-          type: "html",
-          value: DOMPurify.sanitize(newHtml)
-        },
-        null
-      )
-
-      this.notifications.show("HTML updated successfully", "", "success")
+    // The HTML editor replaces the element's children on every keystroke
+    // for live preview. Putting the original child nodes back discards all
+    // of it by identity, so a preview journal still matches the DOM; the
+    // SDK repaints via PreviewManager when the change lands.
+    const originalChildren = Array.from(element.childNodes)
+    const restore = () => {
+      if (this.pendingLiveEdit === restore) this.pendingLiveEdit = null
+      element.replaceChildren(...originalChildren)
+    }
+    this.pendingLiveEdit = restore
+    let newHtml: string | null
+    try {
+      newHtml = await this.htmlEditor.show(element, currentHtml)
+    } finally {
+      // Already run if the visual editor was torn down meanwhile.
+      if (this.pendingLiveEdit === restore) restore()
     }
 
-    // Clear editing mode and re-enable hover tooltips after HTML editor closes
-    this.eventHandlers.setEditing(false)
-    this.eventHandlers.setHoverEnabled(true)
+    try {
+      if (newHtml !== null && newHtml !== currentHtml) {
+        // Sanitize the persisted value — same reasoning as in
+        // handleEditAction: type: "html" payloads are replayed into
+        // innerHTML on every apply.
+        const selector = this.callbacks.getSelector(element as HTMLElement)
+        this.undoRedoManager.addChange(
+          {
+            selector,
+            type: "html",
+            value: DOMPurify.sanitize(newHtml)
+          },
+          null
+        )
+
+        this.notifications.show("HTML updated successfully", "", "success")
+      }
+    } catch (error) {
+      // getSelector refuses a target the page detached while the editor was
+      // open; the edit is dropped but the editor must stay usable.
+      debugWarn("[handleEditHtmlAction] HTML change not recorded:", error)
+      this.notifications.show(
+        "Failed to update HTML",
+        "The element is no longer on the page",
+        "error"
+      )
+    } finally {
+      this.eventHandlers.setEditing(false)
+      this.eventHandlers.setHoverEnabled(true)
+    }
   }
 
   handleSelectRelativeElement(element: Element): void {
@@ -1103,6 +1163,11 @@ export class EditorCoordinator {
     debugLog("[EditorCoordinator] Starting teardownAll", {
       restoreOriginalValues
     })
+
+    // An open edit session writes outside every preview journal: undo it
+    // and close the HTML editor before its host is removed.
+    this.pendingLiveEdit?.()
+    this.htmlEditor.cleanup()
 
     // Call all registered cleanup handlers (includes removeBanner)
     this.cleanup.cleanupVisualEditor(restoreOriginalValues)

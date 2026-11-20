@@ -409,7 +409,8 @@ describe("Orchestrator Integration Tests", () => {
       expect(mockPreviewManager.removePreviewChanges).toHaveBeenCalled()
     })
 
-    it("should handle replace mode - removes existing changes first", () => {
+    it("should handle replace mode - replaces the experiment's changes in place", () => {
+      mockPreviewManager.replacePreviewChanges = jest.fn().mockReturnValue(1)
       mockPreviewManager.removePreviewChanges = jest.fn()
       mockPreviewManager.applyPreviewChange = jest.fn().mockReturnValue(true)
 
@@ -429,13 +430,13 @@ describe("Orchestrator Integration Tests", () => {
         }
       })
 
-      expect(mockPreviewManager.removePreviewChanges).toHaveBeenCalledWith(
-        "test-exp"
+      expect(mockPreviewManager.replacePreviewChanges).toHaveBeenCalledWith(
+        "test-exp",
+        mockChanges,
+        expect.any(Function)
       )
-      expect(mockPreviewManager.applyPreviewChange).toHaveBeenCalledWith(
-        mockChanges[0],
-        "test-exp"
-      )
+      expect(mockPreviewManager.removePreviewChanges).not.toHaveBeenCalled()
+      expect(mockPreviewManager.applyPreviewChange).not.toHaveBeenCalled()
     })
 
     it("should handle ABSMARTLY_PREVIEW apply action", () => {

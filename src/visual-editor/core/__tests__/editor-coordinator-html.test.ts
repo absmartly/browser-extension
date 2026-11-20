@@ -2,9 +2,12 @@
  * Integration tests for EditorCoordinator with CodeMirror-based HTML Editor
  */
 
+import { PreviewManager } from "~src/sdk-bridge/dom/preview-manager"
+
 import UIComponents from "../../ui/components"
 import HtmlEditor from "../../ui/html-editor"
 import { Notifications } from "../../ui/notifications"
+import { generateRobustSelector } from "../../utils/selector-generator"
 import Cleanup from "../cleanup"
 import ContextMenu from "../context-menu"
 import EditModes from "../edit-modes"
@@ -181,6 +184,34 @@ describe("EditorCoordinator HTML Editor Integration", () => {
         "",
         "success"
       )
+    })
+
+    it("leaves edit mode and reports the refusal when the page detached the target", async () => {
+      document.body.innerHTML = "<main><p>Plain</p></main>"
+      const paragraph = document.querySelector("p")!
+      mockCallbacks.getSelector.mockImplementation((el: HTMLElement) =>
+        generateRobustSelector(el)
+      )
+      const notificationSpy = jest.spyOn(Notifications.prototype, "show")
+      mockHtmlEditor.mockImplementation(async () => {
+        // The SPA replaces the paragraph while the editor is open.
+        document.querySelector("main")!.innerHTML = "<p>Replaced</p>"
+        return "<b>Edited</b>"
+      })
+      const eventHandlers = (coordinator as any).eventHandlers as EventHandlers
+
+      await coordinator.handleEditHtmlAction(paragraph, {})
+
+      expect(undoRedoManager.canUndo()).toBe(false)
+      expect(eventHandlers.isEditingMode).toBe(false)
+      expect(notificationSpy).toHaveBeenCalledWith(
+        "Failed to update HTML",
+        "The element is no longer on the page",
+        "error"
+      )
+      const replaced = document.querySelector("p")!
+      eventHandlers.handleMouseOver({ target: replaced } as any)
+      expect(replaced.classList.contains("absmartly-hover")).toBe(true)
     })
 
     it("should remove context menu before opening editor", async () => {
@@ -440,6 +471,334 @@ describe("EditorCoordinator HTML Editor Integration", () => {
       expect(changes[0]).toMatchObject({
         selector: "#test-element.test-class.another-class"
       })
+    })
+  })
+
+  describe("visual-editor teardown during an open edit session", () => {
+    // Records every MutationObserver created while installed, with what it
+    // observes and whether it was disconnected.
+    const trackObservers = () => {
+      const Native = window.MutationObserver
+      const observers: Array<{ targets: Node[]; disconnected: boolean }> = []
+      class Tracked extends Native {
+        private entry = { targets: [] as Node[], disconnected: false }
+        constructor(callback: MutationCallback) {
+          super(callback)
+          observers.push(this.entry)
+        }
+        observe(target: Node, options?: MutationObserverInit) {
+          this.entry.targets.push(target)
+          super.observe(target, options)
+        }
+        disconnect() {
+          this.entry.disconnected = true
+          super.disconnect()
+        }
+      }
+      window.MutationObserver = Tracked
+      return {
+        watching: (node: Node) =>
+          observers.filter(
+            (o) => !o.disconnected && o.targets.some((t) => t.contains(node))
+          ).length,
+        created: (node: Node) =>
+          observers.filter((o) => o.targets.some((t) => t.contains(node)))
+            .length,
+        restore: () => {
+          window.MutationObserver = Native
+        }
+      }
+    }
+
+    let observers: ReturnType<typeof trackObservers>
+
+    beforeEach(() => {
+      document.body.innerHTML = '<div id="test-element">Original</div>'
+      mockHtmlEditor.mockRestore()
+      observers = trackObservers()
+    })
+
+    afterEach(() => observers.restore())
+
+    it("restores the original children by identity when the HTML editor is open", async () => {
+      const element = document.getElementById("test-element")!
+      const text = element.firstChild
+      const session = coordinator.handleEditHtmlAction(element, {})
+      expect(
+        document.getElementById("absmartly-html-editor-host")
+      ).not.toBeNull()
+      // The editor's live preview writes innerHTML on every keystroke.
+      element.innerHTML = "<i>live typing</i>"
+
+      coordinator.teardownAll(true)
+      await session
+
+      expect(element.innerHTML).toBe("Original")
+      expect(element.firstChild).toBe(text)
+      expect(document.getElementById("absmartly-html-editor-host")).toBeNull()
+      expect(undoRedoManager.canUndo()).toBe(false)
+      expect(observers.watching(element)).toBe(0)
+    })
+
+    it("undoes un-blurred contenteditable typing and stops watching", () => {
+      const element = document.getElementById("test-element")!
+      const text = element.firstChild as Text
+      coordinator.handleEditAction(element, {
+        textContent: "Original",
+        innerHTML: "Original"
+      })
+      text.data = "typed"
+      element.append(document.createElement("br"))
+      expect(observers.watching(element)).toBe(1)
+
+      coordinator.teardownAll(true)
+
+      expect(element.innerHTML).toBe("Original")
+      expect(element.firstChild).toBe(text)
+      expect((element as HTMLElement).contentEditable).toBe("false")
+      expect(undoRedoManager.canUndo()).toBe(false)
+      expect(observers.watching(element)).toBe(0)
+    })
+
+    it("keeps no per-write record of HTML-editor live writes", async () => {
+      const element = document.getElementById("test-element")!
+      element.innerHTML = "<ul><li>a</li><li>b</li></ul>"
+      const list = element.firstChild
+      const session = coordinator.handleEditHtmlAction(element, {})
+      for (let i = 0; i < 500; i++)
+        element.innerHTML = `<ul><li>${i}</li><li>b</li></ul>`
+
+      // Nothing observes the element, so none of the 500 child-list
+      // replacements is retained; the session holds the original child
+      // array only.
+      expect(observers.created(element)).toBe(0)
+      document
+        .querySelector<HTMLButtonElement>("#html-editor-cancel-button")!
+        .click()
+      await session
+
+      expect(element.childNodes).toHaveLength(1)
+      expect(element.firstChild).toBe(list)
+      expect(element.innerHTML).toBe("<ul><li>a</li><li>b</li></ul>")
+    })
+  })
+
+  describe("live edits over an applied preview", () => {
+    let preview: PreviewManager
+
+    beforeEach(() => {
+      document.body.innerHTML = '<div id="test-element">Original</div>'
+      preview = new PreviewManager()
+      preview.applyPreviewChange(
+        { selector: "#test-element", type: "html", value: "<b>Preview</b>" },
+        "exp"
+      )
+    })
+
+    afterEach(() => preview.clearAll())
+
+    it("discards contenteditable typing so the preview still restores the original node", () => {
+      const element = document.getElementById("test-element")!
+      coordinator.handleEditAction(element, {
+        textContent: element.textContent,
+        innerHTML: element.innerHTML
+      })
+      element.innerHTML = "<i>typed</i>"
+      element.dispatchEvent(new Event("blur"))
+
+      expect(element.innerHTML).toBe("<b>Preview</b>")
+      expect(undoRedoManager.squashChanges()).toEqual([
+        { selector: ".test-element", type: "html", value: "<i>typed</i>" }
+      ])
+      preview.removePreviewChanges("exp")
+      expect(element.innerHTML).toBe("Original")
+    })
+
+    it("discards the HTML editor's live writes so the preview still restores the original node", async () => {
+      const element = document.getElementById("test-element")!
+      mockHtmlEditor.mockImplementation(async (el: Element) => {
+        el.innerHTML = "<i>live</i>"
+        return "<i>live</i>"
+      })
+
+      await coordinator.handleEditHtmlAction(element, {})
+
+      expect(element.innerHTML).toBe("<b>Preview</b>")
+      preview.removePreviewChanges("exp")
+      expect(element.innerHTML).toBe("Original")
+    })
+  })
+
+  describe("an older preview removed during an open edit session", () => {
+    let preview: PreviewManager
+    let notify: jest.SpyInstance
+
+    beforeEach(() => {
+      mockHtmlEditor.mockRestore()
+      notify = jest
+        .spyOn(Notifications.prototype, "show")
+        .mockImplementation(() => {})
+      preview = new PreviewManager()
+      coordinator.setupEventListeners()
+    })
+
+    afterEach(() => {
+      coordinator.removeEventListeners()
+      preview.clearAll()
+    })
+
+    const applyPreviews = (veChange: any) => {
+      preview.applyPreviewChange(
+        { selector: "#a", type: "text", value: "AA" },
+        "older"
+      )
+      preview.applyPreviewChange(veChange, "__visual_editor__")
+    }
+
+    it("closes the HTML editor and leaves the original children once every preview is removed", async () => {
+      document.body.innerHTML =
+        '<p id="a">A</p><div id="e"><span id="c0">page</span></div>'
+      const original = document.body.innerHTML
+      const c0 = document.getElementById("c0")
+      applyPreviews({ selector: "#e", type: "html", value: "<b>ve</b>" })
+      const element = document.getElementById("e")!
+      const session = coordinator.handleEditHtmlAction(element, {})
+      element.innerHTML = "<i>typing</i>"
+
+      preview.removePreviewChanges("older")
+      expect(await session).toBeUndefined()
+
+      expect(document.getElementById("absmartly-html-editor-host")).toBeNull()
+      expect(element.innerHTML).toBe("<b>ve</b>")
+      expect(undoRedoManager.canUndo()).toBe(false)
+      expect(notify).toHaveBeenCalledWith(
+        "Edit closed: another preview changed",
+        "",
+        "warning"
+      )
+      preview.removePreviewChanges("__visual_editor__")
+      expect(document.getElementById("c0")).toBe(c0)
+      expect(element.firstChild).toBe(c0)
+      expect(document.body.innerHTML).toBe(original)
+    })
+
+    it("ends a contenteditable session and leaves the original text once every preview is removed", () => {
+      document.body.innerHTML = '<p id="a">A</p><div id="e">page</div>'
+      const original = document.body.innerHTML
+      const element = document.getElementById("e")!
+      const text = element.firstChild
+      applyPreviews({ selector: "#e", type: "text", value: "ve" })
+      coordinator.handleEditAction(element, {
+        textContent: "ve",
+        innerHTML: "ve"
+      })
+      ;(element.firstChild as Text).data = "vetyped"
+
+      preview.removePreviewChanges("older")
+
+      expect((element as HTMLElement).contentEditable).toBe("false")
+      expect(element.classList.contains("absmartly-editing")).toBe(false)
+      expect(element.textContent).toBe("ve")
+      expect(notify).toHaveBeenCalledWith(
+        "Edit closed: another preview changed",
+        "",
+        "warning"
+      )
+      element.dispatchEvent(new Event("blur"))
+      expect(undoRedoManager.canUndo()).toBe(false)
+      preview.removePreviewChanges("__visual_editor__")
+      expect(element.firstChild).toBe(text)
+      // The editing class is the visual editor's own, removed by its cleanup.
+      element.removeAttribute("class")
+      expect(document.body.innerHTML).toBe(original)
+    })
+
+    it("closes an HTML editor opened over a newer experiment's children before that experiment is removed", async () => {
+      document.body.innerHTML = '<div id="el"><span id="c0">page</span></div>'
+      const original = document.body.innerHTML
+      const c0 = document.getElementById("c0")
+      preview.applyPreviewChange(
+        { selector: "#el", type: "html", value: "<b id='bnode'>B</b>" },
+        "b"
+      )
+      const element = document.getElementById("el")!
+      const session = coordinator.handleEditHtmlAction(element, {})
+      element.innerHTML = "<i>typing</i>"
+
+      preview.removePreviewChanges("b")
+      document
+        .querySelector<HTMLButtonElement>("#html-editor-cancel-button")
+        ?.click()
+      await session
+
+      expect(document.getElementById("bnode")).toBeNull()
+      expect(element.firstChild).toBe(c0)
+      expect(document.getElementById("absmartly-html-editor-host")).toBeNull()
+      expect(document.body.innerHTML).toBe(original)
+      expect(notify).toHaveBeenCalledWith(
+        "Edit closed: another preview changed",
+        "",
+        "warning"
+      )
+    })
+
+    it("keeps a value typed into a control the HTML editor's live edit detached", async () => {
+      document.body.innerHTML =
+        '<p id="a">A</p><div id="wrap"><input id="field" value="orig"></div>'
+      preview.applyPreviewChange(
+        { selector: "#a", type: "text", value: "AA" },
+        "older"
+      )
+      preview.applyPreviewChange(
+        {
+          selector: "#wrap",
+          type: "javascript",
+          value: "element.querySelector('#field').value = 'js'"
+        },
+        "js"
+      )
+      const field = document.getElementById("field") as HTMLInputElement
+      expect(field.value).toBe("js")
+      field.value = "typed"
+      const element = document.getElementById("wrap")!
+      const session = coordinator.handleEditHtmlAction(element, {})
+      element.innerHTML = "<i>typing</i>"
+
+      preview.removePreviewChanges("older")
+      await session
+
+      expect(document.getElementById("field")).toBe(field)
+      expect(field.value).toBe("typed")
+      expect(document.getElementById("a").textContent).toBe("A")
+    })
+
+    it("closes a session when a preview above the visual editor's is removed", () => {
+      document.body.innerHTML = '<p id="a">A</p><div id="e">page</div>'
+      const element = document.getElementById("e")!
+      preview.applyPreviewChange(
+        { selector: "#e", type: "text", value: "ve" },
+        "__visual_editor__"
+      )
+      preview.applyPreviewChange(
+        { selector: "#a", type: "text", value: "AA" },
+        "newer"
+      )
+      coordinator.handleEditAction(element, {
+        textContent: "ve",
+        innerHTML: "ve"
+      })
+      ;(element.firstChild as Text).data = "vetyped"
+
+      preview.removePreviewChanges("newer")
+
+      expect((element as HTMLElement).contentEditable).toBe("false")
+      expect(element.textContent).toBe("ve")
+      expect(document.getElementById("a").textContent).toBe("A")
+      expect(notify).toHaveBeenCalledWith(
+        "Edit closed: another preview changed",
+        "",
+        "warning"
+      )
     })
   })
 })

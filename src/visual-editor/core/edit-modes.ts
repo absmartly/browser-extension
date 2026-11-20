@@ -3,29 +3,37 @@
  * Handles rearrange mode (drag & drop) and resize mode functionality
  */
 
+import { slotAnchor } from "~src/sdk-bridge/dom/mutation-journal"
 import { debugLog, debugWarn } from "~src/utils/debug"
 
 import type { DOMChange } from "../types/visual-editor"
 import { generateRobustSelector } from "../utils/selector-generator"
 import StateManager from "./state-manager"
 
+// Pre-drag neighbours as raw nodes, whitespace text included. PreviewManager
+// unwinds the drop relative to these same raw siblings (slotAnchor), so
+// reverting anywhere else (appendChild lands after trailing whitespace)
+// leaves sibling order different from the order the positional selectors
+// are generated against.
+interface OriginalPosition {
+  parent: Element
+  previousSibling: Node | null
+  nextSibling: Node | null
+}
+
+function revertToOriginalPosition(
+  element: Element,
+  original: OriginalPosition
+): void {
+  const { parent, previousSibling, nextSibling } = original
+  const anchor = slotAnchor(parent, previousSibling, nextSibling)
+  if (anchor === element) return
+  parent.insertBefore(element, anchor)
+}
+
 export class EditModes {
   private stateManager: StateManager
   private addChange: ((change: DOMChange) => void) | null = null
-  // First-seen position per element, captured once per VE session. Subsequent
-  // drags of the same element revert to THIS position (not the live pre-drag
-  // state) so trackMoveChange generates selectors against the pre-VE DOM —
-  // i.e. the same base SDK replay sees after removePreviewChanges. Without
-  // it, repeat-moves of the same element record selectors against the
-  // intermediate post-previous-move DOM, and UndoRedoManager.squashChanges
-  // collapses the moves onto the last record whose targetSelector resolves
-  // to the wrong sibling when replayed from the original. (Symptom Pedro
-  // hit: drag #gamma before Alpha, then drag #gamma before Beta; save →
-  // SDK replays only the final, mis-anchored move → live order is wrong.)
-  private originalPositions = new WeakMap<
-    Element,
-    { parent: Element; nextSibling: Element | null }
-  >()
 
   constructor(stateManager: StateManager) {
     this.stateManager = stateManager
@@ -44,27 +52,19 @@ export class EditModes {
     this.stateManager.setRearranging(true)
     smartElement.classList.add("absmartly-draggable")
 
-    // Capture the FIRST-SEEN position of this element this VE session as the
-    // rollback anchor. trackMoveChange reverts the drop to that position
-    // before generating selectors so PreviewManager (which runs
-    // removePreviewChanges in replace mode at the start of every replay)
-    // sees the same DOM the selectors describe. Crucially, this is the
-    // pre-VE position, not the live pre-drag position — see the comment on
-    // `originalPositions` for why repeat-moves of the same element require
-    // it.
-    let cached = this.originalPositions.get(smartElement)
-    if (!cached) {
-      const parent = smartElement.parentElement
-      if (parent) {
-        cached = {
+    // Moves are recorded and replayed in order (never squashed), so each one
+    // is described against the DOM just before its own drag: the state the
+    // replay of all earlier changes reproduces. trackMoveChange reverts the
+    // drop to this slot before generating selectors. Capturing per drag
+    // (not once per session) keeps the slot valid across undo and redo.
+    const parent = smartElement.parentElement
+    const originalPosition: OriginalPosition | null = parent
+      ? {
           parent,
-          nextSibling: smartElement.nextElementSibling
+          previousSibling: smartElement.previousSibling,
+          nextSibling: smartElement.nextSibling
         }
-        this.originalPositions.set(smartElement, cached)
-      }
-    }
-    const originalParent: Element | null = cached?.parent ?? null
-    const originalNextSibling: Element | null = cached?.nextSibling ?? null
+      : null
 
     // Make element draggable
     ;(smartElement as HTMLElement).draggable = true
@@ -259,7 +259,7 @@ export class EditModes {
           anchor.element.appendChild(smartElement)
         }
 
-        this.trackMoveChange(smartElement, originalParent, originalNextSibling)
+        this.trackMoveChange(smartElement, originalPosition)
         debugLog("[ABSmartly] Element moved successfully")
       } catch (error) {
         debugWarn("[ABSmartly] Move failed:", error)
@@ -657,8 +657,7 @@ export class EditModes {
 
   private trackMoveChange(
     element: Element,
-    originalParent: Element | null,
-    originalNextSibling: Element | null
+    originalPosition: OriginalPosition | null
   ): void {
     debugLog("[ABSmartly] Tracking move change for element:", element)
 
@@ -706,16 +705,9 @@ export class EditModes {
     // removePreviewChanges in replace mode at the start of every replay, so
     // it observes the reverted DOM — the selectors we emit have to match
     // there.
-    if (originalParent) {
+    if (originalPosition) {
       try {
-        if (
-          originalNextSibling &&
-          originalNextSibling.parentNode === originalParent
-        ) {
-          originalParent.insertBefore(element, originalNextSibling)
-        } else {
-          originalParent.appendChild(element)
-        }
+        revertToOriginalPosition(element, originalPosition)
       } catch (err) {
         debugWarn("[ABSmartly] Failed to revert drop pre-replay:", err)
         // Abort: selectors generated from the post-drop tree would persist a

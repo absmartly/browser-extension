@@ -410,12 +410,30 @@ export class Orchestrator {
       this.probeCspAndReport()
     }
 
-    // If updateMode is 'replace', remove all existing changes first
+    const reportPending = (change: any) => {
+      if (change?.type === "javascript" && change?.selector) {
+        this.reportPendingIfSelectorMissing(change, expName)
+      }
+    }
+
+    // Replace mode swaps the experiment's whole change list in place: the
+    // PreviewManager unwinds it and every newer preview, applies the new
+    // list, then re-applies the newer previews.
     if (updateMode === "replace") {
-      Logger.log(
-        "[ABsmartly Page] Replace mode: removing existing changes first"
-      )
-      this.previewManager.removePreviewChanges(expName)
+      Logger.log("[ABsmartly Page] Replace mode: replacing existing changes")
+      try {
+        const appliedCount = this.previewManager.replacePreviewChanges(
+          expName,
+          Array.isArray(changes) ? changes : [],
+          reportPending
+        )
+        Logger.log(
+          `[ABsmartly Page] Applied ${appliedCount}/${changes?.length ?? 0} changes successfully`
+        )
+      } catch (error) {
+        Logger.error("[ABsmartly Page] Error applying preview changes:", error)
+      }
+      return
     }
 
     if (!changes || changes.length === 0) {
@@ -428,9 +446,7 @@ export class Orchestrator {
       Logger.log("[ABsmartly Page] Applying changes via PreviewManager")
       let appliedCount = 0
       changes.forEach((change: any) => {
-        if (change?.type === "javascript" && change?.selector) {
-          this.reportPendingIfSelectorMissing(change, expName)
-        }
+        reportPending(change)
         const success = this.previewManager.applyPreviewChange(change, expName)
         if (success) appliedCount++
       })

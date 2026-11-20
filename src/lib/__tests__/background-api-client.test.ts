@@ -54,6 +54,38 @@ describe("BackgroundAPIClient", () => {
     })
   })
 
+  describe("getFavorites", () => {
+    it("returns experiment ids from the favorites endpoint rows", async () => {
+      ;(chrome.runtime.sendMessage as jest.Mock).mockResolvedValue({
+        success: true,
+        data: {
+          user_favorite_experiments: [
+            { user_id: 7, experiment_id: 10, created_at: "2026-09-01" },
+            { user_id: 7, experiment_id: 42, created_at: "2026-09-02" },
+            { user_id: 7, experiment_id: null }
+          ]
+        }
+      })
+
+      await expect(client.getFavorites()).resolves.toEqual([10, 42])
+      expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
+        type: "API_REQUEST",
+        method: "GET",
+        path: "/favorites",
+        data: undefined
+      })
+    })
+
+    it("returns no favorites for a response without favorite rows", async () => {
+      ;(chrome.runtime.sendMessage as jest.Mock).mockResolvedValue({
+        success: true,
+        data: { experiments: [10] }
+      })
+
+      await expect(client.getFavorites()).resolves.toEqual([])
+    })
+  })
+
   describe("getExperiments", () => {
     it("should return experiments with pagination info", async () => {
       ;(chrome.runtime.sendMessage as jest.Mock).mockResolvedValue({

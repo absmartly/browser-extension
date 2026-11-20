@@ -160,8 +160,8 @@ export async function testUndoRedoForAllActions(page: Page): Promise<void> {
   // After delete via SDK the element is fully removed from the DOM.
   await expect(page.locator('#test-paragraph')).toHaveCount(0, { timeout: 5000 })
 
-  // Undo delete: PreviewManager.restoreElementState reattaches via the
-  // captured parent + nextSibling, so the element returns to the DOM.
+  // Undo delete: PreviewManager inverts the journaled removal, so the
+  // element returns to the DOM.
   await page.locator('[data-action="undo"]').click()
   await expect(page.locator('#test-paragraph')).toHaveCount(1, { timeout: 5000 })
   await expect(page.locator('#test-paragraph')).toBeVisible()

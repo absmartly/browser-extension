@@ -18,15 +18,54 @@ export class HtmlEditor {
   private stateManager: StateManager
   private editorHost: HTMLElement | null = null
   private editorView: EditorView | null = null
+  private settle: ((html: string | null) => void) | null = null
 
   constructor(stateManager: StateManager) {
     this.stateManager = stateManager
   }
 
+  // Writes each edit to `element` live. Resolves the edited HTML on Apply,
+  // or null on cancel or cleanup(); the caller restores `element`'s children.
+  // Rejects, with the editor UI removed, if building the editor throws.
   async show(element: Element, currentHtml: string): Promise<string | null> {
-    return new Promise((resolve) => {
-      // Store original HTML for cancellation
-      const originalHtml = element.innerHTML
+    this.cleanup()
+    // open() stores the session's resolver and mounts synchronously, so
+    // these identify this session's state even if a newer show() replaces
+    // it before the rejection below is handled.
+    const opened = this.open(element, currentHtml)
+    const settle = this.settle
+    const host = this.editorHost
+    const style = document.getElementById("absmartly-html-editor-styles")
+    try {
+      return await opened
+    } catch (error) {
+      if (this.settle === settle) {
+        this.cleanup()
+      } else {
+        host?.remove()
+        style?.remove()
+      }
+      throw error
+    }
+  }
+
+  private open(element: Element, currentHtml: string): Promise<string | null> {
+    return new Promise((resolvePromise) => {
+      // Defined before the resolver is stored: settling, which cleanup()
+      // can do from then on, removes this listener.
+      const escapeHandler = (e: KeyboardEvent) => {
+        if (e.key === "Escape" && this.editorHost) {
+          resolve(null)
+          this.cleanup()
+        }
+      }
+      const resolve = (html: string | null) => {
+        if (this.settle !== resolve) return
+        this.settle = null
+        document.removeEventListener("keydown", escapeHandler)
+        resolvePromise(html)
+      }
+      this.settle = resolve
 
       // Create editor host in regular DOM
       this.editorHost = document.createElement("div")
@@ -63,7 +102,11 @@ export class HtmlEditor {
 
       const tagInfo = document.createElement("span")
       tagInfo.className = "editor-tag-info"
-      tagInfo.textContent = `<${element.tagName.toLowerCase()}${element.className ? `.${element.className.split(" ").join(".")}` : ""}>`
+      // getAttribute: an SVG element's className is an SVGAnimatedString.
+      const classes = (element.getAttribute("class") ?? "")
+        .split(/\s+/)
+        .filter(Boolean)
+      tagInfo.textContent = `<${element.tagName.toLowerCase()}${classes.map((c) => `.${c}`).join("")}>`
 
       header.appendChild(title)
       header.appendChild(tagInfo)
@@ -118,6 +161,7 @@ export class HtmlEditor {
 
       const cancelBtn = document.createElement("button")
       cancelBtn.className = "editor-button editor-button-cancel"
+      cancelBtn.id = "html-editor-cancel-button"
       cancelBtn.innerHTML = "<span>✕</span> Cancel"
 
       const saveBtn = document.createElement("button")
@@ -140,6 +184,8 @@ export class HtmlEditor {
 
       // Create CodeMirror editor
       setTimeout(() => {
+        // Closed before the editor was built.
+        if (this.settle !== resolve) return
         const startState = EditorState.create({
           doc: this.formatHtml(currentHtml),
           extensions: [
@@ -194,10 +240,8 @@ export class HtmlEditor {
       cancelBtn.addEventListener("click", (e) => {
         e.stopPropagation()
         e.preventDefault()
-        // Restore original HTML
-        element.innerHTML = originalHtml
-        this.cleanup()
         resolve(null)
+        this.cleanup()
       })
 
       saveBtn.addEventListener("click", (e) => {
@@ -206,30 +250,18 @@ export class HtmlEditor {
         e.preventDefault()
         const newHtml = this.editorView?.state.doc.toString() || ""
         debugLog("[HtmlEditor] New HTML:", newHtml)
-        this.cleanup()
-        debugLog("[HtmlEditor] Cleanup done, resolving...")
         resolve(newHtml)
+        this.cleanup()
       })
 
       // Handle ESC key
-      const escapeHandler = (e: KeyboardEvent) => {
-        if (e.key === "Escape" && this.editorHost) {
-          document.removeEventListener("keydown", escapeHandler)
-          // Restore original HTML
-          element.innerHTML = originalHtml
-          this.cleanup()
-          resolve(null)
-        }
-      }
       document.addEventListener("keydown", escapeHandler)
 
       // Prevent backdrop clicks from closing (only click outside container)
       backdrop.addEventListener("click", (e) => {
         if (e.target === backdrop) {
-          // Restore original HTML
-          element.innerHTML = originalHtml
-          this.cleanup()
           resolve(null)
+          this.cleanup()
         }
       })
 
@@ -279,7 +311,11 @@ export class HtmlEditor {
       .join("\n")
   }
 
-  private cleanup(): void {
+  // Removes the editor. An open show() that has not resolved yet (the
+  // visual editor is being torn down) resolves null.
+  cleanup(): void {
+    this.settle?.(null)
+
     if (this.editorView) {
       this.editorView.destroy()
       this.editorView = null

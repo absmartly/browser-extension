@@ -1,5 +1,8 @@
 declare module "@absmartly/sdk-plugins/core/dom-manipulator" {
+  import type { PendingChangeManager } from "@absmartly/sdk-plugins/core/pending-change-manager"
+
   export class DOMManipulatorLite {
+    protected pendingManager: PendingChangeManager
     constructor(debug?: boolean, plugin?: Record<string, any>)
     applyDOMChanges(
       changes: any[],
@@ -9,6 +12,21 @@ declare module "@absmartly/sdk-plugins/core/dom-manipulator" {
     applyChange(change: any, experimentName: string): boolean
     undoDOMChanges(experimentName: string): void
     undoAllDOMChanges(): void
+    destroy(): void
+  }
+}
+
+declare module "@absmartly/sdk-plugins/core/pending-change-manager" {
+  export class PendingChangeManager {
+    constructor(
+      applyFn: (
+        change: any,
+        experimentName: string,
+        element?: Element
+      ) => boolean,
+      debug?: boolean
+    )
+    destroy(): void
   }
 }
 
