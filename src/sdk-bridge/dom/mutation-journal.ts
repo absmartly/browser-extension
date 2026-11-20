@@ -146,17 +146,6 @@ function declarations(
 const sameDeclaration = (a?: Declaration, b?: Declaration) =>
   a?.value === b?.value && a?.priority === b?.priority
 
-// Declarations whose value differs between the entry's old and new style.
-function changedDeclarations(entry: AttributeState) {
-  const doc = entry.target.ownerDocument
-  const before = declarations(doc, entry.oldValue)
-  const after = declarations(doc, entry.newValue)
-  const names = new Set([...before.keys(), ...after.keys()])
-  return Array.from(names)
-    .filter((name) => !sameDeclaration(before.get(name), after.get(name)))
-    .map((name) => ({ name, before: before.get(name), after: after.get(name) }))
-}
-
 function writeDeclaration(
   style: CSSStyleDeclaration,
   name: string,
@@ -168,21 +157,23 @@ function writeDeclaration(
 }
 
 // The inline style has changed since the entry was recorded: restore each
-// declaration the entry changed only where it still holds the entry's
-// value, leaving declarations written by others in place.
+// declaration whose value differs between the entry's old and new style,
+// only where it still holds the entry's value, leaving declarations
+// written by others in place.
 function undoStyleDeclarations(entry: AttributeState): void {
   const element = entry.target as Element & ElementCSSInlineStyle
-  const current = declarations(
-    element.ownerDocument,
-    element.getAttribute("style")
-  )
-  for (const { name, before, after } of changedDeclarations(entry)) {
-    if (sameDeclaration(current.get(name), after))
-      writeDeclaration(element.style, name, before)
+  const doc = element.ownerDocument
+  const current = declarations(doc, element.getAttribute("style"))
+  const before = declarations(doc, entry.oldValue)
+  const after = declarations(doc, entry.newValue)
+  for (const name of new Set([...before.keys(), ...after.keys()])) {
+    const old = before.get(name)
+    const written = after.get(name)
+    if (sameDeclaration(old, written)) continue
+    if (sameDeclaration(current.get(name), written))
+      writeDeclaration(element.style, name, old)
   }
-  const originallyEmpty =
-    declarations(element.ownerDocument, entry.oldValue).size === 0
-  if (element.style.length === 0 && originallyEmpty) {
+  if (element.style.length === 0 && before.size === 0) {
     if (entry.oldValue === null) element.removeAttribute("style")
     else element.setAttribute("style", entry.oldValue)
   }
