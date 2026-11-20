@@ -85,13 +85,9 @@ function attributeValue(
   return target.getAttributeNodeNS(namespace, name)?.value ?? null
 }
 
-// A record's attributeName is the local name; with a null namespace it may
-// contain a colon (`x-on:click`). Lookup and removal by (namespace, local
-// name) accept that, but setAttributeNS parses the colon as a prefix and
-// throws NamespaceError, so such an attribute is re-created with
-// setAttribute. That lowercases only on HTML elements, where a colon name
-// can only have been stored lowercase; other names keep setAttributeNS so
-// the exact case (SVG `viewBox`) is preserved.
+// Null-namespace colon names and ordinary HTML xmlns cannot be recreated
+// with setAttributeNS. Use the ordinary attribute operation for these names;
+// other names keep setAttributeNS to preserve case such as SVG viewBox.
 function writeAttribute(
   target: Element,
   namespace: string | null,
@@ -104,7 +100,7 @@ function writeAttribute(
   }
   const attr = target.getAttributeNodeNS(namespace, name)
   if (attr) attr.value = value
-  else if (namespace === null && name.includes(":"))
+  else if (namespace === null && (name.includes(":") || name === "xmlns"))
     target.setAttribute(name, value)
   else target.setAttributeNS(namespace, name, value)
 }

@@ -282,6 +282,98 @@ test("attribute preview removal restores colon-named attributes and SVG viewBox 
   expect(await attributes("colon-svg")).toEqual(before.svg)
 })
 
+test("packaged preview removal replays root attributes with parser-created xmlns", async ({
+  page,
+  origin
+}) => {
+  await page.route(`${origin}/visual-editor-test.html`, async (route) => {
+    const response = await route.fetch()
+    const html = await response.text()
+    await route.fulfill({
+      response,
+      body: html.replace(
+        "<html>",
+        '<html xmlns="http://www.w3.org/1999/xhtml">'
+      )
+    })
+  })
+  await openPreviewPage(page, origin)
+  await page.evaluate(() => {
+    document.documentElement.id = "preview-page-root"
+    document.documentElement.title = "Original root title"
+    document.getElementById("test-paragraph")!.title =
+      "Original paragraph title"
+  })
+  const root = page.locator("#preview-page-root")
+  const paragraph = page.locator("#test-paragraph")
+  await expect(root).toHaveAttribute("xmlns", "http://www.w3.org/1999/xhtml")
+  expect(
+    await root.evaluate((el) => el.getAttributeNode("xmlns")!.namespaceURI)
+  ).toBeNull()
+  const snapshot = () =>
+    page.evaluate(() => {
+      const attributes = (el: Element) =>
+        Array.from(el.attributes, (attr) => ({
+          name: attr.name,
+          value: attr.value,
+          namespaceURI: attr.namespaceURI
+        }))
+      return {
+        root: attributes(document.documentElement),
+        body: attributes(document.body),
+        paragraph: attributes(document.getElementById("test-paragraph")!),
+        elementCount: document.querySelectorAll("*").length
+      }
+    })
+  const before = await snapshot()
+  const sendA = await previewSender(page, "preview-parser-xmlns-a")
+  const sendB = await previewSender(page, "preview-parser-xmlns-b")
+  await sendA("apply", [
+    {
+      selector: "#test-paragraph",
+      type: "attribute",
+      value: { title: "Preview A paragraph title" }
+    }
+  ])
+  await expect(paragraph).toHaveAttribute("title", "Preview A paragraph title")
+  await sendB("apply", [
+    {
+      selector: "#preview-page-root",
+      type: "attribute",
+      value: { title: "Preview B root title", xmlns: null }
+    }
+  ])
+  await expect(root).toHaveAttribute("title", "Preview B root title")
+  await expect(root).not.toHaveAttribute("xmlns", /.*/)
+  await expect(paragraph).toHaveAttribute("title", "Preview A paragraph title")
+
+  await sendA("remove")
+  await expect(paragraph).toHaveAttribute("title", "Original paragraph title")
+  await expect(root).toHaveAttribute("title", "Preview B root title")
+  await expect(root).not.toHaveAttribute("xmlns", /.*/)
+  await expect(root).toHaveAttribute(
+    "data-absmartly-experiment",
+    "preview-parser-xmlns-b"
+  )
+  await expect
+    .poll(async () => (await snapshot()).paragraph)
+    .toEqual(before.paragraph)
+
+  await sendB("remove")
+  await expect(root).toHaveAttribute("title", "Original root title")
+  await expect(root).toHaveAttribute("xmlns", "http://www.w3.org/1999/xhtml")
+  await expect(
+    page.locator(
+      "[data-absmartly-experiment], [data-absmartly-modified], [data-absmartly-original]"
+    )
+  ).toHaveCount(0)
+  await expect(page.locator("#absmartly-preview-header-host")).toHaveCount(0)
+  await expect.poll(snapshot).toEqual(before)
+  expect(
+    await root.evaluate((el) => el.getAttributeNode("xmlns")!.namespaceURI)
+  ).toBeNull()
+})
+
 test("created preview nodes are removed for every insertion position", async ({
   page,
   origin

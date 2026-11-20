@@ -406,6 +406,45 @@ describe("PreviewManager", () => {
     expect(deleted.nextSibling).toBe(byId("y"))
   })
 
+  it("restores null-namespace xmlns while removing an earlier preview", () => {
+    document.open()
+    document.write(
+      '<!doctype html><html xmlns="http://www.w3.org/1999/xhtml" title="root"><head></head><body><p id="p" title="paragraph">P</p></body></html>'
+    )
+    document.close()
+    const root = document.documentElement
+    const original = root.outerHTML
+    expect(root.getAttributeNode("xmlns").namespaceURI).toBeNull()
+    manager.applyPreviewChange(
+      { selector: "#p", type: "attribute", value: { title: "A" } },
+      "A"
+    )
+    manager.applyPreviewChange(
+      {
+        selector: "html",
+        type: "attribute",
+        value: { title: "B", xmlns: null }
+      } as DOMChange,
+      "B"
+    )
+    expect(byId("p").getAttribute("title")).toBe("A")
+    expect(root.getAttribute("title")).toBe("B")
+    expect(root.hasAttribute("xmlns")).toBe(false)
+
+    manager.removePreviewChanges("A")
+    expect(byId("p").getAttribute("title")).toBe("paragraph")
+    expect(root.getAttribute("title")).toBe("B")
+    expect(root.hasAttribute("xmlns")).toBe(false)
+    expect(manager.getPreviewCount()).toBe(1)
+
+    manager.removePreviewChanges("B")
+    expect(root.getAttributeNode("xmlns").namespaceURI).toBeNull()
+    expect(root.outerHTML).toBe(original)
+    expect(manager.getPreviewCount()).toBe(0)
+    root.removeAttribute("xmlns")
+    root.removeAttribute("title")
+  })
+
   describe("attribute names with a colon and no namespace", () => {
     it("removes an x-on:click an attribute preview added and undoes the other change", () => {
       document.body.innerHTML = '<p id="p" title="orig">P</p>'
