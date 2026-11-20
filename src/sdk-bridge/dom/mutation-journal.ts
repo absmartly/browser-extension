@@ -202,34 +202,69 @@ function isWithinRetiredSubtree(node: Node, retiredRoots: Set<Node>): boolean {
   return false
 }
 
+// Latest value entry per attribute (keyed by namespace and name) and per
+// text node. Entries under a detached subtree are kept apart in a retired
+// state so a reattached node gets its entries back.
+type JournalState = {
+  attributes: Map<Element, Map<string, AttributeState>>
+  characterData: Map<CharacterData, CharacterDataState>
+}
+
+const emptyState = (): JournalState => ({
+  attributes: new Map(),
+  characterData: new Map()
+})
+
+function settle(state: ValueEntry): void {
+  if (state.kind === "attributes")
+    state.newValue = attributeValue(state.target, state.namespace, state.name)
+  else state.newValue = state.target.data
+}
+
+function settleAll(journal: JournalState): void {
+  for (const states of journal.attributes.values()) {
+    for (const state of states.values()) settle(state)
+  }
+  for (const state of journal.characterData.values()) settle(state)
+}
+
+// Moves `node`'s entries from one state to the other, settling their
+// values first when `settleValues` is set.
+function transfer(
+  node: Node,
+  from: JournalState,
+  to: JournalState,
+  settleValues: boolean
+): void {
+  if (node.nodeType === Node.ELEMENT_NODE) {
+    const element = node as Element
+    const states = from.attributes.get(element)
+    if (!states) return
+    if (settleValues) for (const state of states.values()) settle(state)
+    from.attributes.delete(element)
+    to.attributes.set(element, states)
+  } else if (
+    node.nodeType === Node.TEXT_NODE ||
+    node.nodeType === Node.CDATA_SECTION_NODE
+  ) {
+    const character = node as CharacterData
+    const state = from.characterData.get(character)
+    if (!state) return
+    if (settleValues) settle(state)
+    from.characterData.delete(character)
+    to.characterData.set(character, state)
+  }
+}
+
 function restoreAttachedSubtree(
   node: Node,
   retiredRoots: Set<Node>,
-  attributes: Map<Element, Map<string, AttributeState>>,
-  characterData: Map<CharacterData, CharacterDataState>,
-  retiredAttributes: Map<Element, Map<string, AttributeState>>,
-  retiredCharacterData: Map<CharacterData, CharacterDataState>
+  active: JournalState,
+  retired: JournalState
 ): void {
   const visit = (current: Node) => {
     retiredRoots.delete(current)
-    if (current.nodeType === Node.ELEMENT_NODE) {
-      const element = current as Element
-      const states = retiredAttributes.get(element)
-      if (states) {
-        attributes.set(element, states)
-        retiredAttributes.delete(element)
-      }
-    } else if (
-      current.nodeType === Node.TEXT_NODE ||
-      current.nodeType === Node.CDATA_SECTION_NODE
-    ) {
-      const character = current as CharacterData
-      const state = retiredCharacterData.get(character)
-      if (state) {
-        characterData.set(character, state)
-        retiredCharacterData.delete(character)
-      }
-    }
+    transfer(current, retired, active, false)
     for (const child of current.childNodes) visit(child)
   }
   visit(node)
@@ -238,42 +273,15 @@ function restoreAttachedSubtree(
 function markDetached(
   node: Node,
   retiredRoots: Set<Node>,
-  attributes: Map<Element, Map<string, AttributeState>>,
-  characterData: Map<CharacterData, CharacterDataState>,
-  retiredAttributes: Map<Element, Map<string, AttributeState>>,
-  retiredCharacterData: Map<CharacterData, CharacterDataState>,
+  active: JournalState,
+  retired: JournalState,
   diagnostics?: MutationJournalDiagnostics
 ): void {
   if (isWithinRetiredSubtree(node, retiredRoots)) return
   retiredRoots.add(node)
   const visit = (current: Node) => {
     diagnostics && (diagnostics.detachedSubtreeVisits += 1)
-    if (current.nodeType === Node.ELEMENT_NODE) {
-      const element = current as Element
-      const states = attributes.get(element)
-      if (states) {
-        for (const state of states.values()) {
-          state.newValue = attributeValue(
-            state.target,
-            state.namespace,
-            state.name
-          )
-        }
-        attributes.delete(element)
-        retiredAttributes.set(element, states)
-      }
-    } else if (
-      current.nodeType === Node.TEXT_NODE ||
-      current.nodeType === Node.CDATA_SECTION_NODE
-    ) {
-      const character = current as CharacterData
-      const state = characterData.get(character)
-      if (state) {
-        state.newValue = character.data
-        characterData.delete(character)
-        retiredCharacterData.set(character, state)
-      }
-    }
+    transfer(current, active, retired, true)
     for (const child of current.childNodes) visit(child)
   }
   visit(node)
@@ -284,99 +292,50 @@ function toEntries(
   diagnostics?: MutationJournalDiagnostics
 ): JournalEntry[] {
   const entries: JournalEntry[] = []
-  const attributes = new Map<Element, Map<string, AttributeState>>()
-  const characterData = new Map<CharacterData, CharacterDataState>()
+  const active = emptyState()
+  const retired = emptyState()
   const retiredRoots = new Set<Node>()
-  const retiredAttributes = new Map<Element, Map<string, AttributeState>>()
-  const retiredCharacterData = new Map<CharacterData, CharacterDataState>()
 
   for (const record of records) {
     diagnostics && (diagnostics.records += 1)
-    if (record.type === "childList") {
-      for (const added of record.addedNodes)
-        restoreAttachedSubtree(
-          added,
-          retiredRoots,
-          attributes,
-          characterData,
-          retiredAttributes,
-          retiredCharacterData
-        )
-      for (const removed of record.removedNodes)
-        markDetached(
-          removed,
-          retiredRoots,
-          attributes,
-          characterData,
-          retiredAttributes,
-          retiredCharacterData,
-          diagnostics
-        )
-      entries.push(toEntry(record))
-      continue
-    }
-
-    if (record.type === "attributes") {
-      const entry = toEntry(record) as Extract<
-        JournalEntry,
-        { kind: "attributes" }
-      >
-      const key = `${record.attributeNamespace ?? ""}\u0000${record.attributeName ?? ""}`
-      const retired = retiredAttributes.get(entry.target)?.get(key)
-      if (retired || isWithinRetiredSubtree(entry.target, retiredRoots)) {
-        if (retired) retired.newValue = entry.oldValue
-        let states = retiredAttributes.get(entry.target)
-        if (!states) {
-          states = new Map()
-          retiredAttributes.set(entry.target, states)
-        }
-        states.set(key, entry)
-      } else {
-        let states = attributes.get(entry.target)
-        if (!states) {
-          states = new Map()
-          attributes.set(entry.target, states)
-        }
-        const previous = states.get(key)
-        if (previous) previous.newValue = entry.oldValue
-        states.set(key, entry)
-      }
-      entries.push(entry)
-      continue
-    }
-
-    const entry = toEntry(record) as Extract<
-      JournalEntry,
-      { kind: "characterData" }
-    >
-    if (isWithinRetiredSubtree(entry.target, retiredRoots)) {
-      const previous = retiredCharacterData.get(entry.target)
-      if (previous) previous.newValue = entry.oldValue
-      retiredCharacterData.set(entry.target, entry)
-    } else {
-      const previous = characterData.get(entry.target)
-      if (previous) previous.newValue = entry.oldValue
-      characterData.set(entry.target, entry)
-    }
+    const entry = toEntry(record)
     entries.push(entry)
+    if (entry.kind === "childList") {
+      for (const added of record.addedNodes)
+        restoreAttachedSubtree(added, retiredRoots, active, retired)
+      for (const removed of record.removedNodes)
+        markDetached(removed, retiredRoots, active, retired, diagnostics)
+      continue
+    }
+
+    if (entry.kind === "attributes") {
+      const key = `${entry.namespace ?? ""}\u0000${entry.name ?? ""}`
+      const journal =
+        retired.attributes.get(entry.target)?.has(key) ||
+        isWithinRetiredSubtree(entry.target, retiredRoots)
+          ? retired
+          : active
+      let states = journal.attributes.get(entry.target)
+      if (!states) {
+        states = new Map()
+        journal.attributes.set(entry.target, states)
+      }
+      const previous = states.get(key)
+      if (previous) previous.newValue = entry.oldValue
+      states.set(key, entry)
+      continue
+    }
+
+    const journal = isWithinRetiredSubtree(entry.target, retiredRoots)
+      ? retired
+      : active
+    const previous = journal.characterData.get(entry.target)
+    if (previous) previous.newValue = entry.oldValue
+    journal.characterData.set(entry.target, entry)
   }
 
-  for (const states of attributes.values()) {
-    for (const state of states.values()) {
-      state.newValue = attributeValue(state.target, state.namespace, state.name)
-    }
-  }
-  for (const state of characterData.values()) {
-    state.newValue = state.target.data
-  }
-  for (const states of retiredAttributes.values()) {
-    for (const state of states.values()) {
-      state.newValue = attributeValue(state.target, state.namespace, state.name)
-    }
-  }
-  for (const state of retiredCharacterData.values()) {
-    state.newValue = state.target.data
-  }
+  settleAll(active)
+  settleAll(retired)
   return entries
 }
 
