@@ -1107,6 +1107,23 @@ describe("PreviewManager", () => {
     }
   )
 
+  it("retains an empty style attribute the page wrote after a style preview", () => {
+    document.body.innerHTML = '<div id="h">H</div>'
+    const element = byId("h")
+    expect(element.getAttribute("style")).toBeNull()
+
+    manager.applyPreviewChange(
+      { selector: "#h", type: "style", value: { color: "red" } },
+      "exp"
+    )
+    expect(element.style.color).toBe("red")
+
+    element.setAttribute("style", "")
+    manager.removePreviewChanges("exp")
+
+    expect(element.getAttribute("style")).toBe("")
+  })
+
   it("restores the exact original style when the preview removed the attribute", () => {
     document.body.innerHTML = '<div id="h" style="color: red">H</div>'
     const element = byId("h")

@@ -166,14 +166,17 @@ function undoStyleDeclarations(entry: AttributeState): void {
   const current = declarations(doc, element.getAttribute("style"))
   const before = declarations(doc, entry.oldValue)
   const after = declarations(doc, entry.newValue)
+  let reverted = false
   for (const name of new Set([...before.keys(), ...after.keys()])) {
     const old = before.get(name)
     const written = after.get(name)
     if (sameDeclaration(old, written)) continue
-    if (sameDeclaration(current.get(name), written))
+    if (sameDeclaration(current.get(name), written)) {
       writeDeclaration(element.style, name, old)
+      reverted = true
+    }
   }
-  if (element.style.length === 0 && before.size === 0) {
+  if (reverted && element.style.length === 0 && before.size === 0) {
     if (entry.oldValue === null) element.removeAttribute("style")
     else element.setAttribute("style", entry.oldValue)
   }
