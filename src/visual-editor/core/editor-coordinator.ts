@@ -460,9 +460,12 @@ export class EditorCoordinator {
       return typed
     }
     const discard = () => {
-      undoMutations(endSession())
-      element.classList.remove("absmartly-editing")
-      this.eventHandlers.setEditing(false)
+      try {
+        undoMutations(endSession())
+      } finally {
+        element.classList.remove("absmartly-editing")
+        this.eventHandlers.setEditing(false)
+      }
     }
     this.pendingLiveEdit = discard
 
