@@ -480,7 +480,8 @@ export function undoMutations(entries: JournalEntry[]): void {
   }
   for (const entry of entries) countReinserts(entry, 1)
 
-  const failures: unknown[] = []
+  let firstError: unknown
+  let hasError = false
   for (let i = entries.length - 1; i >= 0; i--) {
     const entry = entries[i]
     countReinserts(entry, -1)
@@ -488,10 +489,13 @@ export function undoMutations(entries: JournalEntry[]): void {
       undoEntry(entry, (node) => (pendingReinserts.get(node) ?? 0) > 0)
     } catch (error) {
       Logger.error("[MutationJournal] Undoing an entry failed:", error)
-      failures.push(error)
+      if (!hasError) {
+        firstError = error
+        hasError = true
+      }
     }
   }
-  if (failures.length > 0) throw failures[0]
+  if (hasError) throw firstError
 }
 
 function undoEntry(
