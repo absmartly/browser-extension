@@ -677,22 +677,7 @@ function getSelectorPart(element: Element, isTarget: boolean): string {
 
     // If no semantic classes or data attributes, use positional selector
     // This is crucial for Framer sites where all classes are auto-generated
-    if (element.parentElement) {
-      const siblings = Array.from(element.parentElement.children).filter(
-        (child) => child.tagName === element.tagName
-      )
-      if (siblings.length > 1) {
-        const index = siblings.indexOf(element) + 1
-        // Add any name attributes even with positional selector
-        if (attributes.length > 0) {
-          return `${tagName}:nth-of-type(${index})${attributes.join("")}`
-        }
-        return `${tagName}:nth-of-type(${index})`
-      }
-    }
-
-    // Return tag with any attributes we found
-    return attributes.length > 0 ? `${tagName}${attributes.join("")}` : tagName
+    return element.parentElement ? positionalPart(element) : tagName
   }
 
   // For parent elements, be less specific but still include name attributes
@@ -709,15 +694,8 @@ function getSelectorPart(element: Element, isTarget: boolean): string {
   }
 
   // Use nth-of-type for uniqueness if needed
-  if (element.parentElement && selector === tagName) {
-    const siblings = Array.from(element.parentElement.children).filter(
-      (child) => child.tagName === element.tagName
-    )
-    if (siblings.length > 1) {
-      const index = siblings.indexOf(element) + 1
-      return `${tagName}:nth-of-type(${index})`
-    }
-  }
+  if (element.parentElement && selector === tagName)
+    return positionalPart(element)
 
   return selector
 }
