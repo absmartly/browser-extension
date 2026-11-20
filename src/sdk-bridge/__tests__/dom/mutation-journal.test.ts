@@ -29,6 +29,26 @@ describe("recordMutations when apply throws", () => {
   })
 })
 
+describe("undoing an entry whose inverse throws", () => {
+  it("still undoes the older entries and rethrows the first error", () => {
+    // The parser accepts `@click`; setAttribute rejects it, so re-creating
+    // it after a removal throws InvalidCharacterError.
+    document.body.innerHTML = '<p id="p" title="orig" @click="go">P</p>'
+    const p = document.getElementById("p")
+    const { entries } = recordMutations([document], () => {
+      p.setAttribute("title", "preview")
+      p.textContent = "preview"
+      p.removeAttribute("@click")
+    })
+
+    expect(() => undoMutations(entries)).toThrow(
+      expect.objectContaining({ name: "InvalidCharacterError" })
+    )
+    expect(p.getAttribute("title")).toBe("orig")
+    expect(p.textContent).toBe("P")
+  })
+})
+
 describe("undoing a removal after the page moved its siblings", () => {
   // The preview removes one child of #r; the page then rearranges #r's other
   // children outside the journal; undo must put the child back in its slot.

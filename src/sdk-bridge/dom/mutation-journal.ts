@@ -13,6 +13,8 @@
  * @module MutationJournal
  */
 
+import { Logger } from "../utils/logger"
+
 export type JournalEntry =
   | {
       kind: "attributes"
@@ -81,6 +83,30 @@ function attributeValue(
   name: string
 ): string | null {
   return target.getAttributeNodeNS(namespace, name)?.value ?? null
+}
+
+// A record's attributeName is the local name; with a null namespace it may
+// contain a colon (`x-on:click`). Lookup and removal by (namespace, local
+// name) accept that, but setAttributeNS parses the colon as a prefix and
+// throws NamespaceError, so such an attribute is re-created with
+// setAttribute. That lowercases only on HTML elements, where a colon name
+// can only have been stored lowercase; other names keep setAttributeNS so
+// the exact case (SVG `viewBox`) is preserved.
+function writeAttribute(
+  target: Element,
+  namespace: string | null,
+  name: string,
+  value: string | null
+): void {
+  if (value === null) {
+    target.removeAttributeNS(namespace, name)
+    return
+  }
+  const attr = target.getAttributeNodeNS(namespace, name)
+  if (attr) attr.value = value
+  else if (namespace === null && name.includes(":"))
+    target.setAttribute(name, value)
+  else target.setAttributeNS(namespace, name, value)
 }
 
 type AttributeState = Extract<JournalEntry, { kind: "attributes" }>
@@ -491,7 +517,9 @@ export function restoreAttributeOrder(order: Map<Element, string[]>): void {
  * Invert entries newest-first, restoring the DOM they were recorded on.
  * An entry whose result something else has since overwritten (attribute
  * or text value, or a node it added) is left alone; an inline style is
- * then undone per declaration the page left alone.
+ * then undone per declaration the page left alone. An entry whose inverse
+ * throws does not stop the older ones; the first error is rethrown after
+ * all of them have run.
  */
 export function undoMutations(entries: JournalEntry[]): void {
   // How many not-yet-undone entries put each node back.
@@ -503,31 +531,37 @@ export function undoMutations(entries: JournalEntry[]): void {
   }
   for (const entry of entries) countReinserts(entry, 1)
 
+  const failures: unknown[] = []
   for (let i = entries.length - 1; i >= 0; i--) {
     const entry = entries[i]
     countReinserts(entry, -1)
-    if (entry.kind === "attributes") {
-      const { target, name, namespace, oldValue, newValue } = entry
-      const current = target.getAttributeNodeNS(namespace, name)?.value ?? null
-      if (current !== newValue) {
-        // A style attribute the page removed outright is the page's; the
-        // per-declaration fallback would re-create it.
-        if (isInlineStyle(entry) && current !== null)
-          undoStyleDeclarations(entry)
-        continue
-      }
-      if (oldValue === null) {
-        target.removeAttributeNS(namespace, name)
-      } else {
-        const attr = target.getAttributeNodeNS(namespace, name)
-        if (attr) attr.value = oldValue
-        else target.setAttributeNS(namespace, name, oldValue)
-      }
-    } else if (entry.kind === "characterData") {
-      if (entry.target.data === entry.newValue)
-        entry.target.data = entry.oldValue
-    } else {
-      undoChildList(entry, (node) => (pendingReinserts.get(node) ?? 0) > 0)
+    try {
+      undoEntry(entry, (node) => (pendingReinserts.get(node) ?? 0) > 0)
+    } catch (error) {
+      Logger.error("[MutationJournal] Undoing an entry failed:", error)
+      failures.push(error)
     }
+  }
+  if (failures.length > 0) throw failures[0]
+}
+
+function undoEntry(
+  entry: JournalEntry,
+  reinsertedLater: (node: Node) => boolean
+): void {
+  if (entry.kind === "attributes") {
+    const { target, name, namespace, oldValue, newValue } = entry
+    const current = attributeValue(target, namespace, name)
+    if (current !== newValue) {
+      // A style attribute the page removed outright is the page's; the
+      // per-declaration fallback would re-create it.
+      if (isInlineStyle(entry) && current !== null) undoStyleDeclarations(entry)
+      return
+    }
+    writeAttribute(target, namespace, name, oldValue)
+  } else if (entry.kind === "characterData") {
+    if (entry.target.data === entry.newValue) entry.target.data = entry.oldValue
+  } else {
+    undoChildList(entry, reinsertedLater)
   }
 }

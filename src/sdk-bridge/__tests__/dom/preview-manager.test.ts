@@ -406,6 +406,115 @@ describe("PreviewManager", () => {
     expect(deleted.nextSibling).toBe(byId("y"))
   })
 
+  describe("attribute names with a colon and no namespace", () => {
+    it("removes an x-on:click an attribute preview added and undoes the other change", () => {
+      document.body.innerHTML = '<p id="p" title="orig">P</p>'
+      const original = document.body.innerHTML
+
+      manager.applyPreviewChange(
+        { selector: "#p", type: "attribute", value: { title: "x" } },
+        "exp"
+      )
+      manager.applyPreviewChange(
+        { selector: "#p", type: "attribute", value: { "x-on:click": "go()" } },
+        "exp"
+      )
+      expect(byId("p").getAttribute("x-on:click")).toBe("go()")
+      // A later change of the same experiment drops it again, so undo
+      // re-creates it before removing it.
+      manager.applyPreviewChange(
+        {
+          selector: "#p",
+          type: "javascript",
+          value: "element.removeAttribute('x-on:click')"
+        },
+        "exp"
+      )
+      manager.removePreviewChanges("exp")
+
+      expect(byId("p").hasAttribute("x-on:click")).toBe(false)
+      expect(byId("p").getAttribute("title")).toBe("orig")
+      expect(unmarked()).toBe(original)
+    })
+
+    it("restores an x-on:click an attribute preview removed", () => {
+      document.body.innerHTML = '<p id="p" x-on:click="go()" title="orig">P</p>'
+      const original = document.body.innerHTML
+
+      manager.applyPreviewChange(
+        {
+          selector: "#p",
+          type: "attribute",
+          value: { "x-on:click": null, title: "x" }
+        } as DOMChange,
+        "exp"
+      )
+      expect(byId("p").hasAttribute("x-on:click")).toBe(false)
+      manager.removePreviewChanges("exp")
+
+      expect(byId("p").getAttribute("x-on:click")).toBe("go()")
+      expect(unmarked()).toBe(original)
+    })
+
+    it("restores a wire:click a javascript preview removed and undoes its other write", () => {
+      document.body.innerHTML =
+        '<button id="b" wire:click="save" title="orig">B</button>'
+      const original = document.body.innerHTML
+
+      manager.applyPreviewChange(
+        {
+          selector: "#b",
+          type: "javascript",
+          value:
+            "element.removeAttribute('wire:click'); element.setAttribute('title', 'js')"
+        },
+        "exp"
+      )
+      expect(byId("b").hasAttribute("wire:click")).toBe(false)
+      expect(byId("b").getAttribute("title")).toBe("js")
+      manager.removePreviewChanges("exp")
+
+      expect(byId("b").getAttribute("wire:click")).toBe("save")
+      expect(byId("b").getAttribute("title")).toBe("orig")
+      expect(unmarked()).toBe(original)
+    })
+
+    it("restores an SVG viewBox with its exact case", () => {
+      document.body.innerHTML =
+        '<svg id="s" viewBox="0 0 10 10" wire:ignore=""><rect id="r"></rect></svg>'
+      const original = document.body.innerHTML
+
+      manager.applyPreviewChange(
+        {
+          selector: "#s",
+          type: "javascript",
+          value:
+            "element.removeAttribute('viewBox'); element.removeAttribute('wire:ignore')"
+        },
+        "exp"
+      )
+      manager.applyPreviewChange(
+        {
+          selector: "#r",
+          type: "attribute",
+          value: { viewBox: "1 1 2 2" }
+        },
+        "exp"
+      )
+      expect(byId("s").hasAttribute("viewBox")).toBe(false)
+      manager.removePreviewChanges("exp")
+
+      expect(byId("s").getAttributeNames()).toEqual([
+        "id",
+        "viewBox",
+        "wire:ignore"
+      ])
+      expect(byId("s").getAttribute("viewBox")).toBe("0 0 10 10")
+      expect(byId("r").hasAttribute("viewBox")).toBe(false)
+      expect(unmarked()).toBe(original)
+    })
+  })
+
   describe("SPA pending changes", () => {
     const lateStyle: DOMChange = {
       selector: "#late",

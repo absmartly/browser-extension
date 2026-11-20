@@ -29,7 +29,9 @@ async function openPreviewPage(page: Page, origin: string) {
       <div id="style-host"><button id="host-button">Click</button><input id="host-input"><span id="host-span">Original</span></div>
       <div id="structural-parent"><p id="structural-child">Original child</p></div>
       <div id="create-anchor"><span id="create-anchor-child">Anchor child</span></div>
-      <div id="late-root"></div>`
+      <div id="late-root"></div>
+      <button id="colon-attrs" x-on:click="open = true" wire:click="save" title="orig">Colon</button>
+      <svg id="colon-svg" viewBox="0 0 10 10" wire:ignore=""></svg>`
     document.body.append(fixture)
     const win = window as typeof window & { previewNodes?: Record<string, Element>; previewClicks?: number }
     win.previewClicks = 0
@@ -106,6 +108,29 @@ test('overlapping ancestor and descendant previews restore one original descenda
   await expect(page.locator('#structural-child')).toHaveText('Original child')
   await expect(page.locator('#structural-parent > p')).toHaveCount(1)
   expect(await sameNode(page, 'structural-child')).toBe(true)
+})
+
+test('attribute preview removal restores colon-named attributes and SVG viewBox exactly', async ({ page, origin }) => {
+  await openPreviewPage(page, origin)
+  const attributes = (id: string) => page.locator(`#${id}`).evaluate(el =>
+    el.getAttributeNames().map(name => [name, el.getAttribute(name)]))
+  const before = { button: await attributes('colon-attrs'), svg: await attributes('colon-svg') }
+  const send = await previewSender(page, 'preview-colon-attributes')
+  await send('apply', [
+    { selector: '#colon-attrs', type: 'attribute', value: { 'x-on:click': null, 'wire:click': null, title: 'preview' } },
+    { selector: '#colon-svg', type: 'attribute', value: { viewBox: null, 'wire:ignore': null } },
+    { selector: '#preview-sentinel', type: 'attribute', value: { 'x-on:click': 'added' } },
+  ])
+  await expect(page.locator('#colon-attrs')).toHaveAttribute('title', 'preview')
+  await expect(page.locator('#preview-sentinel')).toHaveAttribute('x-on:click', 'added')
+  expect(await page.locator('#colon-svg').evaluate(el => el.hasAttribute('viewBox'))).toBe(false)
+
+  await send('remove')
+  await expect(page.locator('#colon-attrs')).toHaveAttribute('title', 'orig')
+  await expect(page.locator('#colon-attrs')).not.toHaveAttribute('data-absmartly-modified', 'true')
+  await expect(page.locator('#preview-sentinel')).not.toHaveAttribute('x-on:click', /.*/)
+  expect(await attributes('colon-attrs')).toEqual(before.button)
+  expect(await attributes('colon-svg')).toEqual(before.svg)
 })
 
 test('created preview nodes are removed for every insertion position', async ({ page, origin }) => {
